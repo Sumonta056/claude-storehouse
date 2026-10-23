@@ -6,6 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-24
+
+This release adds a Duplicates page that finds skills, agents, and MCP servers that use the same name, so you can see which ones Claude Code loads and keep only the one you want.
+
+### Added
+
+- Duplicates page: groups skills, agents, and MCP servers of one type that have the same name, across global, project, and plugin scopes. A group shows "Conflict" when more than one item in it is on, and "OK" when one or none is on. The sidebar count shows the groups that need action.
+- "Keep only this" on each item in a group switches off the other items that have their own switch. Plugin items show the plugin that controls them.
+- A group notes when its items have the same description, which usually means that one item is a copy of the other.
+- The website and the live demo show the new page.
+
+### Changed
+
+- The `open` dependency is now version 11. Node 20 or later is still required.
+- Development: Node 24 is pinned for development, the dev tools and GitHub Actions are updated, the code passes the ESLint 10 rules, and the npm package has more keywords.
+
 ## [1.1.0] - 2026-10-23
 
 This release adds a usage band that shows what your Claude Code use would cost at API prices, a Mods page, a new Activity panel, and a website with a live demo.
@@ -87,6 +103,7 @@ First stable release. Claude Storehouse is a local web dashboard for your Claude
 - New README with screenshots, MIT license, and full npm package metadata.
 - Development: ESLint, Prettier, Husky, and commitlint; CI on Node 20 and 22 on Ubuntu and macOS; tag-driven npm publish with provenance.
 
-[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sumonta056/claude-storehouse/releases/tag/v1.0.0

@@ -251,6 +251,8 @@ Tests never touch your real `~/.claude`. Each one makes a fake home with `fs.mkd
 
 ## Changelog
 
+- **1.2.0** — Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
+  - Duplicates page for skills, agents, and MCP servers that use the same name, with "Keep only this".
 - **1.1.0** — Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
   - Dashboard usage band: API-equal cost, tokens, sessions, and prompt-cache savings, from token counts only.
   - Mods page for installed mods and mods in development.
