@@ -95,6 +95,14 @@ Target file per scope:
 - A favorite whose item is gone shows "missing" with a remove button.
 - Drag to reorder.
 
+## Duplicates
+
+- The Duplicates page groups skills, agents, and MCP servers of one kind that have the same name. A skill and an agent with one name do not make a group.
+- The browser builds the groups from `GET /api/inventory`. There is no server code for it.
+- A group shows "Conflict" when more than one item in it is on, and "OK" when one or none is on. The nav count is the number of Conflict groups.
+- "Keep only this" switches off the other items in the group that have their own switch. Plugin items stay on and the page names the plugin.
+- Similar names (shared words, not the same name) are out of scope. A word match gave about 170 false groups on a real setup.
+
 ## Undo, delete, fork
 
 - Toggles and favorites undo with the inverse operation. Two toggles on one file undo independently.

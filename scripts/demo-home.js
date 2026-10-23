@@ -37,6 +37,7 @@ const userSkills = [
   ['security-review', 'Check a diff for injection, leaked keys, and unsafe input handling.'],
   ['sql-explain', 'Read an EXPLAIN plan and suggest indexes.'],
   ['test-first', 'Write a failing test before the fix, then make it pass.'],
+  ['debugging', 'Reproduce, isolate, fix, and guard a bug.'],
   ['ui-polish', 'Tighten spacing, contrast, and type scale on a page.']
 ]
 for (const [n, d] of userSkills) skill(path.join(claude, 'skills'), n, d)
@@ -123,6 +124,7 @@ write(path.join(home, '.claude.json'), {
 skill(path.join(project, '.claude', 'skills'), 'deploy-checklist', 'Run the pre-deploy checks for acme-api.')
 skill(path.join(project, '.claude', 'skills'), 'seed-data', 'Load demo data into the local database.')
 agent(path.join(project, '.claude', 'agents'), 'repo-guide', 'Answer questions about this repo layout.')
+agent(path.join(project, '.claude', 'agents'), 'code-reviewer', 'Review acme-api diffs against the team checklist.')
 write(path.join(project, '.claude', 'settings.json'), { permissions: { allow: ['Bash(npm test:*)'] } })
 write(path.join(project, 'CLAUDE.md'), '# acme-api\n\nRun `npm test` before you push.\n')
 write(path.join(project, '.mcp.json'), {

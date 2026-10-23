@@ -2967,6 +2967,26 @@ select {
   background: var(--accent-soft);
   color: var(--accent-text);
 }
+.gstate.bad {
+  background: var(--red-bg);
+  color: var(--red);
+}
+.gstate.ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+.dnote {
+  margin: 0;
+  max-width: 75ch;
+  font-size: 14px;
+  color: var(--muted);
+}
+.dnote code {
+  color: var(--text2);
+}
+.dnote b {
+  color: var(--text2);
+}
 .gbody {
   padding: 0 16px 14px 44px;
   display: flex;

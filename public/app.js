@@ -3,6 +3,7 @@ import { get, send } from './api.js'
 const PAGES = {
   dash: 'Dashboard',
   fav: 'Favorites',
+  dups: 'Duplicates',
   skills: 'Skills',
   agents: 'Agents',
   plugins: 'Plugins',
@@ -838,6 +839,10 @@ function kindIcon(kind, size = 24) {
 }
 
 const CHIPS = {
+  dups: [
+    ['all', 'All'],
+    ['needs', 'Needs action']
+  ],
   plugins: [
     ['all', 'All'],
     ['on', 'On'],
@@ -896,7 +901,7 @@ const SECTIONS = {
   ]
 }
 
-const chipFilter = { plugins: 'all', mods: 'all', skills: 'all', agents: 'all', hooks: 'all', mcp: 'all' }
+const chipFilter = { dups: 'all', plugins: 'all', mods: 'all', skills: 'all', agents: 'all', hooks: 'all', mcp: 'all' }
 const groupOpen = new Map()
 let menuKey = null
 let menuCtx = ''
@@ -997,9 +1002,20 @@ function metaHtml(item) {
   return ''
 }
 
-function rowHtml(item, ctx = '', { draggable = false, cat = null } = {}) {
+function dupSource(item) {
+  if (item.plugin) return `via plugin ${pluginLabel(item.plugin)}`
+  if (item.kind === 'mcp') return item.source
+  return item.scope === 'project' ? 'Project' : 'Global'
+}
+
+function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false } = {}) {
   const open = menuKey === item.key && menuCtx === ctx
-  const src = ctx === 'fav' && item.plugin ? `via plugin ${pluginLabel(item.plugin)}` : rowSource(item)
+  const src =
+    ctx === 'dups'
+      ? dupSource(item)
+      : ctx === 'fav' && item.plugin
+        ? `via plugin ${pluginLabel(item.plugin)}`
+        : rowSource(item)
   const off = item.canToggle && !item.enabled
   const desc = item.missing
     ? 'Listed in installed_plugins.json, but the plugin folder is gone.'
@@ -1019,6 +1035,7 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null } = {}) {
     ${ver ? `<span class="ver" title="${esc(fullVer)}">${esc(ver)}</span>` : ''}
     <div class="tail">
       ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
+      ${keep ? '<button type="button" class="btn" data-act="keep">Keep only this</button>' : ''}
       ${item.dev ? '' : `<button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`}
       <button type="button" class="icon-btn" data-act="menu" aria-haspopup="menu" aria-expanded="${open ? 'true' : 'false'}"${open ? ` aria-controls="menu-${slug(item.key)}"` : ''} aria-label="${esc(`More actions for ${item.name}`)}">${ICON.dots}</button>
     </div>
@@ -1045,6 +1062,7 @@ function keepChip(page, item) {
 }
 
 function chipCounts(page, list) {
+  if (page === 'dups') return { all: list.length, needs: list.filter(needsAction).length }
   const shown = list.filter(visible)
   if (page === 'mods') {
     const own = shown.filter((m) => !m.dev)
@@ -1113,6 +1131,86 @@ function pluginGroupsHtml(page, list) {
     })
     .join('')
   return `<h2>From plugins <span class="pill">${shown.length}</span><span class="hint">Grouped by plugin. These ${kind}s follow their plugin switch.</span></h2><div class="groups">${body}</div>`
+}
+
+const DUP_KINDS = [
+  ['skill', 'skill'],
+  ['agent', 'agent'],
+  ['mcp', 'MCP server']
+]
+
+function duplicateGroups() {
+  const groups = new Map()
+  for (const [kind] of DUP_KINDS)
+    for (const item of catalog[kind]) {
+      const key = `${kind}:${item.name}`
+      if (!groups.has(key)) groups.set(key, { key, kind, name: item.name, items: [] })
+      groups.get(key).items.push(item)
+    }
+  return [...groups.values()].filter((g) => g.items.length > 1)
+}
+
+function onCount(group) {
+  return group.items.filter((i) => i.enabled).length
+}
+
+function needsAction(group) {
+  return onCount(group) > 1
+}
+
+function dupGroupHtml(g) {
+  const word = new Map(DUP_KINDS).get(g.kind)
+  const on = onCount(g)
+  const bad = on > 1
+  const gk = `dup:${g.key}`
+  const open = groupOpen.has(gk) ? groupOpen.get(gk) : bad
+  const panel = `gp-dup-${slug(g.key)}`
+  const first = g.items[0].description
+  const notes = []
+  if (bad)
+    notes.push(
+      `Claude Code sees ${on} ${word}s named <code>${esc(g.name)}</code>. Switch off the ones you do not want.`
+    )
+  if (first && g.items.every((i) => i.description === first))
+    notes.push(`<b>Same description.</b> One ${word} looks like a copy of the other.`)
+  for (const i of g.items.filter((i) => bad && i.enabled && !i.canToggle && i.plugin))
+    notes.push(
+      `<code>${esc(i.name)}</code> follows the plugin <b>${esc(pluginLabel(i.plugin))}</b>. Switch the plugin off on the Plugins page, or keep it.`
+    )
+  const rows = g.items
+    .map((i) => rowHtml(i, 'dups', { keep: i.enabled && g.items.some((o) => o !== i && o.enabled && o.canToggle) }))
+    .join('')
+  const pill = bad
+    ? `<span class="gstate bad">Conflict · ${on} on</span>`
+    : `<span class="gstate ok">OK · ${on} on</span>`
+  return `<div class="pgroup">
+    <h3 class="ghead"><button type="button" class="gbtn" id="gb-dup-${slug(g.key)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(g.name)}</span><span class="gcount">${esc(plural(g.items.length, word))}</span>${pill}</button></h3>
+    <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? `<ul class="rows" data-rows="dups">${rows}</ul>${notes.map((n) => `<p class="dnote">${n}</p>`).join('')}` : ''}</div>
+  </div>`
+}
+
+function renderDups() {
+  const found = duplicateGroups()
+  const all = found.filter((g) => g.items.some(visible))
+  const shown = all.filter((g) => chipFilter.dups === 'all' || needsAction(g))
+  const note =
+    'Skills, agents, or MCP servers of one type that use the same name. Claude Code loads each one that is on. A group needs action when more than one item in it is on.'
+  let body
+  if (shown.length)
+    body = `<h2>Same name <span class="pill">${shown.length}</span><span class="hint">Conflict groups open first.</span></h2><div class="groups">${shown.map(dupGroupHtml).join('')}</div>`
+  else if (!found.length) body = empty('No duplicates. Each skill, agent, and MCP server has its own name.')
+  else if (all.length) body = empty('No group needs action. In each group, only one item is on.')
+  else body = nothingMatches()
+  $('p-dups').innerHTML = chipsHtml('dups', all, note) + body
+}
+
+async function keepOnly(item) {
+  const group = duplicateGroups().find((g) => g.items.includes(item))
+  const keys = group ? group.items.filter((i) => i !== item && i.enabled && i.canToggle).map((i) => i.key) : []
+  for (const key of keys) {
+    const other = items.get(key)
+    if (other?.enabled) await toggle(other)
+  }
 }
 
 function catalogBody(page, list) {
@@ -1222,6 +1320,7 @@ function renderNav() {
   $('n-mods').textContent = counts(catalog.mod).total
   $('n-hooks').textContent = otherCounts(inv.hooks).total
   $('n-mcp').textContent = otherCounts(inv.mcp).total
+  $('n-dups').textContent = duplicateGroups().filter(needsAction).length
   $('n-fav').textContent = favoriteEntries().filter((e) => !e.item || visible(e.item)).length
   for (const b of document.querySelectorAll('#nav button')) {
     if (b.dataset.p === state.page) b.setAttribute('aria-current', 'page')
@@ -1302,6 +1401,7 @@ function renderPage() {
   const page = state.page
   if (page === 'dash') renderDash()
   else if (page === 'fav') renderFav()
+  else if (page === 'dups') renderDups()
   else if (page === 'skills')
     renderCatalog(
       'skills',
@@ -4121,6 +4221,7 @@ function wire() {
     if (act?.dataset.act === 'toggle') return void toggle(item)
     if (act?.dataset.act === 'star') return void starItem(item, act)
     if (act?.dataset.act === 'del') return void deleteRow(item)
+    if (name === 'keep') return void keepOnly(item)
     if (name === 'uninstall') return void uninstallPlugin(item)
     if (name?.startsWith('m-')) {
       closeMenu()
