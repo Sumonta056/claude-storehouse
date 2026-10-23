@@ -27,6 +27,18 @@ function readBlock(lines, from, style) {
   return { value: text.trim(), next: i }
 }
 
+function readPlain(lines, from) {
+  const parts = []
+  let i = from
+  while (i < lines.length && (lines[i].trim() === '' || indentOf(lines[i]) > 0)) {
+    const text = lines[i].trim()
+    if (text.startsWith('#')) break
+    if (text) parts.push(text)
+    i++
+  }
+  return { value: parts.join(' '), next: i }
+}
+
 export function parseFrontmatter(text) {
   const source = typeof text === 'string' ? text : ''
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/)
@@ -47,6 +59,12 @@ export function parseFrontmatter(text) {
       if (list.length) meta[bare[1]] = list
       continue
     }
+    if (bare && KEEP.has(bare[1])) {
+      const read = readPlain(lines, i)
+      if (read.value) meta[bare[1]] = unquote(read.value)
+      i = read.next
+      continue
+    }
     const at = line.indexOf(': ')
     if (at <= 0 || indentOf(line) > 0) continue
     const key = line.slice(0, at).trim()
@@ -57,7 +75,11 @@ export function parseFrontmatter(text) {
       const read = readBlock(lines, i, block[1])
       value = read.value
       i = read.next
-    } else value = unquote(raw)
+    } else if (raw) {
+      const read = readPlain(lines, i)
+      value = unquote(read.value ? `${raw} ${read.value}` : raw)
+      i = read.next
+    }
     if (KEEP.has(key)) meta[key] = value
   }
   return { ...meta, body: source.slice(match[0].length) }

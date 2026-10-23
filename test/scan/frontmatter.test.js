@@ -46,3 +46,27 @@ test('parseFrontmatter block scalar with + and - variants', () => {
     assert.ok(r.description.startsWith('x'))
   }
 })
+
+test('parseFrontmatter joins indented continuation lines of a plain value', () => {
+  const r = parseFrontmatter(
+    '---\nname: a\ndescription: Reviews a change. Use\n  before it is done.\n  Read only.\ntools: Read\n---\nB'
+  )
+  assert.equal(r.description, 'Reviews a change. Use before it is done. Read only.')
+  assert.equal(r.tools, 'Read')
+})
+
+test('parseFrontmatter stops a plain value at a comment line', () => {
+  const r = parseFrontmatter('---\ndescription: a\n  # note\nname: n\n---\nB')
+  assert.equal(r.description, 'a')
+  assert.equal(r.name, 'n')
+})
+
+test('parseFrontmatter reads a plain value that starts on the next line', () => {
+  const r = parseFrontmatter('---\ndescription:\n  text on\n  next line\nname: n\n---\nB')
+  assert.equal(r.description, 'text on next line')
+})
+
+test('parseFrontmatter joins a multi-line quoted value and keeps nested maps out', () => {
+  const r = parseFrontmatter('---\nmetadata:\n  description: inner\ndescription: "a b\n  c d"\n---\nB')
+  assert.equal(r.description, 'a b c d')
+})
