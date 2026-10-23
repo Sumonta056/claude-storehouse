@@ -7,7 +7,7 @@ import { scanSkills } from './skills.js'
 import { scanAgents } from './agents.js'
 import { scanMcp } from './mcp.js'
 import { scanClaudeMd } from './claudemd.js'
-import { applyFavorites } from './favorites.js'
+import { applyFavorites, readCategories } from './favorites.js'
 import { hookId, scanParkedHooks, storehousePath } from './hooks.js'
 
 function attempt(errors, section, fn, fallback) {
@@ -105,5 +105,6 @@ export function scanAll({ home, projectDir }) {
     errors
   }
   inventory.favorites = attempt(errors, 'favorites', () => applyFavorites(inventory, home), [])
+  inventory.favoriteCategories = attempt(errors, 'favoriteCategories', () => readCategories(home), [])
   return inventory
 }

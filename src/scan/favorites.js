@@ -9,17 +9,41 @@ export function favoriteId(kind, source, name) {
   return `${kind}:${source}:${name}`
 }
 
-export function readFavorites(home) {
+function readStore(home) {
   const result = readJson(storehousePath(home))
-  if (!result.ok || !isObject(result.data) || !Array.isArray(result.data.favorites)) return []
-  return result.data.favorites
+  return result.ok && isObject(result.data) ? result.data : {}
+}
+
+export function categoriesOf(data) {
+  if (!Array.isArray(data.favoriteCategories)) return []
+  const seen = new Set(['uncategorized'])
+  const out = []
+  for (const value of data.favoriteCategories) {
+    const name = typeof value === 'string' ? value.trim() : ''
+    if (name === '' || name.length > 40 || seen.has(name.toLowerCase())) continue
+    seen.add(name.toLowerCase())
+    out.push(name)
+  }
+  return out
+}
+
+export function readCategories(home) {
+  return categoriesOf(readStore(home))
+}
+
+export function readFavorites(home) {
+  const data = readStore(home)
+  if (!Array.isArray(data.favorites)) return []
+  const categories = new Set(categoriesOf(data))
+  return data.favorites
     .filter((f) => isObject(f) && typeof f.kind === 'string' && typeof f.name === 'string' && typeof f.source === 'string')
     .map((f, index) => ({
       id: favoriteId(f.kind, f.source, f.name),
       kind: f.kind,
       name: f.name,
       source: f.source,
-      order: Number.isFinite(f.order) ? f.order : index
+      order: Number.isFinite(f.order) ? f.order : index,
+      category: typeof f.category === 'string' && categories.has(f.category.trim()) ? f.category.trim() : null
     }))
     .sort((a, b) => a.order - b.order)
 }

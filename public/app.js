@@ -12,7 +12,7 @@ const PAGES = {
   claudemd: 'CLAUDE.md'
 }
 
-const HOLDER = '.card, .recent, tr[data-key], .lrow, .pnote'
+const HOLDER = '.recent, tr[data-key], .lrow, .pnote'
 const HOOK_EVENTS = ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop', 'SubagentStop', 'SessionStart', 'SessionEnd', 'PreCompact']
 const SETTINGS_FILE = { global: '~/.claude/settings.json', project: '.claude/settings.json', projectLocal: '.claude/settings.local.json' }
 const MCP_ORIGIN = { user: '~/.claude.json', local: '~/.claude.json · this folder', mcpjson: '.mcp.json' }
@@ -24,6 +24,11 @@ let projectFiles = null
 let bannerDismissed = false
 let bannerShown = false
 let dragKey = null
+const favOpen = new Map()
+let favEditing = null
+let favNewName = ''
+let favRenameValue = ''
+let favPop = null
 const pending = new Set()
 let searchTimer = null
 
@@ -174,41 +179,6 @@ function scopeTag(scope) {
   return `<span class="tag ${esc(scope)}">${esc(scope)}</span>`
 }
 
-function cardHtml(item, { draggable = false } = {}) {
-  const sw = switchInfo(item)
-  const label = `${item.enabled ? 'Switch off' : 'Switch on'} ${item.kind} ${item.name}`
-  const left = sw.text ? `<span class="via" title="${esc(sw.title)}">${esc(sw.text)}</span>` : `<span class="via">${esc(item.meta ?? item.kind)}</span>`
-  const desc = item.description || (item.kind === 'plugin' ? item.meta : 'No description')
-  return `<article class="card${item.enabled ? '' : ' off'}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
-    <div class="h">
-      <div class="ht">
-      <button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>
-      ${item.source !== item.scope ? `<span class="tag ${item.scope === 'plugin' || item.kind === 'plugin' ? 'plugin' : esc(item.scope)}">${esc(item.source)}</span>` : ''}
-      ${scopeTag(item.scope)}
-      ${item.missing ? '<span class="tag bad">missing</span>' : ''}
-      </div>
-      <button type="button" class="star" data-act="star" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>
-    </div>
-    <div class="d">${esc(desc)}</div>
-    <div class="f">
-      ${left}
-      <span class="sw-wrap state"><button type="button" class="sw" role="switch" data-act="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" title="${esc(sw.title)}"${sw.disabled ? ' disabled' : ''}></button></span>
-    </div>
-  </article>`
-}
-
-function missingFavHtml(fav) {
-  return `<article class="card missing" data-fav="${esc(fav.id)}">
-    <div class="h"><div class="ht">
-      <span class="name">${esc(fav.name)}</span>
-      <span class="tag">${esc(fav.source)}</span>
-      <span class="tag bad">missing</span>
-    </div></div>
-    <div class="d">This ${esc(fav.kind)} is no longer on disk.</div>
-    <div class="f"><span>${esc(fav.kind)}</span><button type="button" class="btn danger" data-act="unfav">Remove</button></div>
-  </article>`
-}
-
 function empty(text) {
   return `<div class="empty">${esc(text)}</div>`
 }
@@ -252,8 +222,8 @@ function renderDash() {
     statTile('hooks', 'Hooks', otherCounts(inv.hooks)),
     statTile('mcp', 'MCP servers', otherCounts(inv.mcp))
   ].join('')
-  const favs = favoriteEntries().filter((e) => e.item && visible(e.item)).slice(0, 6).map((e) => e.item)
-  const favHtml = favs.length ? rowsHtml(favs, 'dfav') : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any row.')
+  const favs = favoriteEntries().filter((e) => e.item && visible(e.item)).slice(0, 6)
+  const favHtml = favs.length ? `<ul class="rows" data-rows="dfav">${favs.map((e) => rowHtml(e.item, 'dfav', { cat: e.fav.category })).join('')}</ul>` : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any row.')
   const more = inv.favorites.length > favs.length && favs.length ? '<button type="button" class="btn-link" data-go="fav">All favorites <span aria-hidden="true">→</span></button>' : ''
   const proj = [...catalog.skill, ...catalog.agent, ...catalog.plugin].filter((i) => i.scope === 'project' && visible(i))
   const projHtml = proj.length ? rowsHtml(proj, 'dproj') : empty(state.query ? `No project items match "${state.query}".` : 'No skills, agents, or plugins in ./.claude.')
@@ -313,19 +283,263 @@ function filesHtml() {
     .join('')}</ul>`
 }
 
-function renderFav() {
-  const entries = favoriteEntries()
-  const intro = '<div class="warn">Favorites live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a card to reorder.</div>'
-  if (!entries.length) {
-    $('p-fav').innerHTML = intro + empty('No favorites yet. Click the star on any card.')
-    return
+function favCats() {
+  return state.inventory.favoriteCategories ?? []
+}
+
+function missingFavRowHtml(fav) {
+  return `<li class="lrow missing" data-fav="${esc(fav.id)}" draggable="true">
+    <div class="lead"><span class="lead-ic bad" role="img" aria-label="Missing">${ICON.warn}</span></div>
+    <div class="body">
+      <div class="l1"><span class="name">${esc(fav.name)}</span><span class="src">${esc(fav.kind)} · ${esc(fav.source)}</span><span class="flag bad">Missing</span></div>
+      <p class="desc">This ${esc(fav.kind)} is no longer on disk.</p>
+    </div>
+    <div class="tail"><button type="button" class="btn danger" data-act="unfav">Remove</button></div>
+  </li>`
+}
+
+function favHeadHtml(cat, label, count, open, index) {
+  if (cat !== null && favEditing === cat) {
+    return `<form class="fav-edit" data-form="cat-rename" data-cat="${esc(cat)}">
+      <input type="text" id="fav-rename" name="n" value="${esc(favRenameValue)}" maxlength="40" required aria-label="${esc(`New name for ${cat}`)}">
+      <button type="submit" class="btn p">Rename</button>
+      <button type="button" class="btn ghost" data-fc="cancel">Cancel</button>
+    </form>`
   }
+  const tools =
+    cat === null
+      ? ''
+      : `<span class="fav-tools"><button type="button" class="icon-btn" data-fc="rename" data-cat="${esc(cat)}" aria-label="${esc(`Rename category ${cat}`)}">${ICON.pen}</button><button type="button" class="icon-btn del" data-fc="delete" data-cat="${esc(cat)}" aria-label="${esc(`Delete category ${cat}`)}">${ICON.bin}</button></span>`
+  return `<button type="button" class="fav-tog${cat === null ? ' uncat' : ''}" data-fc="collapse" data-cat="${esc(cat ?? '')}" aria-expanded="${open}" aria-controls="favsec-${index}">${ICON.chev}<span class="fav-name">${esc(label)}</span><span class="pill">${count}</span></button>${tools}`
+}
+
+function favSectionHtml(cat, list, index) {
+  const label = cat ?? 'Uncategorized'
+  const open = favOpen.get(cat ?? '') !== false
+  const rows = list.map((e) => (e.item ? rowHtml(e.item, 'fav', { draggable: true }) : missingFavRowHtml(e.fav))).join('')
+  const body = list.length ? `<ul class="rows" data-rows="fav">${rows}</ul>` : `<div class="empty fav-drop">No favorites here. Drag a row here, or pick ${esc(label)} from a star.</div>`
+  return `<section class="fav-sec" data-cat="${esc(cat ?? '')}" aria-label="${esc(label)}">
+    <div class="fav-h">${favHeadHtml(cat, label, list.length, open, index)}</div>
+    <div id="favsec-${index}"${open ? '' : ' hidden'}>${body}</div>
+  </section>`
+}
+
+function renderFav() {
+  const cats = favCats()
+  const entries = favoriteEntries()
   const shown = entries.filter((e) => (e.item ? visible(e.item) : matches({ name: e.fav.name, source: e.fav.source })))
-  const html = shown.map((e) => (e.item ? cardHtml(e.item, { draggable: true }) : missingFavHtml(e.fav))).join('')
-  $('p-fav').innerHTML = intro + (shown.length ? `<div class="grid" id="favgrid">${html}</div>` : nothingMatches())
+  const groups = [...cats.map((c) => [c, shown.filter((e) => e.fav.category === c)]), [null, shown.filter((e) => e.fav.category === null)]]
+  const top = `<div class="fav-top">
+    <div class="warn">Favorites and categories live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a row to reorder it or to move it to another category.</div>
+    <form class="fav-new" data-form="cat-new">
+      <input type="text" id="fav-newcat" name="n" value="${esc(favNewName)}" maxlength="40" placeholder="New category" aria-label="New category name">
+      <button type="submit" class="btn p">Add category</button>
+    </form>
+  </div>`
+  let body
+  if (!entries.length && !cats.length) body = empty('No favorites yet. Click the star on any row and pick a category.')
+  else if (state.query) {
+    const hits = groups.map((g, i) => [...g, i]).filter(([, list]) => list.length)
+    body = hits.length ? hits.map(([c, list, i]) => favSectionHtml(c, list, i)).join('') : nothingMatches()
+  } else body = groups.map(([c, list], i) => favSectionHtml(c, list, i)).join('')
+  $('p-fav').innerHTML = top + body
+}
+
+function favOf(item) {
+  return state.inventory.favorites.find((f) => f.id === item.key) ?? null
+}
+
+function favNameError(name) {
+  if (name === '') return 'Type a category name.'
+  if (name.length > 40) return 'Use 40 characters or fewer.'
+  if (name.toLowerCase() === 'uncategorized') return 'Uncategorized is a reserved name.'
+  return null
+}
+
+function favPopHtml(item, fav) {
+  const current = fav ? fav.category ?? '' : ''
+  const options = [['', 'Uncategorized'], ...favCats().map((c) => [c, c])]
+  return `<form data-form="favpop">
+    <h3 id="favpop-t">${fav ? 'Change category' : 'Add to favorites'}</h3>
+    <p class="sub">${esc(item.name)}</p>
+    <fieldset><legend class="sr">Category</legend>${options
+      .map(([value, label]) => `<label class="opt"><input type="radio" name="cat" value="${esc(value)}"${value === current ? ' checked' : ''}><span>${esc(label)}</span></label>`)
+      .join('')}</fieldset>
+    <input type="text" name="newcat" maxlength="40" placeholder="+ New category" aria-label="New category name">
+    <p class="err" role="alert" hidden></p>
+    <div class="bar">${fav ? '<button type="button" class="btn danger ghost" data-pop="remove">Remove</button>' : '<button type="button" class="btn ghost" data-pop="cancel">Cancel</button>'}<button type="submit" class="btn p">Save</button></div>
+  </form>`
+}
+
+function placeFavPop() {
+  if (!favPop) return
+  const { el, trigger } = favPop
+  if (!trigger?.isConnected) return closeFavPop(false)
+  const r = trigger.getBoundingClientRect()
+  const w = el.offsetWidth
+  const h = el.offsetHeight
+  el.style.left = `${Math.max(16, Math.min(r.right - w, innerWidth - w - 16))}px`
+  el.style.top = `${r.bottom + 6 + h > innerHeight - 16 ? Math.max(16, r.top - h - 6) : r.bottom + 6}px`
+}
+
+function openFavPop(item, trigger) {
+  closeFavPop(false)
+  const fav = favOf(item)
+  const el = document.createElement('div')
+  el.className = 'favpop'
+  el.setAttribute('role', 'dialog')
+  el.setAttribute('aria-labelledby', 'favpop-t')
+  el.innerHTML = favPopHtml(item, fav)
+  document.body.append(el)
+  favPop = { el, item, trigger, inDrawer: Boolean(trigger?.closest('#dr')) }
+  placeFavPop()
+  el.querySelector('input[name="cat"]:checked')?.focus()
+  el.addEventListener('input', (e) => {
+    if (e.target.name !== 'newcat') return
+    const typed = e.target.value.trim() !== ''
+    for (const r of el.querySelectorAll('input[name="cat"]')) r.disabled = typed
+    el.querySelector('.err').hidden = true
+  })
+  el.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-pop]')?.dataset.pop
+    if (act === 'cancel') closeFavPop()
+    else if (act === 'remove') {
+      closeFavPop()
+      star(favBody(item, false), `Unstarred ${item.name}`)
+    }
+  })
+  el.addEventListener('submit', (e) => {
+    e.preventDefault()
+    submitFavPop(e.target)
+  })
+}
+
+function closeFavPop(refocus = true) {
+  if (!favPop) return
+  const { el, item, trigger, inDrawer } = favPop
+  favPop = null
+  el.remove()
+  if (!refocus) return
+  if (trigger?.isConnected) return trigger.focus({ preventScroll: true })
+  const scope = inDrawer && drawerOpen() ? $('dr') : document.querySelector('.page:not([hidden])')
+  const btn = inDrawer ? scope?.querySelector('[data-dact="star"]') : [...(scope?.querySelectorAll('[data-act="star"]') ?? [])].find((b) => holderKey(b.closest(HOLDER)) === item.key)
+  btn?.focus({ preventScroll: true })
+}
+
+function favBody(item, favorite, category) {
+  const body = { kind: item.kind, name: item.kind === 'plugin' ? item.id : item.name, source: item.kind === 'plugin' ? 'plugin' : item.source, favorite }
+  if (category !== undefined) body.category = category
+  return body
+}
+
+function submitFavPop(form) {
+  const { item } = favPop
+  const typed = form.elements.newcat.value.trim()
+  const picked = form.querySelector('input[name="cat"]:checked')?.value ?? ''
+  const fav = favOf(item)
+  if (typed) {
+    const error = favNameError(typed)
+    if (error) {
+      const p = form.querySelector('.err')
+      p.textContent = error
+      p.hidden = false
+      form.elements.newcat.focus()
+      return
+    }
+  } else if (fav && (fav.category ?? '') === picked) return closeFavPop()
+  const category = typed || picked || null
+  const label = category ?? 'Uncategorized'
+  closeFavPop()
+  star(favBody(item, true, category), fav ? `Moved ${item.name} to ${label}` : `Starred ${item.name} in ${label}`)
+}
+
+async function editFavCategory(body, message) {
+  if (pending.has('favcat')) return false
+  pending.add('favcat')
+  try {
+    await send('POST', '/api/favorites/category', body)
+    toast(`${message} · ~/.claude/storehouse.json`)
+    await refresh()
+    return true
+  } catch (err) {
+    toast(`Could not update categories: ${err.message}`, true)
+    return false
+  } finally {
+    pending.delete('favcat')
+    loadActivity()
+  }
+}
+
+function focusFavTool(cat, tool) {
+  document.querySelector(`#p-fav [data-fc="${tool}"][data-cat="${CSS.escape(cat)}"]`)?.focus({ preventScroll: true })
+}
+
+function startRename(cat) {
+  favEditing = cat
+  favRenameValue = cat
+  render()
+  const input = $('fav-rename')
+  input?.focus()
+  input?.select()
+}
+
+function cancelRename() {
+  const cat = favEditing
+  favEditing = null
+  render()
+  if (cat !== null) focusFavTool(cat, 'rename')
+}
+
+async function onFavCat(el) {
+  const act = el.dataset.fc
+  const cat = el.dataset.cat ?? ''
+  if (act === 'collapse') {
+    favOpen.set(cat, el.getAttribute('aria-expanded') !== 'true')
+    render()
+    return focusFavTool(cat, 'collapse')
+  }
+  if (act === 'rename') return startRename(cat)
+  if (act === 'cancel') return cancelRename()
+  if (act === 'delete') {
+    const n = state.inventory.favorites.filter((f) => f.category === cat).length
+    const yes = await ask({
+      title: `Delete category ${cat}?`,
+      message: n ? `Its ${plural(n, 'favorite')} move to Uncategorized. They stay favorites. You can undo this from the activity log.` : 'This category is empty.',
+      ok: 'Delete',
+      danger: true
+    })
+    if (yes) await editFavCategory({ op: 'delete', name: cat }, `Deleted category ${cat}`)
+  }
+}
+
+async function submitNewCat() {
+  const name = favNewName.trim()
+  const error = favNameError(name)
+  if (error) return toast(error, true)
+  if (favCats().some((c) => c.toLowerCase() === name.toLowerCase())) return toast(`Category ${name} already exists.`, true)
+  if (await editFavCategory({ op: 'create', name }, `Added category ${name}`)) {
+    favNewName = ''
+    render()
+    $('fav-newcat')?.focus()
+  }
+}
+
+async function submitRename(form) {
+  const old = form.dataset.cat
+  const name = favRenameValue.trim()
+  if (name === old) return cancelRename()
+  const error = favNameError(name)
+  if (error) return toast(error, true)
+  favEditing = null
+  if (await editFavCategory({ op: 'rename', name: old, newName: name }, `Renamed ${old} to ${name}`)) return focusFavTool(name, 'rename')
+  favEditing = old
+  render()
+  $('fav-rename')?.focus()
 }
 
 const ICON = {
+  pen: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+  bin: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   lock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   warn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5"/><path d="M12 18h.01"/></svg>',
   dots: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
@@ -434,24 +648,24 @@ function metaHtml(item) {
   return ''
 }
 
-function rowHtml(item, ctx = '') {
+function rowHtml(item, ctx = '', { draggable = false, cat = null } = {}) {
   const open = menuKey === item.key && menuCtx === ctx
   const src = rowSource(item)
   const off = item.canToggle && !item.enabled
   const desc = item.missing ? 'Listed in installed_plugins.json, but the plugin folder is gone.' : item.description || 'No description'
   const ver = item.kind === 'plugin' ? shortVersion(pluginById(item.id)?.version) : ''
   const cls = ['lrow', off ? 'off' : '', item.missing ? 'missing' : '', item.canToggle ? '' : 'locked'].filter(Boolean).join(' ')
-  return `<li class="${cls}" data-key="${esc(item.key)}">
+  return `<li class="${cls}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
     <div class="lead">${leadHtml(item)}</div>
     <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
       <p class="desc">${esc(desc)}</p>
       ${metaHtml(item)}
     </div>
     ${ver ? `<span class="ver" title="${esc(pluginById(item.id)?.version ?? '')}">${esc(ver)}</span>` : ''}
     <div class="tail">
       ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
-      <button type="button" class="star" data-act="star" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>
+      <button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>
       <button type="button" class="icon-btn" data-act="menu" aria-haspopup="menu" aria-expanded="${open ? 'true' : 'false'}"${open ? ` aria-controls="menu-${slug(item.key)}"` : ''} aria-label="${esc(`More actions for ${item.name}`)}">${ICON.dots}</button>
     </div>
     ${open ? menuHtml(item) : ''}
@@ -824,13 +1038,13 @@ async function toggle(item) {
   }
 }
 
-async function star(kind, name, source, favorite, label) {
-  const busy = `${kind}:${source}:${name}:star`
+async function star(body, message) {
+  const busy = `${body.kind}:${body.source}:${body.name}:star`
   if (pending.has(busy)) return
   pending.add(busy)
   try {
-    await send('POST', '/api/favorite', { kind, name, source, favorite })
-    toast(`${favorite ? 'Starred' : 'Unstarred'} ${label} · ~/.claude/storehouse.json`)
+    await send('POST', '/api/favorite', body)
+    toast(`${message} · ~/.claude/storehouse.json`)
     await refresh()
   } catch (err) {
     toast(`Could not update favorites: ${err.message}`, true)
@@ -840,10 +1054,9 @@ async function star(kind, name, source, favorite, label) {
   }
 }
 
-function starItem(item) {
-  const name = item.kind === 'plugin' ? item.id : item.name
-  const source = item.kind === 'plugin' ? 'plugin' : item.source
-  return star(item.kind, name, source, !item.favorite, item.name)
+function starItem(item, trigger) {
+  if (favPop && favPop.item.key === item.key && favPop.trigger === trigger) return closeFavPop()
+  openFavPop(item, trigger)
 }
 
 const dr = {
@@ -982,7 +1195,7 @@ function drawerMenuEntries(item) {
 
 function headTools(item) {
   if (item.kind === 'hook' || item.kind === 'mcp') return ''
-  const starBtn = `<button type="button" class="icon-btn star" data-dact="star" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`
+  const starBtn = `<button type="button" class="icon-btn star" data-dact="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`
   const entries = drawerMenuEntries(item)
   if (!entries.length) return starBtn
   const menu = dr.menu
@@ -1601,7 +1814,7 @@ async function onDrawerClick(e) {
   }
   const owner = ownerPlugin(item)
   if (act === 'toggle') return void toggle(item)
-  if (act === 'star') return void starItem(item)
+  if (act === 'star') return void starItem(item, b)
   if (act === 'copy') return void copyPath()
   if (act === 'uninstall') return void uninstallPlugin(item)
   if (act === 'plugin-toggle' && owner) return void toggle(owner)
@@ -2684,25 +2897,31 @@ function onCfg(el) {
   }
 }
 
-function reorder(fromKey, toKey, after) {
-  const ids = state.inventory.favorites.map((f) => f.id)
-  const from = ids.indexOf(fromKey)
-  if (from < 0 || fromKey === toKey) return null
-  ids.splice(from, 1)
-  let to = ids.indexOf(toKey)
-  if (to < 0) return null
-  if (after) to += 1
-  ids.splice(to, 0, fromKey)
-  return ids
+function placeFav(fromKey, cat, toKey, after) {
+  const favs = state.inventory.favorites
+  const from = favs.find((f) => f.id === fromKey)
+  if (!from || toKey === fromKey) return null
+  const ids = favs.map((f) => f.id).filter((id) => id !== fromKey)
+  const target = toKey ? ids.indexOf(toKey) : -1
+  let at = ids.length
+  if (target >= 0) at = target + (after ? 1 : 0)
+  else {
+    const last = favs.filter((f) => f.id !== fromKey && f.category === cat).at(-1)
+    if (last) at = ids.indexOf(last.id) + 1
+  }
+  ids.splice(at, 0, fromKey)
+  const move = from.category === cat ? undefined : { id: fromKey, category: cat }
+  if (!move && ids.every((id, i) => id === favs[i].id)) return null
+  return { ids, move }
 }
 
-async function saveOrder(ids) {
+async function saveOrder({ ids, move }) {
   const byId = new Map(state.inventory.favorites.map((f) => [f.id, f]))
-  state.inventory.favorites = ids.map((id) => byId.get(id))
+  state.inventory.favorites = ids.map((id) => byId.get(id)).map((f) => (move && f.id === move.id ? { ...f, category: move.category } : f))
   render()
   try {
-    await send('PUT', '/api/favorites/order', { ids })
-    toast('Saved order · ~/.claude/storehouse.json')
+    await send('PUT', '/api/favorites/order', move ? { ids, move } : { ids })
+    toast(move ? `Moved ${byId.get(move.id).name} to ${move.category ?? 'Uncategorized'} · ~/.claude/storehouse.json` : 'Saved order · ~/.claude/storehouse.json')
   } catch (err) {
     toast(`Could not save order: ${err.message}`, true)
   }
@@ -2801,6 +3020,18 @@ function wire() {
       } else if (e.key === 'Tab') trapTab(e, $('cf'))
       return
     }
+    if (favPop) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeFavPop()
+      } else if (e.key === 'Tab') trapTab(e, favPop.el)
+      return
+    }
+    if (favEditing !== null && e.key === 'Escape' && document.activeElement?.id === 'fav-rename') {
+      e.preventDefault()
+      cancelRename()
+      return
+    }
     if (drawerOpen()) {
       if (dr.menu && e.key === 'Escape') {
         e.preventDefault()
@@ -2841,6 +3072,15 @@ function wire() {
     }
   })
   window.addEventListener('hashchange', () => go(location.hash.slice(1)))
+  document.addEventListener(
+    'mousedown',
+    (e) => {
+      if (favPop && !favPop.el.contains(e.target) && !e.target.closest('[data-act="star"], [data-dact="star"]')) closeFavPop(false)
+    },
+    true
+  )
+  window.addEventListener('resize', () => closeFavPop(false))
+  window.addEventListener('scroll', placeFavPop, true)
   window.addEventListener('beforeunload', (e) => {
     if (isDirty() || cfgDirty()) e.preventDefault()
   })
@@ -2860,6 +3100,8 @@ function wire() {
       menuKey = null
       return render()
     }
+    const fc = e.target.closest('[data-fc]')
+    if (fc) return void onFavCat(fc)
     const grp = e.target.closest('[data-group]')
     if (grp) {
       groupOpen.set(grp.dataset.group, grp.getAttribute('aria-expanded') !== 'true')
@@ -2872,13 +3114,13 @@ function wire() {
     if (name === 'menu') return openMenu(key, act.closest('[data-rows]')?.dataset.rows ?? '')
     if (act?.dataset.act === 'unfav') {
       const fav = state.inventory.favorites.find((f) => f.id === key)
-      if (fav) star(fav.kind, fav.name, fav.source, false, fav.name)
+      if (fav) star({ kind: fav.kind, name: fav.name, source: fav.source, favorite: false }, `Unstarred ${fav.name}`)
       return
     }
     const item = items.get(key)
     if (!item) return
     if (act?.dataset.act === 'toggle') return void toggle(item)
-    if (act?.dataset.act === 'star') return void starItem(item)
+    if (act?.dataset.act === 'star') return void starItem(item, act)
     if (act?.dataset.act === 'del') return void deleteRow(item)
     if (name === 'uninstall') return void uninstallPlugin(item)
     if (name?.startsWith('m-')) {
@@ -2901,48 +3143,64 @@ function wire() {
     setTimeout(() => closeMenu(false), 0)
   })
 
-  main.addEventListener('input', onCfgInput)
+  main.addEventListener('input', (e) => {
+    if (e.target.id === 'fav-newcat') favNewName = e.target.value
+    else if (e.target.id === 'fav-rename') favRenameValue = e.target.value
+    else onCfgInput(e)
+  })
   main.addEventListener('submit', (e) => {
     e.preventDefault()
     if (e.target.id === 'hook-form') submitHook()
     else if (e.target.id === 'mcp-form') submitMcp()
+    else if (e.target.dataset.form === 'cat-new') submitNewCat()
+    else if (e.target.dataset.form === 'cat-rename') submitRename(e.target)
   })
 
+  const clearDrop = () => {
+    for (const n of document.querySelectorAll('.drop-over, .drop-before, .drop-after')) n.classList.remove('drop-over', 'drop-before', 'drop-after')
+  }
+  const isAfter = (e, row) => {
+    const r = row.getBoundingClientRect()
+    return e.clientY > r.top + r.height / 2
+  }
   main.addEventListener('dragstart', (e) => {
-    const card = e.target.closest?.('.card[draggable="true"]')
-    if (!card) return
-    dragKey = card.dataset.key
-    card.classList.add('dragging')
+    const row = e.target.closest?.('.fav-sec .lrow[draggable="true"]')
+    if (!row) return
+    dragKey = holderKey(row)
+    row.classList.add('dragging')
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', dragKey)
   })
   main.addEventListener('dragover', (e) => {
     if (!dragKey) return
-    const card = e.target.closest('#favgrid .card')
-    if (!card) return
+    const sec = e.target.closest('.fav-sec')
+    if (!sec) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    for (const c of document.querySelectorAll('.drop-target')) if (c !== card) c.classList.remove('drop-target')
-    card.classList.add('drop-target')
+    clearDrop()
+    sec.classList.add('drop-over')
+    const row = e.target.closest('.fav-sec .lrow')
+    if (row && holderKey(row) !== dragKey) row.classList.add(isAfter(e, row) ? 'drop-after' : 'drop-before')
   })
   main.addEventListener('dragleave', (e) => {
-    const card = e.target.closest?.('.card')
-    if (card && !card.contains(e.relatedTarget)) card.classList.remove('drop-target')
+    const sec = e.target.closest?.('.fav-sec')
+    if (sec && !sec.contains(e.relatedTarget)) clearDrop()
   })
   main.addEventListener('drop', (e) => {
     if (!dragKey) return
-    const card = e.target.closest('#favgrid .card')
-    if (!card) return
+    const sec = e.target.closest('.fav-sec')
+    if (!sec) return
     e.preventDefault()
-    const rect = card.getBoundingClientRect()
-    const after = e.clientX > rect.left + rect.width / 2
-    const ids = reorder(dragKey, card.dataset.key ?? card.dataset.fav, after)
+    const row = e.target.closest('.fav-sec .lrow')
+    const plan = placeFav(dragKey, sec.dataset.cat || null, row ? holderKey(row) : null, row ? isAfter(e, row) : true)
     dragKey = null
-    if (ids) saveOrder(ids)
+    clearDrop()
+    if (plan) saveOrder(plan)
   })
   main.addEventListener('dragend', () => {
     dragKey = null
-    for (const c of document.querySelectorAll('.dragging, .drop-target')) c.classList.remove('dragging', 'drop-target')
+    clearDrop()
+    for (const c of document.querySelectorAll('.dragging')) c.classList.remove('dragging')
   })
 }
 
