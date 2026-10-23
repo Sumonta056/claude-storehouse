@@ -21,7 +21,7 @@ test('scanAll returns every section and errors array', () => {
     assert.ok(inv.mcp.length > 0)
     assert.deepEqual(Object.keys(inv.settings), ['global', 'project', 'projectLocal'])
     assert.equal(inv.settings.global.exists, true)
-    assert.deepEqual(Object.keys(inv.claudeMd), ['global', 'project', 'projectLocal', 'projectClaudeDir'])
+    assert.deepEqual(Object.keys(inv.claudeMd), ['global', 'project', 'projectLocal', 'projectClaudeDir', 'rules'])
     assert.deepEqual(inv.favorites, [])
     assert.deepEqual(inv.errors, [])
     assert.ok(inv.hooks.some((h) => h.scope === 'global'))

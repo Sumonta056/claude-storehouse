@@ -83,7 +83,8 @@ export function scanAll({ home, projectDir }) {
     global: null,
     project: null,
     projectLocal: null,
-    projectClaudeDir: null
+    projectClaudeDir: null,
+    rules: []
   })
 
   const byScope = Object.fromEntries(settings.files.map((file) => [file.scope, file]))
