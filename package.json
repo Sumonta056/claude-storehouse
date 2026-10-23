@@ -1,0 +1,10 @@
+{
+  "name": "claude-storehouse",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "claude-storehouse": "bin/storehouse.js" },
+  "files": ["bin", "src", "public"],
+  "scripts": { "test": "node --test test/", "start": "node bin/storehouse.js" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "open": "^10.1.0" }
+}

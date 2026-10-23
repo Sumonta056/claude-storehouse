@@ -1,0 +1,1 @@
+{ "mcpServers": { "context7": { "command": "npx", "args": ["-y", "context7"] }, "demo": { "type": "http", "url": "https://demo.example.com/mcp", "headers": { "Authorization": "Bearer secret-token" } } } }

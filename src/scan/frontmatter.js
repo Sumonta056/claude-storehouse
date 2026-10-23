@@ -1,0 +1,61 @@
+function unquote(value) {
+  if (value.length >= 2) {
+    const first = value[0]
+    if ((first === '"' || first === "'") && value[value.length - 1] === first) return value.slice(1, -1)
+  }
+  return value
+}
+
+const BLOCK = /^([>|])[+-]?$/
+
+function indentOf(line) {
+  return line.length - line.trimStart().length
+}
+
+function readBlock(lines, from, style) {
+  const block = []
+  let i = from
+  while (i < lines.length && (lines[i].trim() === '' || indentOf(lines[i]) > 0)) {
+    block.push(lines[i])
+    i++
+  }
+  const filled = block.filter((l) => l.trim() !== '')
+  const common = filled.length ? Math.min(...filled.map(indentOf)) : 0
+  const stripped = block.map((l) => l.slice(common).replace(/\s+$/, ''))
+  const text = style === '>' ? filled.map((l) => l.trim()).join(' ') : stripped.join('\n')
+  return { value: text.trim(), next: i }
+}
+
+export function parseFrontmatter(text) {
+  const source = typeof text === 'string' ? text : ''
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/)
+  if (!match) return { body: source }
+  const meta = {}
+  const lines = match[1].split(/\r?\n/)
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    i++
+    const at = line.indexOf(': ')
+    if (at <= 0 || indentOf(line) > 0) continue
+    const key = line.slice(0, at).trim()
+    const raw = line.slice(at + 2).trim()
+    const block = raw.match(BLOCK)
+    let value = raw
+    if (block) {
+      const read = readBlock(lines, i, block[1])
+      value = read.value
+      i = read.next
+    } else value = unquote(raw)
+    if (key === 'name' || key === 'description') meta[key] = value
+  }
+  return { ...meta, body: source.slice(match[0].length) }
+}
+
+export function firstBodyLine(body, limit = 200) {
+  for (const line of body.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith('#')) return trimmed.slice(0, limit)
+  }
+  return ''
+}

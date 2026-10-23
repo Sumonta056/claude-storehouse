@@ -1,0 +1,1 @@
+{ "mcpServers": { "postgres": { "command": "psql-mcp" }, "redis": { "command": "redis-mcp", "args": ["--port", "6379"] } } }

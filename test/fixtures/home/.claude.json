@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "kubernetes": { "command": "npx", "args": ["-y", "kube-mcp"], "env": { "KUBE_TOKEN": "secret-value" } }
+  },
+  "projects": {
+    "__PROJECT__": {
+      "mcpServers": { "aws": { "type": "sse", "url": "https://aws.example.com/sse" } },
+      "disabledMcpServers": ["aws", "plugin:superpowers:demo"]
+    }
+  }
+}

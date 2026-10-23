@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Storehouse</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">Storehouse</div>
+    <nav class="nav" id="nav" aria-label="Pages">
+      <button type="button" data-p="dash">Dashboard</button>
+      <button type="button" data-p="fav">Favorites <b id="n-fav">0</b></button>
+      <div class="sep">Catalog</div>
+      <button type="button" data-p="skills">Skills <b id="n-skills">0</b></button>
+      <button type="button" data-p="agents">Agents <b id="n-agents">0</b></button>
+      <button type="button" data-p="plugins">Plugins <b id="n-plugins">0</b></button>
+      <button type="button" data-p="hooks">Hooks <b id="n-hooks">0</b></button>
+      <button type="button" data-p="mcp">MCP servers <b id="n-mcp">0</b></button>
+      <div class="sep">Config</div>
+      <button type="button" data-p="settings">Settings</button>
+      <button type="button" data-p="claudemd">CLAUDE.md</button>
+    </nav>
+    <section class="act" id="act-box" aria-labelledby="act-title">
+      <button type="button" class="btn act-toggle" id="act-toggle" aria-expanded="false" aria-controls="act">Activity</button>
+      <h2 id="act-title" tabindex="-1">Activity · this session</h2>
+      <ul id="act"><li class="sub">No writes yet.</li></ul>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <h1 id="title" tabindex="-1">Dashboard</h1>
+      <div class="controls">
+        <input class="search" id="q" type="search" placeholder="Search name or description ( / )" aria-label="Search">
+        <div class="scope" id="scope" role="group" aria-label="Scope">
+          <button type="button" data-s="all" aria-pressed="true">All</button>
+          <button type="button" data-s="global" aria-pressed="false">Global</button>
+          <button type="button" data-s="project" aria-pressed="false">Project</button>
+        </div>
+      </div>
+    </div>
+    <div class="ctx" id="ctx">Loading your Claude Code setup…</div>
+    <div class="banner" id="banner" hidden>
+      <span>Claude Code applies this at the next session.</span>
+      <button type="button" class="btn" id="banner-x" aria-label="Dismiss">Dismiss</button>
+    </div>
+    <div class="warn" id="load-error" hidden></div>
+
+    <section class="page" id="p-dash"></section>
+    <section class="page" id="p-fav"></section>
+    <section class="page" id="p-skills"></section>
+    <section class="page" id="p-agents"></section>
+    <section class="page" id="p-plugins"></section>
+    <section class="page" id="p-hooks"></section>
+    <section class="page" id="p-mcp"></section>
+    <section class="page" id="p-settings"></section>
+    <section class="page" id="p-claudemd"></section>
+  </main>
+</div>
+
+<div class="scrim" id="dr-scrim" hidden></div>
+<aside class="drawer" id="dr" role="dialog" aria-modal="true" aria-labelledby="dr-name" aria-hidden="true">
+  <div class="dh">
+    <h2 class="dr-title" id="dr-name"></h2>
+    <div class="dh-tools" id="dr-tools"></div>
+    <button type="button" class="btn x" id="dr-close">Close</button>
+  </div>
+  <div class="dr-tags" id="dr-tags"></div>
+  <div class="path-row"><code class="path" id="dr-path"></code><button type="button" class="btn" id="dr-copy">Copy path</button></div>
+  <p class="dr-desc" id="dr-desc"></p>
+  <div id="dr-body"></div>
+</aside>
+
+<div class="modal" id="cf" hidden>
+  <div class="box" role="alertdialog" aria-modal="true" aria-labelledby="cf-title" aria-describedby="cf-msg">
+    <h3 id="cf-title"></h3>
+    <p id="cf-msg"></p>
+    <div class="row end">
+      <button type="button" class="btn" id="cf-no">Cancel</button>
+      <button type="button" class="btn" id="cf-yes">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

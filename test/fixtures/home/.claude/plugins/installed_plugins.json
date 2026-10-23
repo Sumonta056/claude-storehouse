@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "plugins": {
+    "superpowers@claude-plugins-official": [
+      { "scope": "user", "installPath": "__HOME__/.claude/plugins/cache/claude-plugins-official/superpowers/1.0.0", "version": "465f09344424", "installedAt": "2026-01-01T00:00:00.000Z", "lastUpdated": "2026-01-01T00:00:00.000Z" }
+    ],
+    "ecc@ecc": [
+      { "scope": "user", "installPath": "__HOME__/.claude/plugins/cache/ecc/ecc/1.0.0", "version": "1.0.0", "installedAt": "2026-01-01T00:00:00.000Z", "lastUpdated": "2026-01-01T00:00:00.000Z" }
+    ],
+    "code-review@claude-plugins-official": [
+      { "scope": "project", "installPath": "__HOME__/.claude/plugins/cache/claude-plugins-official/code-review/1.0.0", "version": "1.0.0", "installedAt": "2026-01-01T00:00:00.000Z", "lastUpdated": "2026-01-01T00:00:00.000Z", "projectPath": "__PROJECT__" },
+      { "scope": "local", "installPath": "__HOME__/.claude/plugins/cache/claude-plugins-official/code-review/1.0.0", "version": "1.0.0", "installedAt": "2026-01-01T00:00:00.000Z", "lastUpdated": "2026-01-01T00:00:00.000Z", "projectPath": "/somewhere/else" }
+    ],
+    "ghost@x": [
+      { "scope": "user", "installPath": "__HOME__/.claude/plugins/cache/x/ghost/9.9.9", "version": "9.9.9", "installedAt": "2026-01-01T00:00:00.000Z", "lastUpdated": "2026-01-01T00:00:00.000Z" }
+    ]
+  }
+}

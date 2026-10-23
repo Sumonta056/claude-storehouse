@@ -1,0 +1,8 @@
+{
+  "permissions": { "allow": ["Bash(npm test:*)"] },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash(rm:*)", "hooks": [ { "type": "command", "command": "echo guard-rm" } ] }
+    ]
+  }
+}
