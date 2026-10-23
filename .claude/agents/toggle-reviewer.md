@@ -7,8 +7,9 @@ tools: Read, Grep, Glob, Bash
 You review claude-storehouse code that reads or writes Claude Code config files.
 
 Read first:
+
 1. `.claude/skills/storehouse-config-safety/SKILL.md`
-2. `docs/superpowers/specs/2026-10-23-claude-storehouse-design.md`, sections "On/off mechanism per type" and "Write safety".
+2. `.claude/rules/business-logic.md` section "On/off per type", and `.claude/rules/config-safety.md` section "Write procedure".
 
 Then read the changed files that the caller names.
 

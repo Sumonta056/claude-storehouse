@@ -1,0 +1,91 @@
+# Business logic
+
+## Purpose
+
+The developer has about 110 skills and 28 plugins across 10 marketplaces. The dashboard replaces a hand-written Markdown catalog of favorite skills. It gives a live view and makes on/off one click instead of a JSON edit.
+
+## Goals
+
+1. One command, any folder, no install step beyond `npx`.
+2. Show global and project items side by side with a scope filter.
+3. Switch on/off for plugins, skills, hooks, MCP servers, agents.
+4. Edit and save any file the developer owns.
+5. Favorites survive on/off changes.
+6. Never corrupt a Claude Code config file.
+
+## Non-goals
+
+- Install or update plugins or marketplaces. Use `/plugin`. Uninstall is allowed: it calls `claude plugin uninstall <id> --scope <scope>`.
+- Run Claude, start sessions, or read session history.
+- Multi-user, remote, or hosted use.
+- A database, a cloud account, or a UI build pipeline.
+
+## Failure even if it works
+
+- A write that drops keys from a config file.
+- A switch that uses a mechanism Claude Code does not read. The dashboard then says "off" but Claude still loads the item.
+
+## What Claude Code reads
+
+| Item              | Global                                                        | Project                                                    |
+| ----------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| Settings          | `~/.claude/settings.json`                                     | `./.claude/settings.json`, `./.claude/settings.local.json` |
+| CLAUDE.md         | `~/.claude/CLAUDE.md`                                         | `./CLAUDE.md`, `./CLAUDE.local.md`, `./.claude/CLAUDE.md`  |
+| Skills            | `~/.claude/skills/<name>/SKILL.md`                            | `./.claude/skills/<name>/SKILL.md`                         |
+| Agents            | `~/.claude/agents/<name>.md`                                  | `./.claude/agents/<name>.md`                               |
+| Hooks             | `settings.json` → `hooks.<Event>[]`                           | same keys in project settings                              |
+| MCP servers       | `~/.claude.json` → `mcpServers`, `projects.<path>.mcpServers` | `./.mcp.json`                                              |
+| Plugins installed | `~/.claude/plugins/installed_plugins.json`                    | —                                                          |
+| Plugin files      | `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`   | —                                                          |
+
+A plugin folder contains `skills/<name>/SKILL.md`, `agents/<name>.md`, `hooks/hooks.json`, `.claude-plugin/plugin.json`, and optionally `.mcp.json`.
+
+Scan rules:
+
+- Loose files such as `~/.claude/skills/code-review.md` count as skills.
+- Skip `.trash` folders and names that start with `.`.
+- Symlinked skills are allowed when the real path is under the home folder.
+
+## On/off per type
+
+| Type                      | Off                                                                                             | On             | Native to Claude Code |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | -------------- | --------------------- |
+| Plugin                    | `enabledPlugins[id] = false`                                                                    | `= true`       | yes                   |
+| Local or project skill    | `skillOverrides[name] = "off"`                                                                  | delete the key | yes                   |
+| Plugin skill, agent, hook | no own switch, follows the plugin. UI shows "via plugin X".                                     | —              | —                     |
+| MCP in `./.mcp.json`      | add to `disabledMcpjsonServers`, remove from `enabledMcpjsonServers`                            | the reverse    | yes                   |
+| MCP global                | add name to `projects.<dir>.disabledMcpServers` in `~/.claude.json`                             | remove it      | yes, per project      |
+| MCP from a plugin         | add `plugin:<plugin>:<server>` to `projects.<dir>.disabledMcpServers`                           | remove it      | yes, per project      |
+| Hook                      | move the entry to `~/.claude/storehouse.json` → `parkedHooks` with event, matcher, scope, index | move it back   | no                    |
+| Agent                     | rename `name.md` → `name.md.disabled`                                                           | rename back    | no                    |
+
+Target file per scope:
+
+| Scope                     | File                                                     |
+| ------------------------- | -------------------------------------------------------- |
+| global                    | `~/.claude/settings.json`                                |
+| project                   | `./.claude/settings.local.json`                          |
+| MCP global and plugin MCP | `~/.claude.json` under `projects.<absolute project dir>` |
+
+## Favorites
+
+- Stored in `~/.claude/storehouse.json` → `favorites[]` as `{ kind, id, source, order }`.
+- Global only, not per project.
+- A favorite that is off stays in the list and shows the off state.
+- A favorite whose item is gone shows "missing" with a remove button.
+- Drag to reorder.
+
+## Undo, delete, fork
+
+- Toggles and favorites undo with the inverse operation. Two toggles on one file undo independently.
+- A file edit undoes by restoring the backup that the save made. Only the latest save of a file can undo.
+- Delete moves the file to `~/.claude/backups/storehouse/trash/<timestamp>-<name>` and removes its `skillOverrides` or favorite entry. No OS Trash. Restore from the Backups panel.
+- Fork copies a plugin skill to `~/.claude/skills`. Only skills can be forked.
+
+## Known limitations
+
+1. Plugin skills have no own on/off switch.
+2. Agent off is a rename to `.md.disabled`.
+3. Hook off parks the entry in `~/.claude/storehouse.json`.
+4. Changes apply at the next Claude Code session.
+5. `commands`, `rules`, `output-styles` are out of scope for version 1.
