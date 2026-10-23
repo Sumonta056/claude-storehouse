@@ -13,19 +13,19 @@
 <body>
 <div class="app">
   <aside class="side">
-    <div class="brand">Storehouse</div>
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 2.5V9M12 15v6.5M2.5 12H9M15 12h6.5M18.4 5.6l-4.2 4.2M5.6 5.6l4.2 4.2M18.4 18.4l-4.2-4.2M5.6 18.4l4.2-4.2"/></svg><span>Storehouse</span></div>
     <nav class="nav" id="nav" aria-label="Pages">
-      <button type="button" data-p="dash">Dashboard</button>
-      <button type="button" data-p="fav">Favorites <b id="n-fav">0</b></button>
+      <button type="button" data-p="dash"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span class="lbl">Dashboard</span></button>
+      <button type="button" data-p="fav"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3l-5.5 2.9 1-6.2L3 9.6l6.2-.9z"/></svg><span class="lbl">Favorites</span><b id="n-fav">0</b></button>
       <div class="sep">Catalog</div>
-      <button type="button" data-p="skills">Skills <b id="n-skills">0</b></button>
-      <button type="button" data-p="agents">Agents <b id="n-agents">0</b></button>
-      <button type="button" data-p="plugins">Plugins <b id="n-plugins">0</b></button>
-      <button type="button" data-p="hooks">Hooks <b id="n-hooks">0</b></button>
-      <button type="button" data-p="mcp">MCP servers <b id="n-mcp">0</b></button>
+      <button type="button" data-p="skills"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/></svg><span class="lbl">Skills</span><b id="n-skills">0</b></button>
+      <button type="button" data-p="agents"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="lbl">Agents</span><b id="n-agents">0</b></button>
+      <button type="button" data-p="plugins"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg><span class="lbl">Plugins</span><b id="n-plugins">0</b></button>
+      <button type="button" data-p="hooks"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10a4 4 0 0 0 8 0v-2M7 6l3-3 3 3"/></svg><span class="lbl">Hooks</span><b id="n-hooks">0</b></button>
+      <button type="button" data-p="mcp"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01"/></svg><span class="lbl">MCP servers</span><b id="n-mcp">0</b></button>
       <div class="sep">Config</div>
-      <button type="button" data-p="settings">Settings</button>
-      <button type="button" data-p="claudemd">CLAUDE.md</button>
+      <button type="button" data-p="settings"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4"/></svg><span class="lbl">Settings</span></button>
+      <button type="button" data-p="claudemd"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6zM14 2v6h6"/></svg><span class="lbl">CLAUDE.md</span></button>
     </nav>
     <section class="act" id="act-box" aria-labelledby="act-title">
       <button type="button" class="btn act-toggle" id="act-toggle" aria-expanded="false" aria-controls="act">Activity</button>
@@ -67,21 +67,28 @@
 
 <div class="scrim" id="dr-scrim" hidden></div>
 <aside class="drawer" id="dr" role="dialog" aria-modal="true" aria-labelledby="dr-name" aria-hidden="true">
-  <div class="dh">
-    <h2 class="dr-title" id="dr-name"></h2>
-    <div class="dh-tools" id="dr-tools"></div>
-    <button type="button" class="btn x" id="dr-close">Close</button>
+  <div class="dr-top">
+    <div class="dh">
+      <div class="dh-name">
+        <span class="dr-kind" id="dr-kind"></span>
+        <h2 class="dr-title" id="dr-name"></h2>
+      </div>
+      <div class="dh-tools" id="dr-tools"></div>
+      <button type="button" class="icon-btn" id="dr-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <p class="dr-desc" id="dr-desc"></p>
+    <div id="dr-status"></div>
+    <dl class="facts" id="dr-facts"></dl>
   </div>
-  <div class="dr-tags" id="dr-tags"></div>
-  <div class="path-row"><code class="path" id="dr-path"></code><button type="button" class="btn" id="dr-copy">Copy path</button></div>
-  <p class="dr-desc" id="dr-desc"></p>
-  <div id="dr-body"></div>
+  <div class="dr-body" id="dr-body"></div>
+  <div class="dr-bar" id="dr-bar"></div>
 </aside>
 
 <div class="modal" id="cf" hidden>
   <div class="box" role="alertdialog" aria-modal="true" aria-labelledby="cf-title" aria-describedby="cf-msg">
     <h3 id="cf-title"></h3>
     <p id="cf-msg"></p>
+    <div class="cf-cmd" id="cf-cmd-box" hidden><span>Storehouse runs this command:</span><code id="cf-cmd"></code></div>
     <div class="row end">
       <button type="button" class="btn" id="cf-no">Cancel</button>
       <button type="button" class="btn" id="cf-yes">OK</button>

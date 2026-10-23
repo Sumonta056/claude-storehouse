@@ -11,6 +11,16 @@ function stripSuffix(fileName) {
   return null
 }
 
+function toolList(value) {
+  if (Array.isArray(value)) return value.map((t) => String(t).trim()).filter(Boolean)
+  if (typeof value !== 'string') return []
+  return value
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map((t) => t.trim().replace(/^["']|["']$/g, ''))
+    .filter(Boolean)
+}
+
 function mtimeOf(file) {
   try {
     return fs.statSync(file).mtimeMs
@@ -40,6 +50,8 @@ function readItem(file, fileName, scope, source, pluginId, enabled, readOnly) {
     kind: 'agent',
     name,
     description: meta.description || firstBodyLine(meta.body),
+    model: typeof meta.model === 'string' ? meta.model : '',
+    tools: toolList(meta.tools),
     scope,
     source,
     path: file,

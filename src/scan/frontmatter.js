@@ -7,6 +7,7 @@ function unquote(value) {
 }
 
 const BLOCK = /^([>|])[+-]?$/
+const KEEP = new Set(['name', 'description', 'model', 'tools'])
 
 function indentOf(line) {
   return line.length - line.trimStart().length
@@ -36,6 +37,16 @@ export function parseFrontmatter(text) {
   while (i < lines.length) {
     const line = lines[i]
     i++
+    const bare = line.match(/^([A-Za-z_][\w-]*):\s*$/)
+    if (bare && bare[1] === 'tools') {
+      const list = []
+      while (i < lines.length && /^\s+-\s+/.test(lines[i])) {
+        list.push(unquote(lines[i].replace(/^\s+-\s+/, '').trim()))
+        i++
+      }
+      if (list.length) meta[bare[1]] = list
+      continue
+    }
     const at = line.indexOf(': ')
     if (at <= 0 || indentOf(line) > 0) continue
     const key = line.slice(0, at).trim()
@@ -47,7 +58,7 @@ export function parseFrontmatter(text) {
       value = read.value
       i = read.next
     } else value = unquote(raw)
-    if (key === 'name' || key === 'description') meta[key] = value
+    if (KEEP.has(key)) meta[key] = value
   }
   return { ...meta, body: source.slice(match[0].length) }
 }

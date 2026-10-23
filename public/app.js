@@ -12,7 +12,7 @@ const PAGES = {
   claudemd: 'CLAUDE.md'
 }
 
-const HOLDER = '.card, .recent, tr[data-key]'
+const HOLDER = '.card, .recent, tr[data-key], .lrow, .pnote'
 const HOOK_EVENTS = ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop', 'SubagentStop', 'SessionStart', 'SessionEnd', 'PreCompact']
 const SETTINGS_FILE = { global: '~/.claude/settings.json', project: '.claude/settings.json', projectLocal: '.claude/settings.local.json' }
 const MCP_ORIGIN = { user: '~/.claude.json', local: '~/.claude.json · this folder', mcpjson: '.mcp.json' }
@@ -129,7 +129,7 @@ function inScope(scope) {
 function matches(item) {
   const q = state.query.trim().toLowerCase()
   if (!q) return true
-  return [item.name, item.description, item.source, item.plugin, item.id].some((v) => String(v ?? '').toLowerCase().includes(q))
+  return [item.name, item.description, item.source, item.plugin, item.id, item.model, item.tools?.join(' ')].some((v) => String(v ?? '').toLowerCase().includes(q))
 }
 
 function visible(item) {
@@ -209,32 +209,12 @@ function missingFavHtml(fav) {
   </article>`
 }
 
-function grid(list, opts) {
-  return `<div class="grid">${list.map((i) => cardHtml(i, opts)).join('')}</div>`
-}
-
 function empty(text) {
   return `<div class="empty">${esc(text)}</div>`
 }
 
 function nothingMatches() {
   return empty(state.query ? `Nothing matches "${state.query}" in this scope.` : 'Nothing in this scope.')
-}
-
-function groups(list, kind) {
-  if (!list.length) return empty(`No ${kind} found in ~/.claude or ./.claude.`)
-  const defs =
-    kind === 'plugins'
-      ? [['global', 'Global · installed for your user'], ['project', 'Project · installed for this folder']]
-      : [['global', 'Global · ~/.claude'], ['project', 'Project · ./.claude'], ['plugin', 'From plugins']]
-  const html = defs
-    .map(([scope, title]) => {
-      const shown = list.filter((i) => i.scope === scope && visible(i))
-      if (!shown.length) return ''
-      return `<h2>${esc(title)} <span class="pill">${shown.length}</span></h2>${grid(shown)}`
-    })
-    .join('')
-  return html || nothingMatches()
 }
 
 function favoriteEntries() {
@@ -246,9 +226,16 @@ function counts(list) {
   return { total: shown.length, on: shown.filter((i) => i.enabled).length }
 }
 
-function statTile(page, label, c, extra) {
-  const sub = extra ?? `<span class="on">${c.on} on</span> · ${c.total - c.on} off`
-  return `<button type="button" class="stat" data-go="${page}"><span class="n">${c.total}</span><span class="l">${esc(label)}</span><span class="s">${sub}</span></button>`
+function navIcon(page) {
+  return document.querySelector(`#nav [data-p="${page}"] .ic`)?.outerHTML ?? ''
+}
+
+function statTile(page, label, c) {
+  return `<button type="button" class="stat" data-go="${page}">
+    <span class="st-top"><span class="st-ic">${navIcon(page)}</span><span class="l">${esc(label)}</span></span>
+    <span class="n">${c.total}</span>
+    <span class="s"><span class="on">${c.on} on</span><span class="off">${c.total - c.on} off</span></span>
+  </button>`
 }
 
 function otherCounts(list) {
@@ -266,19 +253,20 @@ function renderDash() {
     statTile('mcp', 'MCP servers', otherCounts(inv.mcp))
   ].join('')
   const favs = favoriteEntries().filter((e) => e.item && visible(e.item)).slice(0, 6).map((e) => e.item)
-  const favHtml = favs.length ? grid(favs) : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any card.')
+  const favHtml = favs.length ? rowsHtml(favs, 'dfav') : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any row.')
+  const more = inv.favorites.length > favs.length && favs.length ? '<button type="button" class="btn-link" data-go="fav">All favorites <span aria-hidden="true">→</span></button>' : ''
   const proj = [...catalog.skill, ...catalog.agent, ...catalog.plugin].filter((i) => i.scope === 'project' && visible(i))
-  const projHtml = proj.length ? grid(proj) : empty(state.query ? `No project items match "${state.query}".` : 'No skills, agents, or plugins in ./.claude.')
+  const projHtml = proj.length ? rowsHtml(proj, 'dproj') : empty(state.query ? `No project items match "${state.query}".` : 'No skills, agents, or plugins in ./.claude.')
   const errors = inv.errors?.length
     ? `<div class="warn"><b>${inv.errors.length} file${inv.errors.length > 1 ? 's' : ''} could not be read.</b> ${inv.errors.map((e) => `<code>${esc(tilde(e.path))}</code>: ${esc(e.error)}`).join('; ')}</div>`
     : ''
   $('p-dash').innerHTML = `${errors}
     <div class="stats">${tiles}</div>
     <div class="two">
-      <div><h2>Favorites</h2>${favHtml}${recentHtml()}</div>
+      <div><h2>Favorites ${more}</h2>${favHtml}${recentHtml()}</div>
       <div>
         <h2>This project</h2>
-        ${projectOn() ? `${filesHtml()}<h2>Project items</h2>${projHtml}` : projectOffHtml()}
+        ${projectOn() ? `${filesHtml()}<h2>Project items <span class="pill">${proj.length}</span></h2>${projHtml}` : projectOffHtml()}
       </div>
     </div>`
 }
@@ -300,9 +288,9 @@ function recentHtml() {
     .sort((a, b) => b.mtime - a.mtime)
     .slice(0, 5)
   const body = recent.length
-    ? `<ul class="files">${recent
+    ? `<ul class="clist">${recent
         .map(
-          (i) => `<li class="recent" data-key="${esc(i.key)}"><button type="button" class="btn-plain name" data-act="open">${esc(i.name)}</button><span class="tag">${esc(i.kind)}</span>${scopeTag(i.scope)}<span class="no when" title="${esc(new Date(i.mtime).toLocaleString())}">${esc(ago(i.mtime))}</span></li>`
+          (i) => `<li class="recent" data-key="${esc(i.key)}"><button type="button" class="btn-plain name" data-act="open">${esc(i.name)}</button><span class="ck">${esc(KIND_WORD[i.kind] ?? i.kind)} · ${esc(i.scope)}</span><span class="when" title="${esc(new Date(i.mtime).toLocaleString())}">${esc(ago(i.mtime))}</span></li>`
         )
         .join('')}</ul>`
     : nothingMatches()
@@ -312,19 +300,22 @@ function recentHtml() {
 function filesHtml() {
   const inv = state.inventory
   const rows = [
-    ['CLAUDE.md', inv.claudeMd?.project?.exists],
-    ['.claude/settings.json', inv.settings?.project?.exists],
-    ['.claude/settings.local.json', inv.settings?.projectLocal?.exists],
-    ['.mcp.json', projectFiles ? projectFiles.has('.mcp.json') : inv.mcp.some((m) => m.origin === 'mcpjson')]
+    ['CLAUDE.md', inv.claudeMd?.project?.exists, 'claudemd'],
+    ['.claude/settings.json', inv.settings?.project?.exists, 'settings'],
+    ['.claude/settings.local.json', inv.settings?.projectLocal?.exists, 'settings'],
+    ['.mcp.json', projectFiles ? projectFiles.has('.mcp.json') : inv.mcp.some((m) => m.origin === 'mcpjson'), 'mcp']
   ]
-  return `<ul class="files">${rows
-    .map(([name, yes]) => `<li><code>${esc(name)}</code><span class="${yes ? 'yes' : 'no'}">${yes ? 'present' : 'not found'}</span></li>`)
+  return `<ul class="clist files">${rows
+    .map(
+      ([name, yes, page]) =>
+        `<li><span class="dot${yes ? ' yes' : ''}" aria-hidden="true"></span><button type="button" class="btn-plain fname" data-go="${page}" aria-label="${esc(`${name}, ${yes ? 'present' : 'not found'}. Open ${PAGES[page]}`)}">${esc(name)}</button><span class="${yes ? 'yes' : 'no'}">${yes ? 'present' : 'not found'}</span></li>`
+    )
     .join('')}</ul>`
 }
 
 function renderFav() {
   const entries = favoriteEntries()
-  const intro = '<div class="ok">Favorites live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a card to reorder.</div>'
+  const intro = '<div class="warn">Favorites live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a card to reorder.</div>'
   if (!entries.length) {
     $('p-fav').innerHTML = intro + empty('No favorites yet. Click the star on any card.')
     return
@@ -334,8 +325,296 @@ function renderFav() {
   $('p-fav').innerHTML = intro + (shown.length ? `<div class="grid" id="favgrid">${html}</div>` : nothingMatches())
 }
 
+const ICON = {
+  lock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  warn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5"/><path d="M12 18h.01"/></svg>',
+  dots: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  copy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  chev: '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>'
+}
+
+const CHIPS = {
+  plugins: [['all', 'All'], ['on', 'On'], ['off', 'Off'], ['broken', 'Broken']],
+  skills: [['all', 'All'], ['on', 'On'], ['off', 'Off'], ['plugin', 'From plugins']],
+  agents: [['all', 'All'], ['on', 'On'], ['off', 'Off'], ['plugin', 'From plugins']]
+}
+
+const SECTIONS = {
+  plugins: [['global', 'Global · installed for your user', ''], ['project', 'Project · installed for this folder', '']],
+  skills: [
+    ['global', 'Global · ~/.claude/skills', 'The switch writes skillOverrides in ~/.claude/settings.json'],
+    ['project', 'Project · ./.claude/skills', 'The switch writes .claude/settings.local.json']
+  ],
+  agents: [
+    ['global', 'Global · ~/.claude/agents', 'Off renames name.md to name.md.disabled'],
+    ['project', 'Project · ./.claude/agents', 'Off renames name.md to name.md.disabled']
+  ]
+}
+
+const chipFilter = { plugins: 'all', skills: 'all', agents: 'all' }
+const groupOpen = new Map()
+let menuKey = null
+let menuCtx = ''
+
+function slug(value) {
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
+function shortVersion(v) {
+  const s = String(v ?? '').trim()
+  if (!s) return ''
+  if (/^[0-9a-f]{8,}$/i.test(s)) return s.slice(0, 7)
+  return /^v\d/i.test(s) ? s : /^\d/.test(s) ? `v${s}` : s
+}
+
+function pluginParts(id) {
+  const p = pluginById(id)
+  if (!p) return []
+  const parts = [[p.skills.length, 'skill'], [p.agents.length, 'agent'], [p.hooks.length, 'hook']].filter(([n]) => n).map(([n, w]) => plural(n, w))
+  if (p.mcp.length) parts.push(`${p.mcp.length} MCP`)
+  return parts
+}
+
+function cliScope(id) {
+  const s = pluginById(id)?.installScope
+  return ['user', 'project', 'local'].includes(s) ? s : 'user'
+}
+
+function rowSource(item) {
+  if (item.kind === 'plugin') return item.source === 'plugin' ? '' : item.source
+  if (item.plugin) return ''
+  return item.source === 'local' || item.source === 'project' ? '' : item.source
+}
+
+function leadHtml(item) {
+  const sw = switchInfo(item)
+  if (item.kind === 'plugin' && item.missing) {
+    return `<span class="lead-ic bad" role="img" aria-label="Plugin folder missing" title="${esc(sw.title)}">${ICON.warn}</span>`
+  }
+  if (!item.canToggle) {
+    return `<span class="lead-ic" role="img" aria-label="${esc(sw.title)}" title="${esc(sw.title)}">${ICON.lock}</span>`
+  }
+  const label = `${item.enabled ? 'Switch off' : 'Switch on'} ${item.kind} ${item.name}`
+  return `<button type="button" class="sw" role="switch" data-act="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" title="${esc(sw.title)}"></button>`
+}
+
+function menuEntries(item) {
+  if (item.kind === 'plugin' && item.missing) return [['m-open', 'Open details'], ['m-uninstall', 'Remove entry', true]]
+  const list = [['m-open', 'Open details']]
+  if (item.canToggle) list.push(['m-toggle', item.enabled ? 'Switch off' : 'Switch on'])
+  if (item.path) list.push(['m-finder', 'Reveal in Finder'])
+  if (item.kind === 'plugin') list.push(['m-uninstall', 'Uninstall plugin…', true])
+  return list
+}
+
+function menuHtml(item) {
+  const entries = menuEntries(item)
+  const html = entries
+    .map(([act, text, danger]) => `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-act="${act}">${esc(text)}</button>`)
+    .join('')
+  return `<div class="menu" role="menu" id="menu-${slug(item.key)}" aria-label="${esc(`More actions for ${item.name}`)}">${html}</div>`
+}
+
+function metaHtml(item) {
+  if (item.kind === 'plugin') {
+    if (item.missing) return '<p class="meta muted">Use “Remove entry” to clean up installed_plugins.json.</p>'
+    const parts = pluginParts(item.id)
+    return `<p class="meta${parts.length ? '' : ' muted'}">${esc(parts.length ? parts.join(' · ') : 'No skills, agents, hooks, or MCP servers found')}</p>`
+  }
+  if (item.kind === 'agent') {
+    const bits = []
+    if (item.model) bits.push(`<span class="mchip">model: ${esc(item.model)}</span>`)
+    if (item.tools?.length) bits.push(`<span class="mchip">${esc(item.tools.join(' · '))}</span>`)
+    return bits.length ? `<p class="meta chips-s">${bits.join('')}</p>` : ''
+  }
+  return ''
+}
+
+function rowHtml(item, ctx = '') {
+  const open = menuKey === item.key && menuCtx === ctx
+  const src = rowSource(item)
+  const off = item.canToggle && !item.enabled
+  const desc = item.missing ? 'Listed in installed_plugins.json, but the plugin folder is gone.' : item.description || 'No description'
+  const ver = item.kind === 'plugin' ? shortVersion(pluginById(item.id)?.version) : ''
+  const cls = ['lrow', off ? 'off' : '', item.missing ? 'missing' : '', item.canToggle ? '' : 'locked'].filter(Boolean).join(' ')
+  return `<li class="${cls}" data-key="${esc(item.key)}">
+    <div class="lead">${leadHtml(item)}</div>
+    <div class="body">
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
+      <p class="desc">${esc(desc)}</p>
+      ${metaHtml(item)}
+    </div>
+    ${ver ? `<span class="ver" title="${esc(pluginById(item.id)?.version ?? '')}">${esc(ver)}</span>` : ''}
+    <div class="tail">
+      ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
+      <button type="button" class="star" data-act="star" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>
+      <button type="button" class="icon-btn" data-act="menu" aria-haspopup="menu" aria-expanded="${open ? 'true' : 'false'}"${open ? ` aria-controls="menu-${slug(item.key)}"` : ''} aria-label="${esc(`More actions for ${item.name}`)}">${ICON.dots}</button>
+    </div>
+    ${open ? menuHtml(item) : ''}
+  </li>`
+}
+
+function rowsHtml(list, ctx = '') {
+  return `<ul class="rows" data-rows="${ctx}">${list.map((i) => rowHtml(i, ctx)).join('')}</ul>`
+}
+
+function keepChip(page, item) {
+  const f = chipFilter[page]
+  if (f === 'all') return true
+  if (page === 'plugins') return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
+  if (f === 'plugin') return item.scope === 'plugin'
+  return item.scope !== 'plugin' && (f === 'on') === Boolean(item.enabled)
+}
+
+function chipCounts(page, list) {
+  const shown = list.filter(visible)
+  if (page === 'plugins') {
+    const ok = shown.filter((p) => !p.missing)
+    return { all: shown.length, on: ok.filter((p) => p.enabled).length, off: ok.filter((p) => !p.enabled).length, broken: shown.length - ok.length }
+  }
+  const own = shown.filter((i) => i.scope !== 'plugin')
+  return { all: shown.length, on: own.filter((i) => i.enabled).length, off: own.filter((i) => !i.enabled).length, plugin: shown.length - own.length }
+}
+
+function chipsHtml(page, list, note) {
+  const n = chipCounts(page, list)
+  const buttons = CHIPS[page]
+    .map(([k, label]) => {
+      const on = chipFilter[page] === k
+      const bad = k === 'broken' && n.broken ? ' bad' : ''
+      return `<button type="button" class="chip${bad}" id="chip-${page}-${k}" data-chip="${k}" aria-pressed="${on ? 'true' : 'false'}">${esc(label)} <span class="n">${n[k]}</span></button>`
+    })
+    .join('')
+  return `<div class="chipbar"><div class="chips" role="group" aria-label="${esc(`Filter ${PAGES[page].toLowerCase()}`)}">${buttons}</div><p class="note">${note}</p></div>`
+}
+
+function pluginGroupsHtml(page, list) {
+  const kind = page === 'skills' ? 'skill' : 'agent'
+  const shown = list.filter((i) => i.scope === 'plugin' && visible(i) && keepChip(page, i))
+  if (!shown.length) return ''
+  const byPlugin = new Map()
+  for (const i of shown) {
+    const id = i.plugin ?? i.source
+    if (!byPlugin.has(id)) byPlugin.set(id, [])
+    byPlugin.get(id).push(i)
+  }
+  const body = [...byPlugin]
+    .map(([id, rows]) => {
+      const plugin = catalog.plugin.find((p) => p.id === id)
+      const gk = `${kind}:${id}`
+      const open = groupOpen.has(gk) ? groupOpen.get(gk) : Boolean(state.query.trim())
+      const name = plugin?.name ?? id
+      const panel = `gp-${kind}-${slug(id)}`
+      const stateText = plugin?.enabled ? 'Plugin on' : 'Plugin off'
+      const notice = plugin
+        ? `<div class="pnote" role="note" data-key="${esc(plugin.key)}">${ICON.lock}<span class="pnote-t">These ${kind}s are part of the plugin <b>${esc(name)}</b>. You cannot delete or switch them one by one.</span><span class="pnote-a"><button type="button" class="btn" data-act="toggle">${plugin.enabled ? 'Switch off plugin' : 'Switch on plugin'}</button><button type="button" class="btn danger" data-act="uninstall">Uninstall plugin…</button></span></div>`
+        : ''
+      return `<div class="pgroup${plugin?.enabled ? '' : ' off'}">
+        <h3 class="ghead"><button type="button" class="gbtn" id="gb-${kind}-${slug(id)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(name)}</span><span class="gcount">${esc(plural(rows.length, kind))}</span><span class="gstate${plugin?.enabled ? ' on' : ''}">${stateText}</span></button></h3>
+        <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? notice + rowsHtml(rows) : ''}</div>
+      </div>`
+    })
+    .join('')
+  return `<h2>From plugins <span class="pill">${shown.length}</span><span class="hint">Grouped by plugin. These ${kind}s follow their plugin switch.</span></h2><div class="groups">${body}</div>`
+}
+
+function catalogBody(page, list) {
+  if (!list.length) return empty(`No ${page} found in ~/.claude or ./.claude.`)
+  const own = SECTIONS[page]
+    .map(([scope, title, hint]) => {
+      const shown = list.filter((i) => i.scope === scope && visible(i) && keepChip(page, i))
+      if (!shown.length) return ''
+      return `<h2>${esc(title)} <span class="pill">${shown.length}</span>${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</h2>${rowsHtml(shown)}`
+    })
+    .join('')
+  const html = own + (page === 'plugins' ? '' : pluginGroupsHtml(page, list))
+  if (html) return html
+  if (chipFilter[page] !== 'all' && list.some(visible)) return empty(`No ${page} match this filter.`)
+  return nothingMatches()
+}
+
 function renderCatalog(page, list, note) {
-  $(`p-${page}`).innerHTML = `<div class="warn">${note}</div>${groups(list, page)}`
+  $(`p-${page}`).innerHTML = chipsHtml(page, list, note) + catalogBody(page, list)
+}
+
+function menuButtonFor(key) {
+  const page = document.querySelector('.page:not([hidden])')
+  return page ? [...page.querySelectorAll('[data-act="menu"]')].find((b) => holderKey(b.closest(HOLDER)) === key && (b.closest('[data-rows]')?.dataset.rows ?? '') === menuCtx) ?? null : null
+}
+
+function closeMenu(refocus = true) {
+  if (!menuKey) return
+  const btn = refocus ? menuButtonFor(menuKey) : null
+  menuKey = null
+  if (btn) btn.focus({ preventScroll: true })
+  render()
+}
+
+function openMenu(key, ctx = '') {
+  menuKey = menuKey === key && menuCtx === ctx ? null : key
+  menuCtx = ctx
+  render()
+  if (menuKey) document.querySelector('.page:not([hidden]) .menu [role="menuitem"]')?.focus({ preventScroll: true })
+}
+
+function menuKeys(e) {
+  const menu = document.activeElement?.closest?.('.menu')
+  if (!menu) return false
+  const list = [...menu.querySelectorAll('[role="menuitem"]')]
+  const at = list.indexOf(document.activeElement)
+  let next = null
+  if (e.key === 'ArrowDown') next = list[(at + 1) % list.length]
+  else if (e.key === 'ArrowUp') next = list[(at - 1 + list.length) % list.length]
+  else if (e.key === 'Home') next = list[0]
+  else if (e.key === 'End') next = list[list.length - 1]
+  if (!next) return false
+  e.preventDefault()
+  next.focus()
+  return true
+}
+
+function reveal(item) {
+  const file = item.path
+  return guarded(`reveal-${item.key}`, async () => {
+    try {
+      await send('POST', '/api/open', { path: file, app: 'finder' })
+      toast(`Revealed ${tilde(file)} in Finder`)
+    } catch (err) {
+      toast(`Could not open: ${err.message}`, true)
+    }
+  })
+}
+
+async function uninstallPlugin(item) {
+  const busy = `${item.key}:uninstall`
+  if (pending.has(busy)) return
+  const parts = pluginParts(item.id)
+  const command = `claude plugin uninstall ${item.id} --scope ${cliScope(item.id)}`
+  const yes = await ask({
+    title: item.missing ? `Remove entry ${item.name}?` : `Uninstall ${item.name}?`,
+    message: item.missing
+      ? 'The plugin folder is gone. This removes its entry from installed_plugins.json.'
+      : `Claude Code stops loading ${parts.length ? `its ${parts.join(', ')}` : 'this plugin'}. You can install it again with /plugin.`,
+    ok: item.missing ? 'Remove entry' : 'Uninstall',
+    danger: true,
+    command
+  })
+  if (!yes) return
+  pending.add(busy)
+  try {
+    await send('POST', '/api/plugin/uninstall', { id: item.id })
+    toast(item.missing ? `Removed entry ${item.id}` : `Uninstalled ${item.id}`)
+    await refresh()
+  } catch (err) {
+    toast(`Could not uninstall ${item.name}: ${err.message}`, true)
+  } finally {
+    pending.delete(busy)
+    loadActivity()
+  }
 }
 
 function renderNav() {
@@ -428,6 +707,18 @@ function renderPage() {
 
 export function go(page) {
   if (!Object.hasOwn(PAGES, page)) page = 'dash'
+  const dirty = state.page === 'claudemd' && page !== 'claudemd' ? mdDirtyKey() : null
+  if (dirty) {
+    discardMd(dirty).then((yes) => {
+      if (yes) show(page)
+      else if (location.hash !== '#claudemd') history.replaceState(null, '', `${location.search}#claudemd`)
+    })
+    return
+  }
+  show(page)
+}
+
+function show(page) {
   state.page = page
   markStale()
   if (location.hash !== `#${page}`) history.replaceState(null, '', `${location.search}#${page}`)
@@ -568,7 +859,7 @@ const dr = {
   tab: 'file',
   seq: 0,
   opener: null,
-  backupsOpen: false
+  menu: false
 }
 
 const TEXT_EXT = /\.(md|json|txt)$/i
@@ -610,12 +901,14 @@ function fmtSize(n) {
 
 let confirmState = null
 
-function ask({ title, message, ok = 'OK', danger = false }) {
+function ask({ title, message, ok = 'OK', danger = false, command = '' }) {
   if (confirmState) confirmState.done(false)
   return new Promise((resolve) => {
     const box = $('cf')
     $('cf-title').textContent = title
     $('cf-msg').textContent = message
+    $('cf-cmd').textContent = command
+    $('cf-cmd-box').hidden = !command
     const yes = $('cf-yes')
     yes.textContent = ok
     yes.classList.toggle('danger', danger)
@@ -655,27 +948,145 @@ function trapTab(e, container) {
   }
 }
 
+const KIND_WORD = { skill: 'Skill', agent: 'Agent', plugin: 'Plugin', hook: 'Hook', mcp: 'MCP server' }
+const LOCK_WORD = { skill: 'skill', agent: 'agent', hook: 'hook', mcp: 'MCP server' }
+
+function isPluginOwned(item) {
+  return item.kind !== 'plugin' && Boolean(item.plugin || item.scope === 'plugin')
+}
+
+function ownerId(item) {
+  return item.plugin ?? item.source
+}
+
+function ownerPlugin(item) {
+  return isPluginOwned(item) ? catalog.plugin.find((p) => p.id === ownerId(item)) ?? null : null
+}
+
+function kindLabel(item) {
+  const word = KIND_WORD[item.kind] ?? item.kind
+  if (item.kind === 'plugin') return `${word} · ${item.source === 'plugin' ? item.scope : item.source}`
+  if (isPluginOwned(item)) return `${word} · from plugin ${pluginLabel(ownerId(item))}`
+  return `${word} · ${item.scope}`
+}
+
+function drawerName(item) {
+  if (item.kind === 'hook') return `${item.event} · ${item.matcher}`
+  return item.name
+}
+
+function drawerMenuEntries(item) {
+  if (item.kind === 'hook' || item.kind === 'mcp' || isPluginOwned(item)) return []
+  return menuEntries(item).filter(([act]) => act !== 'm-open')
+}
+
 function headTools(item) {
-  if (!item || item.kind === 'hook' || item.kind === 'mcp') return ''
+  if (item.kind === 'hook' || item.kind === 'mcp') return ''
+  const starBtn = `<button type="button" class="icon-btn star" data-dact="star" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`
+  const entries = drawerMenuEntries(item)
+  if (!entries.length) return starBtn
+  const menu = dr.menu
+    ? `<div class="menu" role="menu" id="dr-menu" aria-label="${esc(`More actions for ${item.name}`)}">${entries
+        .map(([act, text, danger]) => `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-dact="${act}">${esc(text)}</button>`)
+        .join('')}</div>`
+    : ''
+  return `${starBtn}<div class="dr-more"><button type="button" class="icon-btn" data-dact="menu" id="dr-menu-btn" aria-haspopup="menu" aria-expanded="${dr.menu ? 'true' : 'false'}"${dr.menu ? ' aria-controls="dr-menu"' : ''} aria-label="More actions">${ICON.dots}</button>${menu}</div>`
+}
+
+function lockHtml(item) {
+  const p = ownerPlugin(item)
+  const actions = p
+    ? `<div class="lock-a">
+        <button type="button" class="btn soft" data-dact="plugin-toggle"${p.canToggle ? '' : ' disabled'}>${p.enabled ? 'Switch off plugin' : 'Switch on plugin'}</button>
+        <button type="button" class="btn danger" data-dact="plugin-uninstall">Uninstall plugin…</button>
+        <button type="button" class="btn-link" data-dact="plugin-open">Open plugin <span aria-hidden="true">→</span></button>
+      </div>`
+    : ''
+  return `<div class="dr-note" role="note">
+      <div class="lock-t">${ICON.lock}<p><b>You cannot delete this ${LOCK_WORD[item.kind] ?? item.kind}.</b> It is part of the plugin <b>${esc(pluginLabel(ownerId(item)))}</b>. To remove it, switch off or uninstall the plugin.</p></div>
+      ${actions}
+    </div>`
+}
+
+function statusHtml(item) {
+  if (item.kind === 'plugin' && item.missing) {
+    return `<div class="dr-note bad" role="note"><div class="lock-t">${ICON.warn}<p><b>Plugin folder missing.</b> ${esc(item.id)} is listed in installed_plugins.json, but its folder is gone. Remove the entry to clean up.</p></div></div>`
+  }
+  if (isPluginOwned(item)) return lockHtml(item)
+  if (item.kind === 'hook' || item.kind === 'mcp') return ''
   const sw = switchInfo(item)
   const label = `${item.enabled ? 'Switch off' : 'Switch on'} ${item.kind} ${item.name}`
-  return `${sw.text ? `<span class="via" title="${esc(sw.title)}">${esc(sw.text)}</span>` : ''}<button type="button" class="sw" role="switch" data-dact="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" title="${esc(sw.title)}"${sw.disabled ? ' disabled' : ''}></button><button type="button" class="star" data-dact="star" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`
+  const text = item.enabled ? '<b>On</b> <span class="muted">· loads in every session</span>' : '<b>Off</b>'
+  return `<div class="dr-status">
+      <button type="button" class="sw" role="switch" data-dact="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" aria-describedby="dr-st-file"${sw.disabled ? ' disabled' : ''}></button>
+      <span class="st-text">${text}</span>
+      <span class="st-file" id="dr-st-file">${esc(sw.title)}</span>
+    </div>`
+}
+
+function factsHtml(item) {
+  const rows = []
+  if (isPluginOwned(item)) {
+    const p = ownerPlugin(item)
+    if (p) rows.push(['State', p.enabled ? `On, because ${p.name} is on` : `Off, because ${p.name} is off`])
+  } else if (item.kind === 'hook' || item.kind === 'mcp') {
+    rows.push(['State', item.enabled === false ? 'Off' : 'On'])
+  }
+  const path = `<dt>Path</dt><dd class="f-path"><code class="path" id="dr-path"></code><button type="button" class="icon-btn sm" data-dact="copy" id="dr-copy" aria-label="Copy path">${ICON.copy}</button></dd>`
+  if (item.mtime) rows.push(['Changed', ago(item.mtime)])
+  if (item.kind === 'plugin' && !item.missing) {
+    const p = pluginById(item.id)
+    if (p?.version) rows.push(['Version', p.version])
+    const parts = pluginParts(item.id)
+    rows.push(['Contents', parts.length ? parts.join(' · ') : 'No skills, agents, hooks, or MCP servers'])
+  }
+  if (item.kind === 'agent') {
+    if (item.model) rows.push(['Model', item.model])
+    if (item.tools?.length) rows.push(['Tools', item.tools.join(' · ')])
+  }
+  const lead = rows.length && rows[0][0] === 'State' ? rows.shift() : null
+  const html = (r) => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`
+  return (lead ? html(lead) : '') + path + rows.map(html).join('')
+}
+
+function barHtml(item) {
+  const finder = '<button type="button" class="btn" data-dact="finder">Reveal in Finder</button>'
+  const editor = '<button type="button" class="btn p" data-dact="editor">Open in editor</button>'
+  let left = ''
+  let right = finder + editor
+  if (item.kind === 'plugin') {
+    left = `<button type="button" class="btn danger ghost" data-dact="uninstall">${item.missing ? 'Remove entry…' : 'Uninstall plugin…'}</button>`
+    if (item.missing) right = ''
+  } else if (isPluginOwned(item)) {
+    if (item.kind === 'skill') {
+      left = '<span class="bar-hint">Want your own version?</span>'
+      right = `${finder}<button type="button" class="btn p" data-dact="fork">Copy to my skills</button>`
+    }
+  } else if (!item.readOnly) {
+    left = '<button type="button" class="btn danger ghost" data-dact="delete">Delete…</button>'
+  }
+  return `<div class="bar-l">${left}</div><div class="bar-r">${right}</div>`
+}
+
+function drawerFocusAct() {
+  const el = document.activeElement
+  if (!el || !$('dr').contains(el) || $('dr-body').contains(el)) return null
+  return el.dataset?.dact ?? null
 }
 
 function syncDrawerHead() {
   if (!drawerOpen()) return
   const item = drawerItem()
-  if (!item) return
-  const plugin = item.kind === 'plugin' ? pluginById(item.id) : null
-  const focused = document.activeElement?.dataset?.dact
+  if (!item) return forceClose()
+  const focused = drawerFocusAct()
+  $('dr-kind').textContent = kindLabel(item)
+  $('dr-name').textContent = drawerName(item)
   $('dr-tools').innerHTML = headTools(item)
-  if (focused === 'toggle' || focused === 'star') $('dr-tools').querySelector(`[data-dact="${focused}"]`)?.focus()
-  $('dr-name').textContent = item.kind === 'plugin' ? item.id : item.kind === 'hook' ? `${item.event} · ${item.matcher}` : item.name
-  const sourceTag = item.kind === 'plugin'
-    ? (plugin?.version ? `<span class="tag plugin">v${esc(plugin.version)}</span>` : '')
-    : `<span class="tag ${item.scope === 'plugin' ? 'plugin' : esc(item.scope)}">${esc(item.source)}</span>`
-  $('dr-tags').innerHTML = `<span class="tag">${esc(item.kind)}</span>${sourceTag}${scopeTag(item.scope)}${item.missing ? '<span class="tag bad">missing</span>' : ''}${item.readOnly ? '<span class="tag">read-only</span>' : ''}`
   $('dr-desc').textContent = item.kind === 'hook' ? item.name || '(no command)' : item.description || 'No description.'
+  $('dr-status').innerHTML = statusHtml(item)
+  $('dr-facts').innerHTML = factsHtml(item)
+  $('dr-bar').innerHTML = barHtml(item)
+  if (focused) document.querySelector(`#dr .dr-top [data-dact="${focused}"], #dr .dr-bar [data-dact="${focused}"]`)?.focus()
   if (item.kind !== 'plugin' && item.path !== dr.mainFile) {
     const wasMain = dr.file === dr.mainFile
     dr.mainFile = item.path
@@ -684,8 +1095,16 @@ function syncDrawerHead() {
   showPath()
 }
 
+function closeDrawerMenu(refocus) {
+  if (!dr.menu) return
+  dr.menu = false
+  syncDrawerHead()
+  if (refocus) $('dr-menu-btn')?.focus()
+}
+
 function showPath() {
-  $('dr-path').textContent = dr.file ? tilde(dr.file) : dr.root ? tilde(dr.root) : ''
+  const box = $('dr-path')
+  if (box) box.textContent = dr.file ? tilde(dr.file) : dr.root ? tilde(dr.root) : ''
 }
 
 function tabsHtml(tabs) {
@@ -695,30 +1114,23 @@ function tabsHtml(tabs) {
 }
 
 function fileBodyHtml(item, withFiles) {
-  const tabs = [['file', 'File'], ['preview', 'Preview']]
+  const own = !item.readOnly && !isPluginOwned(item)
+  const tabs = [['preview', 'Preview'], ['file', own ? 'Edit' : 'Source (read-only)']]
   if (withFiles) tabs.push(['files', 'Files'])
-  const isPluginSkill = item.kind === 'skill' && item.scope === 'plugin'
-  const canDelete = !item.readOnly
-  return `<div class="row">${tabsHtml(tabs)}<span class="dirty" id="dr-dirty" aria-live="polite"></span></div>
-    <div class="pane" id="pane-file" role="tabpanel" aria-labelledby="tab-file">
+  if (own) tabs.push(['backups', 'Backups'])
+  return `${tabsHtml(tabs)}
+    <div class="pane md" id="pane-preview" role="tabpanel" aria-labelledby="tab-preview"></div>
+    <div class="pane" id="pane-file" role="tabpanel" aria-labelledby="tab-file" hidden>
       <div class="filebar">
         <code id="dr-file"></code>
         <button type="button" class="btn" data-dact="main" id="dr-main" hidden>Back to ${esc(baseName(dr.mainFile))}</button>
-        <button type="button" class="btn" data-dact="backups" id="dr-bk-btn" aria-expanded="false" aria-controls="dr-backups">Backups</button>
+        ${own ? '<span class="dirty" id="dr-dirty" aria-live="polite"></span><button type="button" class="btn p" data-dact="save" id="dr-save" disabled>Save</button>' : ''}
       </div>
-      <div class="backups" id="dr-backups" hidden></div>
       <textarea id="dr-txt" spellcheck="false" aria-label="File contents"></textarea>
+      <p class="note" id="dr-note"></p>
     </div>
-    <div class="pane md" id="pane-preview" role="tabpanel" aria-labelledby="tab-preview" hidden></div>
     ${withFiles ? '<div class="pane" id="pane-files" role="tabpanel" aria-labelledby="tab-files" hidden></div>' : ''}
-    <div class="row actions">
-      <button type="button" class="btn p" data-dact="save" id="dr-save" disabled>Save</button>
-      <button type="button" class="btn" data-dact="editor">Open in editor</button>
-      <button type="button" class="btn" data-dact="finder">Reveal in Finder</button>
-      ${isPluginSkill ? '<button type="button" class="btn" data-dact="fork">Fork to local</button>' : ''}
-      ${canDelete ? '<button type="button" class="btn danger x" data-dact="delete">Delete</button>' : ''}
-    </div>
-    <p class="note" id="dr-note"></p>`
+    ${own ? '<div class="pane" id="pane-backups" role="tabpanel" aria-labelledby="tab-backups" hidden></div>' : ''}`
 }
 
 function listLinks(list, kind) {
@@ -737,7 +1149,8 @@ function pluginBodyHtml(item) {
   const hooks = p?.hooks ?? []
   const mcp = p?.mcp ?? []
   const events = [...new Set(hooks.map((h) => h.event).filter(Boolean))]
-  return `<div class="row">${tabsHtml([['overview', 'Overview'], ['files', 'Files'], ['file', 'File']])}</div>
+  const tabs = item.missing ? [['overview', 'Overview']] : [['overview', 'Overview'], ['files', 'Files'], ['file', 'File']]
+  return `${tabsHtml(tabs)}
     <div class="pane" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
       <h3>Skills <span class="pill">${skills.length}</span></h3>${listLinks(skills, 'skills')}
       <h3>Agents <span class="pill">${agents.length}</span></h3>${listLinks(agents, 'agents')}
@@ -751,10 +1164,6 @@ function pluginBodyHtml(item) {
     <div class="pane" id="pane-file" role="tabpanel" aria-labelledby="tab-file" hidden>
       <div class="filebar"><code id="dr-file"></code></div>
       <textarea id="dr-txt" spellcheck="false" aria-label="File contents" placeholder="Pick a file in the Files tab." readonly></textarea>
-    </div>
-    <div class="row actions">
-      <button type="button" class="btn" data-dact="editor">Open in editor</button>
-      <button type="button" class="btn" data-dact="finder">Reveal in Finder</button>
     </div>`
 }
 
@@ -764,6 +1173,7 @@ function setTab(tab) {
   for (const pane of $('dr-body').querySelectorAll('.pane')) pane.hidden = pane.id !== `pane-${tab}`
   if (tab === 'preview') $('pane-preview').innerHTML = previewHtml($('dr-txt').value, dr.file)
   if (tab === 'files') loadDir(dr.dir ?? dr.root)
+  if (tab === 'backups') loadBackups()
 }
 
 function updateDirty() {
@@ -777,7 +1187,7 @@ function updateDirty() {
 function noteText(item) {
   if (item.kind === 'plugin') return ''
   if (item.readOnly) {
-    return item.kind === 'skill' ? 'Plugin files are read-only. Fork to ~/.claude/skills to edit a copy.' : 'Plugin files are read-only.'
+    return item.kind === 'skill' ? 'Plugin files are read-only. Use Copy to my skills to edit a copy in ~/.claude/skills.' : 'Plugin files are read-only.'
   }
   if (!dr.editable) return 'This file is shown read-only. Only .md, .json, and .txt files can be edited here.'
   return 'Save writes the file and a backup to ~/.claude/backups/storehouse/.'
@@ -812,7 +1222,7 @@ async function loadFile(file, { main = false } = {}) {
   if (back) back.hidden = dr.file === dr.mainFile
   const note = $('dr-note')
   if (note) note.textContent = noteText(item)
-  closeBackups()
+  if (dr.tab === 'backups') loadBackups()
   showPath()
   updateDirty()
   if (dr.tab === 'preview') $('pane-preview').innerHTML = previewHtml(txt.value, dr.file)
@@ -841,28 +1251,16 @@ async function loadDir(dir) {
   }
 }
 
-function closeBackups() {
-  dr.backupsOpen = false
-  const box = $('dr-backups')
-  if (box) {
-    box.hidden = true
-    box.innerHTML = ''
-  }
-  $('dr-bk-btn')?.setAttribute('aria-expanded', 'false')
-}
-
-async function toggleBackups() {
-  if (dr.backupsOpen) return closeBackups()
-  dr.backupsOpen = true
-  const box = $('dr-backups')
-  $('dr-bk-btn').setAttribute('aria-expanded', 'true')
-  box.hidden = false
+async function loadBackups() {
+  const box = $('pane-backups')
+  const file = dr.file
+  if (!box || !file) return
+  const seq = dr.seq
   box.innerHTML = '<p class="note">Loading backups…</p>'
   try {
-    const res = await get(`/api/backups?path=${encodeURIComponent(dr.file)}`)
-    if (!dr.backupsOpen) return
-    const list = res.backups ?? []
-    box.innerHTML = backupsListHtml(list, 'data-dact="restore"', dr.editable, 'dr')
+    const res = await get(`/api/backups?path=${encodeURIComponent(file)}`)
+    if (seq !== dr.seq || dr.file !== file || dr.tab !== 'backups') return
+    box.innerHTML = `<p class="note">Backups of <code>${esc(relTo(dr.root, file))}</code></p>${backupsListHtml(res.backups ?? [], 'data-dact="restore"', dr.editable, 'dr')}`
   } catch (err) {
     box.innerHTML = `<p class="note">${esc(`Could not list backups: ${err.message}`)}</p>`
   }
@@ -962,7 +1360,7 @@ export function openDrawer(item) {
   dr.key = item.key
   dr.kind = item.kind
   dr.seq++
-  dr.backupsOpen = false
+  dr.menu = false
   dr.dir = null
   dr.loaded = ''
   dr.editable = false
@@ -982,7 +1380,7 @@ export function openDrawer(item) {
     dr.mainFile = item.path
     dr.root = isFolderSkill(item) ? parentDir(item.path) : null
     dr.file = item.path
-    dr.tab = 'file'
+    dr.tab = 'preview'
     $('dr-body').innerHTML = fileBodyHtml(item, isFolderSkill(item))
     $('dr-txt').addEventListener('input', updateDirty)
   }
@@ -1008,6 +1406,7 @@ function forceClose() {
   $('dr-scrim').hidden = true
   dr.seq++
   dr.key = null
+  dr.menu = false
   const opener = dr.opener
   dr.opener = null
   let target = null
@@ -1058,7 +1457,7 @@ function saveFile() {
         dr.stamp = res.stamp
         if ($('dr-txt').value === sent) $('dr-txt').value = res.content
         updateDirty()
-        closeBackups()
+        if (dr.tab === 'backups') loadBackups()
       }
       toast('Saved · backup written')
       await refresh().catch(() => {})
@@ -1137,11 +1536,11 @@ function forkItem() {
   return guarded('fork', async () => {
     try {
       const res = await send('POST', '/api/fork', { name, plugin: item.plugin })
-      toast(`Forked to ${tilde(res.path)}`)
+      toast(`Copied to ${tilde(res.path)}`)
       await refresh().catch(() => {})
     } catch (err) {
       if (err.status === 409) toast(`${name} already exists in ~/.claude/skills. Open it from the Skills page.`, true)
-      else toast(`Could not fork ${name}: ${err.message}`, true)
+      else toast(`Could not copy ${name}: ${err.message}`, true)
     } finally {
       loadActivity()
     }
@@ -1165,7 +1564,8 @@ function restoreBackupFile(backup) {
         dr.stamp = res.stamp
         $('dr-txt').value = res.content
         updateDirty()
-        closeBackups()
+        setTab('file')
+        $('dr-txt').focus()
       }
       toast(`Restored ${baseName(file)} from backup`)
       await refresh().catch(() => {})
@@ -1178,19 +1578,39 @@ function restoreBackupFile(backup) {
 }
 
 async function onDrawerClick(e) {
+  if (dr.menu && !e.target.closest('#dr-menu, [data-dact="menu"]')) closeDrawerMenu(false)
   const tab = e.target.closest('[data-tab]')
   if (tab) return setTab(tab.dataset.tab)
   const b = e.target.closest('[data-dact]')
   if (!b || b.disabled) return
   const act = b.dataset.dact
   const item = drawerItem()
-  if (act === 'toggle' && item) return void toggle(item)
-  if (act === 'star' && item) return void starItem(item)
+  if (!item) return
+  if (act === 'menu') {
+    dr.menu = !dr.menu
+    syncDrawerHead()
+    if (dr.menu) $('dr-menu')?.querySelector('[role="menuitem"]')?.focus()
+    return
+  }
+  if (act.startsWith('m-')) {
+    closeDrawerMenu(true)
+    if (act === 'm-toggle') return void toggle(item)
+    if (act === 'm-finder') return void reveal(item)
+    if (act === 'm-uninstall') return void uninstallPlugin(item)
+    return
+  }
+  const owner = ownerPlugin(item)
+  if (act === 'toggle') return void toggle(item)
+  if (act === 'star') return void starItem(item)
+  if (act === 'copy') return void copyPath()
+  if (act === 'uninstall') return void uninstallPlugin(item)
+  if (act === 'plugin-toggle' && owner) return void toggle(owner)
+  if (act === 'plugin-uninstall' && owner) return void uninstallPlugin(owner)
+  if (act === 'plugin-open' && owner) return openDrawer(owner)
   if (act === 'save') return void saveFile()
   if (act === 'editor' || act === 'finder') return void openIn(act)
-  if (act === 'delete') return void deleteItem()
+  if (act === 'delete') return void (item.kind === 'hook' || item.kind === 'mcp' ? deleteRow(item) : deleteItem())
   if (act === 'fork') return void forkItem()
-  if (act === 'backups') return void toggleBackups()
   if (act === 'restore') return void restoreBackupFile(b.dataset.path)
   if (act === 'dir') return void loadDir(b.dataset.path)
   if (act === 'sub') {
@@ -1262,8 +1682,31 @@ function rowSwitch(item, label) {
   return `<span class="sw-wrap">${sw.text ? `<span class="via" title="${esc(sw.title)}">${esc(sw.text)}</span>` : ''}<button type="button" class="sw" role="switch" data-act="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(`${text} ${label}`)}" title="${esc(sw.title)}"${sw.disabled ? ' disabled' : ''}></button></span>`
 }
 
+function cellSwitch(item, label) {
+  if (item.plugin && !item.canToggle) {
+    const sw = switchInfo(item)
+    return `<span class="lead-ic" role="img" aria-label="${esc(sw.title)}" title="${esc(sw.title)}">${ICON.lock}</span>`
+  }
+  return rowSwitch(item, label)
+}
+
+function viaPlugin(item) {
+  const name = pluginLabel(item.plugin)
+  return `<span class="via-lock" title="${esc(`Follows the plugin ${name}. Switch or uninstall it on the Plugins page.`)}">${ICON.lock}<span>via plugin ${esc(name)}</span></span>`
+}
+
 function tableHtml(label, head, rows) {
-  return `<div class="tbl"><table class="data" aria-label="${esc(label)}"><thead><tr>${head.map((h) => `<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`
+  return `<div class="tbl"><table class="data" aria-label="${esc(label)}"><thead><tr>${head.map(([h, sr]) => `<th scope="col">${sr ? `<span class="sr">${esc(sr)}</span>` : esc(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`
+}
+
+function pageBar(note, actions) {
+  return `<div class="pagebar"><p class="note">${note}</p><div class="pb-a">${actions}</div></div>`
+}
+
+function addButton(name, label) {
+  const open = cfg[name].open
+  const id = name === 'hook' ? 'hf' : 'mf'
+  return `<button type="button" class="btn${open ? '' : ' p'}" id="${id}-open" data-c="${id}-open" aria-expanded="${open}" aria-controls="${name}-form">${open ? 'Close form' : label}</button>`
 }
 
 function renderHooks() {
@@ -1271,13 +1714,14 @@ function renderHooks() {
   const rows = list
     .map((h) => {
       const label = `${h.event} hook ${h.name}`
-      const del = h.plugin ? '' : `<button type="button" class="btn danger" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
-      return `<tr data-key="${esc(h.key)}"${h.enabled ? '' : ' class="off"'}>
-        <td data-label="Event">${esc(h.event)}</td>
-        <td data-label="Matcher"><code>${esc(h.matcher)}</code></td>
-        <td data-label="Command" class="wide"><button type="button" class="btn-plain cmd" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(h.name || '(no command)')}</button></td>
-        <td data-label="Scope"><span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}</span></td>
-        <td data-label="On">${rowSwitch(h, label)}</td>
+      const del = h.plugin ? '' : `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
+      const source = h.plugin ? viaPlugin(h) : `<span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}<span class="src">${esc(h.parked ? '~/.claude/storehouse.json' : SETTINGS_FILE[h.file] ?? h.file)}</span></span>`
+      return `<tr data-key="${esc(h.key)}" class="${[h.enabled ? '' : 'off', h.plugin ? 'locked' : ''].filter(Boolean).join(' ')}">
+        <td data-label="On" class="sw-cell">${cellSwitch(h, label)}</td>
+        <td data-label="Event" class="ev">${esc(h.event)}</td>
+        <td data-label="Matcher"><code class="cchip">${esc(h.matcher)}</code></td>
+        <td data-label="Command" class="wide"><button type="button" class="btn-plain cmd cchip" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(h.name || '(no command)')}</button></td>
+        <td data-label="Source">${source}</td>
         <td class="end">${del}</td>
       </tr>`
     })
@@ -1285,19 +1729,20 @@ function renderHooks() {
   const table = !catalog.hook.length
     ? empty('No hooks in ~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json, or plugins.')
     : list.length
-      ? tableHtml('Hooks', ['Event', 'Matcher', 'Command', 'Scope', 'On', ''], rows)
+      ? tableHtml('Hooks', [['', 'On'], ['Event'], ['Matcher'], ['Command'], ['Source'], ['', 'Actions']], rows)
       : nothingMatches()
-  $('p-hooks').innerHTML = `<div class="warn">Your own hooks can be switched and deleted. Off moves a hook into <code>~/.claude/storehouse.json</code> (parkedHooks); On puts it back. Plugin hooks follow their plugin.</div>
-    ${table}${hookFormHtml()}`
+  const bar = pageBar(
+    'Your own hooks can be switched and deleted. Off moves a hook into <code>~/.claude/storehouse.json</code> (parkedHooks); On puts it back. Plugin hooks follow their plugin.',
+    `<button type="button" class="btn" data-go="settings">Edit settings files</button>${addButton('hook', 'Add hook')}`
+  )
+  $('p-hooks').innerHTML = `${bar}${hookFormHtml()}${table}`
 }
 
 function hookFormHtml() {
   const f = cfg.hook
-  if (!f.open) {
-    return `<div class="row"><button type="button" class="btn p" id="hf-open" data-c="hf-open" aria-expanded="false">Add hook</button><button type="button" class="btn" data-go="settings">Edit settings files</button></div>`
-  }
+  if (!f.open) return ''
   return `<form class="form" id="hook-form" novalidate aria-labelledby="hf-title">
-    <h3 id="hf-title">Add hook</h3>
+    <div class="form-head"><h3 id="hf-title">Add hook</h3><p class="note">Writes the hook into the settings file you pick. A backup is made first.</p></div>
     <label for="hf-scope">Scope</label>
     <select id="hf-scope" data-f="hook.scope">${opt('global', 'Global · ~/.claude/settings.json', f.scope)}${projectOn() ? opt('project', 'Project · .claude/settings.json', f.scope) : ''}</select>
     <label for="hf-event">Event</label>
@@ -1344,14 +1789,15 @@ function renderMcp() {
     .map((m) => {
       const label = `MCP server ${m.name}`
       const keys = [...Object.keys(isPlain(m.config?.env) ? m.config.env : {}), ...Object.keys(isPlain(m.config?.headers) ? m.config.headers : {})]
-      const canDelete = ['user', 'local', 'mcpjson'].includes(m.origin)
-      const del = canDelete ? `<button type="button" class="btn danger" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>` : ''
-      return `<tr data-key="${esc(m.key)}"${m.enabled ? '' : ' class="off"'}>
+      const canDelete = !m.plugin && ['user', 'local', 'mcpjson'].includes(m.origin)
+      const del = canDelete ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>` : ''
+      const source = m.plugin ? viaPlugin(m) : `<span class="tags">${scopeTag(m.scope)}<span class="src">${esc(m.source)}</span></span>`
+      return `<tr data-key="${esc(m.key)}" class="${[m.enabled ? '' : 'off', m.plugin ? 'locked' : ''].filter(Boolean).join(' ')}">
+        <td data-label="On" class="sw-cell">${cellSwitch(m, label)}</td>
         <td data-label="Name"><button type="button" class="btn-plain cmd" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button></td>
-        <td data-label="Transport">${esc(m.transport)}</td>
-        <td data-label="Command / URL" class="wide"><code>${esc(m.command ?? m.url ?? '')}</code>${keys.length ? `<div class="note">${esc(`${m.config?.headers ? 'keys' : 'env'}: ${keys.join(', ')}`)}</div>` : ''}</td>
-        <td data-label="Scope"><span class="tags">${scopeTag(m.scope)}<span class="tag${m.origin === 'plugin' ? ' plugin' : ''}">${esc(m.source)}</span></span></td>
-        <td data-label="On">${rowSwitch(m, label)}</td>
+        <td data-label="Transport"><span class="mchip">${esc(m.transport)}</span></td>
+        <td data-label="Command / URL" class="wide"><code class="cchip">${esc(m.command ?? m.url ?? '')}</code>${keys.length ? `<div class="note">${esc(`${m.config?.headers ? 'keys' : 'env'}: ${keys.join(', ')}`)}</div>` : ''}</td>
+        <td data-label="Source">${source}</td>
         <td class="end">${del}</td>
       </tr>`
     })
@@ -1359,17 +1805,18 @@ function renderMcp() {
   const table = !catalog.mcp.length
     ? empty('No MCP servers in ~/.claude.json, .mcp.json, or plugins.')
     : list.length
-      ? tableHtml('MCP servers', ['Name', 'Transport', 'Command / URL', 'Scope', 'On', ''], rows)
+      ? tableHtml('MCP servers', [['', 'On'], ['Name'], ['Transport'], ['Command / URL'], ['Source'], ['', 'Actions']], rows)
       : nothingMatches()
-  $('p-mcp').innerHTML = `<div class="warn">Global servers live in <code>~/.claude.json</code>. Project servers live in <code>./.mcp.json</code>. Plugin servers follow their plugin and cannot be deleted here.</div>
-    ${table}
-    <p class="note under">Changes apply at the next Claude Code session.</p>
-    ${mcpFormHtml()}`
+  const bar = pageBar(
+    'Global servers live in <code>~/.claude.json</code>. Project servers live in <code>./.mcp.json</code>. Plugin servers follow their plugin and cannot be deleted here. Changes apply at the next Claude Code session.',
+    addButton('mcp', 'Add MCP server')
+  )
+  $('p-mcp').innerHTML = `${bar}${mcpFormHtml()}${table}`
 }
 
 function mcpFormHtml() {
   const f = cfg.mcp
-  if (!f.open) return '<div class="row"><button type="button" class="btn p" id="mf-open" data-c="mf-open" aria-expanded="false">Add server</button></div>'
+  if (!f.open) return ''
   const stdio = f.transport === 'stdio'
   const target = stdio
     ? `<label for="mf-command">Command (required)</label>
@@ -1381,7 +1828,7 @@ function mcpFormHtml() {
     : `<label for="mf-url">URL (required)</label>
     <input id="mf-url" data-f="mcp.url" value="${esc(f.url)}" placeholder="https://example.com/mcp" autocomplete="off" spellcheck="false" aria-required="true" aria-describedby="mf-err"${invalidAttr('mcp', 'url')}>`
   return `<form class="form" id="mcp-form" novalidate aria-labelledby="mf-title">
-    <h3 id="mf-title">Add MCP server</h3>
+    <div class="form-head"><h3 id="mf-title">Add MCP server</h3><p class="note">Global writes <code>~/.claude.json</code>. Project writes <code>./.mcp.json</code>. A backup is made first.</p></div>
     <label for="mf-scope">Scope</label>
     <select id="mf-scope" data-f="mcp.scope">${opt('global', 'Global · ~/.claude.json', f.scope)}${projectOn() ? opt('project', 'Project · .mcp.json', f.scope) : ''}</select>
     <label for="mf-name">Name (required)</label>
@@ -1478,7 +1925,7 @@ function jsonBodyHtml(item) {
       ? `Read-only. This hook comes from the plugin ${pluginLabel(item.plugin)} and follows its switch.`
       : item.parked
         ? `Read-only. This hook is parked in ~/.claude/storehouse.json. Switch it on to put it back in ${SETTINGS_FILE[item.file] ?? item.file}.`
-        : `Read-only. Switch or delete it on the Hooks page, or edit ${SETTINGS_FILE[item.file] ?? item.file} on the Settings page.`
+        : `Read-only here. Switch it on the Hooks page, or edit ${SETTINGS_FILE[item.file] ?? item.file} on the Settings page.`
   } else {
     json = { [item.name]: item.config }
     note = 'Read-only. Env and header values are hidden. Open the file to see them.'
@@ -1486,10 +1933,6 @@ function jsonBodyHtml(item) {
   return `<div class="pane" id="pane-json" role="region" aria-label="JSON">
       <pre class="md json"><code>${esc(JSON.stringify(json, null, 2))}</code></pre>
       <p class="note">${esc(note)}</p>
-    </div>
-    <div class="row actions">
-      <button type="button" class="btn" data-dact="editor">Open in editor</button>
-      <button type="button" class="btn" data-dact="finder">Reveal in Finder</button>
     </div>`
 }
 
@@ -1643,29 +2086,30 @@ function editorHtml(k, p) {
   const ed = eds[k]
   if (!ed || ed.status === 'loading') return '<p class="note">Loading…</p>'
   if (ed.status === 'error') return `<p class="note">${esc(`Could not read ${p.file}: ${ed.error}`)}</p>${msgHtml(k)}`
-  const md = Boolean(p.md)
-  const editing = !md || ed.editing
-  const preview = md && ed.preview
   const dirty = edDirty(ed)
-  const btns = []
-  if (md && !editing) btns.push(`<button type="button" class="btn p" id="${k}-edit" data-c="edit" data-k="${k}">Edit</button>`)
-  if (editing) btns.push(`<button type="button" class="btn p" id="${k}-save" data-c="save" data-k="${k}"${dirty ? '' : ' disabled'}>Save</button>`)
-  if (md && editing) btns.push(`<button type="button" class="btn" id="${k}-cancel" data-c="cancel" data-k="${k}">Cancel</button>`)
-  if (md) btns.push(`<button type="button" class="btn" id="${k}-pv" data-c="preview" data-k="${k}" aria-pressed="${preview}">Preview</button>`)
-  btns.push(`<span class="dirty" id="${k}-dirty" aria-live="polite">${dirty ? '● unsaved' : ''}</span>`)
-  btns.push(backupsBtn(k))
+  const btns = [
+    `<button type="button" class="btn p" id="${k}-save" data-c="save" data-k="${k}"${dirty ? '' : ' disabled'}>Save</button>`,
+    `<span class="dirty" id="${k}-dirty" aria-live="polite">${dirty ? '● unsaved' : ''}</span>`,
+    backupsBtn(k)
+  ]
   if (p.del) btns.push(`<button type="button" class="btn danger x" id="${k}-del" data-c="delete" data-k="${k}">Delete file</button>`)
-  const area = `<textarea id="${k}-txt" class="ed${md ? '' : ' code'}" data-ed="${k}" spellcheck="false" aria-label="${esc(`${p.file} contents`)}"${editing ? '' : ' readonly'}${preview ? ' hidden' : ''}>\n${esc(ed.text)}</textarea>`
-  const prev = preview ? `<div class="md" id="${k}-prev" role="region" aria-label="${esc(`${p.file} preview`)}">${previewHtml(ed.text, p.info.path)}</div>` : ''
-  return `${area}${prev}<div class="row">${btns.join('')}</div>${panelBackupsHtml(k)}${msgHtml(k)}`
+  const area = `<textarea id="${k}-txt" class="ed code" data-ed="${k}" spellcheck="false" aria-label="${esc(`${p.file} contents`)}">\n${esc(ed.text)}</textarea>`
+  return `${area}<div class="row">${btns.join('')}</div>${panelBackupsHtml(k)}${msgHtml(k)}`
 }
 
 function edChrome(k) {
-  const dirty = edDirty(eds[k])
+  const ed = eds[k]
+  const dirty = edDirty(ed)
+  const md = MD_ORDER.includes(k)
   const mark = $(`${k}-dirty`)
-  if (mark) mark.textContent = dirty ? '● unsaved' : ''
+  if (mark) mark.textContent = md ? (dirty ? '● Unsaved changes' : `${plural(lineCount(ed?.text ?? ''), 'line')} · Saved`) : dirty ? '● unsaved' : ''
+  if (mark && md) mark.classList.toggle('is-dirty', dirty)
   const save = $(`${k}-save`)
   if (save) save.disabled = !dirty
+  const dot = $(`cm-dot-${k}`)
+  if (dot) dot.textContent = dirty ? '● unsaved' : ''
+  const cancel = md ? $(`${k}-cancel`) : null
+  if (cancel) cancel.hidden = !dirty
 }
 
 function sformChrome() {
@@ -1791,11 +2235,145 @@ function renderSettings() {
     </div>`
 }
 
+const MD_ORDER = ['mg', 'mp', 'mc', 'ml']
+const MD_WHERE = { mg: 'every project', mp: 'this folder · in git', mc: 'this folder · in git', ml: 'this folder · only you' }
+const cmd = { sel: null }
+
+function mdKeys() {
+  return projectOn() ? MD_ORDER : ['mg']
+}
+
+function mdSelected(panels) {
+  const keys = mdKeys()
+  if (!cmd.sel || !keys.includes(cmd.sel)) cmd.sel = keys.find((k) => panels[k].info?.exists) ?? keys[0]
+  return cmd.sel
+}
+
+function lineCount(text) {
+  return text ? text.replace(/\r?\n$/, '').split(/\r?\n/).length : 0
+}
+
+function mdMeta(k, p) {
+  const info = p.info
+  if (!info) return 'Could not be scanned'
+  if (!info.exists) return p.pill ? `Not found · ${p.pill}` : 'Not found'
+  const ed = eds[k]
+  const size = ed?.status === 'ready' ? plural(lineCount(ed.text), 'line') : fmtSize(info.size)
+  return `${size} · ${MD_WHERE[k]}`
+}
+
+function mdListHtml(panels, sel) {
+  let n = 0
+  return mdKeys()
+    .map((k) => {
+      const p = panels[k]
+      const exists = Boolean(p.info?.exists)
+      if (exists) ensureEd(k, p.info.path)
+      const num = exists ? ++n : 0
+      const cur = k === sel
+      const dirty = edDirty(eds[k])
+      const create = p.info && !exists ? `<button type="button" class="btn" id="cm-create-${k}" data-c="create" data-k="${k}" data-v="default" aria-label="${esc(`Create ${p.file}`)}">Create</button>` : ''
+      return `<li class="cm-file${cur ? ' cur' : ''}${exists ? '' : ' missing'}">
+        <span class="cm-num" aria-hidden="true">${num || '–'}</span>
+        <button type="button" class="cm-pick" id="cm-pick-${k}" data-c="pick" data-k="${k}"${cur ? ' aria-current="true"' : ''}>
+          <span class="sr">${num ? `Read ${num}${['st', 'nd', 'rd'][num - 1] ?? 'th'}. ` : ''}</span>
+          <span class="cm-label">${esc(p.label)}<span class="dirty" id="cm-dot-${k}">${dirty ? '● unsaved' : ''}</span></span>
+          <span class="cm-path">${esc(p.file)}</span>
+          <span class="cm-meta">${esc(mdMeta(k, p))}</span>
+        </button>
+        ${create}
+      </li>`
+    })
+    .join('')
+}
+
+function mdPanelHtml(k, p) {
+  const info = p.info
+  const ed = info?.exists ? eds[k] : null
+  const ready = ed?.status === 'ready'
+  const editing = ready && ed.editing
+  const pill = p.pill ? `<span class="pill">${esc(p.pill)}</span>` : ''
+  const tabs = ready
+    ? `<div class="tabs" role="tablist" aria-label="View">
+        <button type="button" role="tab" id="${k}-pv" data-c="preview" data-k="${k}" aria-selected="${!editing}" aria-controls="${k}-pane">Preview</button>
+        <button type="button" role="tab" id="${k}-edit" data-c="edit" data-k="${k}" aria-selected="${editing}" aria-controls="${k}-pane">Edit</button>
+      </div>`
+    : ''
+  const head = `<div class="cm-head"><div class="cm-title"><h2 id="${k}-h">${esc(p.label)}${pill}</h2><code class="cm-path">${esc(info ? tilde(info.path) : p.file)}</code></div>${tabs}</div>`
+  let body
+  let bar = ''
+  if (!info) body = '<div class="warn">This file could not be scanned.</div>'
+  else if (!info.exists) body = missingHtml(k, p)
+  else if (!ed || ed.status === 'loading') body = '<p class="note">Loading…</p>'
+  else if (ed.status === 'error') body = `<p class="note">${esc(`Could not read ${p.file}: ${ed.error}`)}</p>${msgHtml(k)}`
+  else {
+    const dirty = edDirty(ed)
+    const pane = editing
+      ? `<div class="cm-pane" id="${k}-pane" role="tabpanel" aria-labelledby="${k}-edit"><textarea id="${k}-txt" class="ed" data-ed="${k}" spellcheck="false" aria-label="${esc(`${p.file} contents`)}">\n${esc(ed.text)}</textarea></div>`
+      : `<div class="cm-pane md" id="${k}-pane" role="tabpanel" aria-labelledby="${k}-pv" tabindex="0">${previewHtml(ed.text, info.path)}</div>`
+    body = `${msgHtml(k)}${pane}${panelBackupsHtml(k)}`
+    bar = `<div class="cm-bar">
+        <button type="button" class="btn danger ghost" id="${k}-del" data-c="delete" data-k="${k}">Delete…</button>
+        <span class="cm-state${dirty ? ' is-dirty' : ''}" id="${k}-dirty" aria-live="polite">${dirty ? '● Unsaved changes' : `${esc(plural(lineCount(ed.text), 'line'))} · Saved`}</span>
+        <button type="button" class="btn ghost" id="${k}-cancel" data-c="cancel" data-k="${k}"${dirty ? '' : ' hidden'}>Discard</button>
+        ${backupsBtn(k)}
+        <button type="button" class="btn" id="${k}-open" data-c="editor" data-k="${k}">Open in editor</button>
+        <button type="button" class="btn p" id="${k}-save" data-c="save" data-k="${k}"${dirty ? '' : ' disabled'}>Save</button>
+      </div>`
+  }
+  return `<section class="panel cm-panel" aria-labelledby="${k}-h">${head}<div class="cm-body">${body}</div>${bar}</section>`
+}
+
 function renderClaudeMd() {
   const panels = cfgPanels()
-  $('p-claudemd').innerHTML = `<div class="ok">Claude Code loads these files at the start of each session in this folder. Each save writes a backup to <code>~/.claude/backups/storehouse/</code>.</div>
-    ${projectOn() ? '' : projectOffHtml()}
-    <div class="two">${(projectOn() ? ['mg', 'mp', 'ml', 'mc'] : ['mg']).map((k) => panelHtml(k, panels[k])).join('')}</div>`
+  const sel = mdSelected(panels)
+  $('p-claudemd').innerHTML = `<p class="note cm-intro">Claude Code reads every file that exists here at the start of a session in this folder. Each save writes a backup to <code>~/.claude/backups/storehouse/</code> first.</p>
+    <div class="cm">
+      <nav class="cm-nav" aria-label="CLAUDE.md files">
+        <ul class="cm-list">${mdListHtml(panels, sel)}</ul>
+        <p class="note">The numbers show the read order. A later file can add to an earlier one.</p>
+        ${projectOn() ? '' : projectOffHtml()}
+      </nav>
+      ${mdPanelHtml(sel, panels[sel])}
+    </div>`
+}
+
+function mdDirtyKey() {
+  return MD_ORDER.find((k) => edDirty(eds[k])) ?? null
+}
+
+async function discardMd(k) {
+  const ed = eds[k]
+  if (!edDirty(ed)) return true
+  const yes = await ask({ title: 'Discard changes?', message: `Your unsaved edits in ${cfgPanels()[k].file} are lost.`, ok: 'Discard', danger: true })
+  if (!yes) return false
+  ed.text = ed.loaded
+  ed.editing = false
+  delete msgs[k]
+  return true
+}
+
+async function pickMd(k) {
+  if (!MD_ORDER.includes(k)) return false
+  if (k === cmd.sel) return true
+  const dirty = mdDirtyKey()
+  if (dirty && !(await discardMd(dirty))) return false
+  cmd.sel = k
+  render()
+  return true
+}
+
+function openCfgFile(k) {
+  const info = cfgPanels()[k]?.info
+  if (!info?.exists) return
+  return busy(`open:${k}`, async () => {
+    try {
+      await send('POST', '/api/open', { path: info.path, app: 'editor' })
+      toast(`Opened ${tilde(info.path)} in your editor`)
+    } catch (err) {
+      toast(`Could not open: ${err.message}`, true)
+    }
+  })
 }
 
 function onCfgInput(e) {
@@ -1901,7 +2479,6 @@ function saveEd(k) {
       ed.loaded = res.content
       ed.stamp = res.stamp
       if (ed.text === sent) ed.text = res.content
-      if (!edDirty(ed)) ed.editing = false
       if (k === 'sg') cfg.sform = null
       toast(`Saved ${tilde(p.info.path)} · backup written`)
       await afterWrite()
@@ -2058,6 +2635,7 @@ function onCfg(el) {
   const v = el.dataset.v
   if (act === 'hf-open' || act === 'mf-open') {
     const name = act === 'hf-open' ? 'hook' : 'mcp'
+    if (cfg[name].open) return closeForm(name)
     cfg[name].open = true
     render()
     $(name === 'hook' ? 'hf-scope' : 'mf-scope')?.focus()
@@ -2079,6 +2657,13 @@ function onCfg(el) {
     $('sf-model')?.focus()
     return
   }
+  if (act === 'pick') {
+    return void pickMd(k).then((ok) => ok && $(`cm-pick-${k}`)?.focus())
+  }
+  if (act === 'create' && MD_ORDER.includes(k) && k !== cmd.sel) {
+    return void pickMd(k).then((ok) => ok && createPanel(k, v))
+  }
+  if (act === 'editor') return void openCfgFile(k)
   if (act === 'backups') return void togglePanelBackups(k)
   if (act === 'restore') return void restorePanel(k, el.dataset.path)
   if (act === 'save') return void saveEd(k)
@@ -2093,7 +2678,8 @@ function onCfg(el) {
     render()
     $(`${k}-txt`)?.focus()
   } else if (act === 'preview') {
-    ed.preview = !ed.preview
+    if (MD_ORDER.includes(k)) ed.editing = false
+    else ed.preview = !ed.preview
     render()
   }
 }
@@ -2200,9 +2786,7 @@ function wire() {
   })
   $('dr-close').addEventListener('click', () => closeDrawer())
   $('dr-scrim').addEventListener('click', () => closeDrawer())
-  $('dr-copy').addEventListener('click', copyPath)
-  $('dr-body').addEventListener('click', onDrawerClick)
-  $('dr-tools').addEventListener('click', onDrawerClick)
+  $('dr').addEventListener('click', onDrawerClick)
   $('cf-no').addEventListener('click', () => confirmState?.done(false))
   $('cf-yes').addEventListener('click', () => confirmState?.done(true))
   $('act-toggle').addEventListener('click', () => {
@@ -2218,6 +2802,13 @@ function wire() {
       return
     }
     if (drawerOpen()) {
+      if (dr.menu && e.key === 'Escape') {
+        e.preventDefault()
+        closeDrawerMenu(true)
+        return
+      }
+      if (dr.menu && menuKeys(e)) return
+      if (dr.menu && e.key === 'Tab') closeDrawerMenu(true)
       if (e.key === 'Escape') {
         e.preventDefault()
         closeDrawer()
@@ -2233,6 +2824,14 @@ function wire() {
       e.preventDefault()
       saveEd(panelKey)
       return
+    }
+    if (menuKey) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeMenu()
+        return
+      }
+      if (menuKeys(e)) return
     }
     const tag = document.activeElement?.tagName
     if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && !e.metaKey && !e.ctrlKey) {
@@ -2255,9 +2854,22 @@ function wire() {
       if (!cfgEl.disabled) onCfg(cfgEl)
       return
     }
+    const chip = e.target.closest('[data-chip]')
+    if (chip) {
+      chipFilter[state.page] = chip.dataset.chip
+      menuKey = null
+      return render()
+    }
+    const grp = e.target.closest('[data-group]')
+    if (grp) {
+      groupOpen.set(grp.dataset.group, grp.getAttribute('aria-expanded') !== 'true')
+      return render()
+    }
     const act = e.target.closest('[data-act]')
     const key = cardKey(e.target)
     if (!key) return
+    const name = act?.dataset.act
+    if (name === 'menu') return openMenu(key, act.closest('[data-rows]')?.dataset.rows ?? '')
     if (act?.dataset.act === 'unfav') {
       const fav = state.inventory.favorites.find((f) => f.id === key)
       if (fav) star(fav.kind, fav.name, fav.source, false, fav.name)
@@ -2268,7 +2880,25 @@ function wire() {
     if (act?.dataset.act === 'toggle') return void toggle(item)
     if (act?.dataset.act === 'star') return void starItem(item)
     if (act?.dataset.act === 'del') return void deleteRow(item)
-    if (act?.dataset.act === 'open' || !e.target.closest('button, a, input')) openDrawer(item)
+    if (name === 'uninstall') return void uninstallPlugin(item)
+    if (name?.startsWith('m-')) {
+      closeMenu()
+      if (name === 'm-open') return openDrawer(item)
+      if (name === 'm-toggle') return void toggle(item)
+      if (name === 'm-finder') return void reveal(item)
+      if (name === 'm-uninstall') return void uninstallPlugin(item)
+      return
+    }
+    if (act?.dataset.act === 'open' || !e.target.closest('button, a, input, .menu, .pnote')) openDrawer(item)
+  })
+  document.addEventListener('click', (e) => {
+    if (menuKey && !e.target.closest('.menu, [data-act="menu"]')) closeMenu(false)
+  })
+  main.addEventListener('focusout', (e) => {
+    if (!menuKey || !e.relatedTarget) return
+    const holder = e.relatedTarget.closest?.(HOLDER)
+    if (holder && holderKey(holder) === menuKey && e.relatedTarget.closest('.menu, [data-act="menu"]')) return
+    setTimeout(() => closeMenu(false), 0)
   })
 
   main.addEventListener('input', onCfgInput)

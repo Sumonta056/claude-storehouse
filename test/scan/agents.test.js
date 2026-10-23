@@ -61,3 +61,22 @@ test('empty agent description falls back to first body line', () => {
     fx.cleanup()
   }
 })
+
+test('scanAgents reads model and tools from frontmatter', () => {
+  const fx = makeFixture()
+  try {
+    const dir = path.join(fx.home, '.claude', 'agents')
+    fs.writeFileSync(path.join(dir, 'my-agent.md'), '---\nname: my-agent\ndescription: d\nmodel: sonnet\ntools: Read, Grep, Bash\n---\nBody\n')
+    fs.writeFileSync(path.join(dir, 'listed.md'), '---\nname: listed\ntools:\n  - Read\n  - "Glob"\n---\nBody\n')
+    const items = run(fx)
+    const a = items.find((i) => i.name === 'my-agent')
+    assert.equal(a.model, 'sonnet')
+    assert.deepEqual(a.tools, ['Read', 'Grep', 'Bash'])
+    assert.deepEqual(items.find((i) => i.name === 'listed').tools, ['Read', 'Glob'])
+    const parked = items.find((i) => i.name === 'parked')
+    assert.equal(parked.model, '')
+    assert.deepEqual(parked.tools, [])
+  } finally {
+    fx.cleanup()
+  }
+})
