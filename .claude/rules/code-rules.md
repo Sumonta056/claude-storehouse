@@ -25,5 +25,6 @@
 
 - Before you claim a task is done, run `npm run check` and show the output. For UI tasks also run the Chrome check in skill `storehouse-verify`.
 - After a change in `src/write/` or `src/scan/`, run agent `toggle-reviewer`.
+- After a user-visible change (a feature, page, switch, CLI flag, shortcut, or UI change), run skill `storehouse-website`. It updates the website, the live demo, the screenshots, and `README.md` in the same task.
 - Ask before `git commit` or `git push`.
 - Plans and specs are temporary. When the work in a plan is complete, move any lasting rule or decision into `.claude/rules/`, then delete the plan and its spec.

@@ -22,6 +22,10 @@ Never bypass a hook with `--no-verify`. Fix the cause.
 
 Runs on each push to `main` and each PR: lint, commitlint, tests on Node 20 and 22 on Ubuntu and macOS, CLI smoke test, and a packed-tarball install check.
 
+## Website (`.github/workflows/pages.yml`)
+
+Runs after CI passes on a push to `main`, and on manual dispatch. It runs `node site/build.js _site` and deploys `_site` to GitHub Pages at `https://sumonta056.github.io/claude-storehouse/`. The live demo in `_site/demo/` is the `public/` code of that commit. Content steps: skill `storehouse-website`.
+
 ## Format
 
 - Prettier config: `.prettierrc.json`. `lint-staged` formats only the files in a commit.

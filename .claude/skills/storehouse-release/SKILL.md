@@ -12,8 +12,7 @@ A release has 4 parts that must agree: `package.json` version, a `CHANGELOG.md` 
 1. `git status` is clean except for files the user keeps out on purpose. `main` equals `origin/main`.
 2. `npm run check` passes. Show the last lines.
 3. The last CI run on `main` is green: `gh run list --workflow ci.yml --limit 1`.
-4. If the UI changed since the last release, refresh the screenshots (section 3).
-5. If features changed, update `README.md` (section 2).
+4. If features or the UI changed since the last release, run skill `storehouse-website`. It updates the website, the live demo data, the screenshots, and `README.md`.
 
 ## 2. npm package page
 
@@ -30,26 +29,7 @@ npm builds the page from `README.md` and `package.json` only.
 
 ## 3. Screenshots
 
-Never screenshot the real `~/.claude`. It holds private config.
-
-```
-S=<scratchpad>/demo
-rm -rf "$S" && node scripts/demo-home.js "$S"
-node bin/storehouse.js --dir "$S/home/acme-api" --home "$S/home" --no-open --port 4818
-```
-
-The project lives inside the fake home, so the page shows `~/acme-api`. Take each page at 1440x900, scale 2:
-
-```
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
-  --user-data-dir=<scratchpad>/chrome --hide-scrollbars --force-device-scale-factor=2 \
-  --window-size=1440,900 --virtual-time-budget=4000 \
-  --screenshot=docs/images/<name>.png "<url with token>#<page>"
-```
-
-Pages: `dash`, `fav`, `skills`, `agents`, `plugins`, `hooks`, `mcp`, `settings`, `claudemd`. Use a new `--user-data-dir` for each shot. The token is in the URL, and the app moves it to session storage. The README uses `dashboard.png`, `skills.png`, `mcp.png`. Look at each image before you keep it. Stop the server when done.
-
-If the demo data needs a change, edit `scripts/demo-home.js`. Favorites use `{ kind, name, source }`. `source` is `local` for global items and `<plugin>@<market>` for plugin items. Do not put strings that look like keys or tokens in it: a security hook blocks the write.
+Skill `storehouse-website` owns the screenshots. It takes them from the live demo build, which uses the sample data in `scripts/demo-home.js`. Never screenshot the real `~/.claude`.
 
 ## 4. Cut the release
 
@@ -58,7 +38,7 @@ Run `/release-tag`. It picks the version from Conventional Commits, writes `CHAN
 This repo has 1 extra limit: a branch-protection hook from a Claude Code plugin blocks Claude's `git commit` and `git push` on `main`. The hook also blocks any Bash command that contains the word "commit" next to `main`. Give the user each command to run with the `!` prefix:
 
 ```
-! git add package.json package-lock.json CHANGELOG.md README.md docs/images && git commit -m "chore(release): X.Y.Z" && git push origin main
+! git add package.json package-lock.json CHANGELOG.md README.md docs/images site && git commit -m "chore(release): X.Y.Z" && git push origin main
 ```
 
 `commitlint` limits each body line to 100 characters. Pass a long body as several `-m` parts. After the push, run step 1 of `/release-tag` again, then the tag and the GitHub Release.

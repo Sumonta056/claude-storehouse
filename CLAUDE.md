@@ -29,7 +29,8 @@ Key rules:
 
 - Skill `storehouse-config-safety`: switch table, write procedure, path allow-list, test rule. Load for any `src/write` or `src/scan` task.
 - Skill `storehouse-verify`: test command, fake home recipe, 10-point Chrome check. Load before you claim a task is done.
-- Skill `storehouse-release`: release to GitHub and npm, README and npm page, screenshots from a demo home. Load for any release or README task.
+- Skill `storehouse-release`: release to GitHub and npm, and the npm page. Load for any release task.
+- Skill `storehouse-website`: website, live demo, screenshots, and README. Load after any user-visible change and for any README or site task.
 - Agent `toggle-reviewer`: read-only reviewer for toggle and scanner code. Run after each `src/write` task.
 - `.claude/settings.json`: allows `npm test`, `node --test`, and the CLI. Denies edits to the real `~/.claude/settings.json` and `~/.claude.json`.
 
@@ -41,6 +42,7 @@ npm run lint          ESLint
 npm run format        Prettier write
 npm run check         lint + tests, run before you claim a task is done
 npm start             start the server on this folder
+npm run site          build the website and live demo into _site/
 node bin/storehouse.js --dir <path> --home <fakeHome> --no-open
 ```
 
@@ -58,6 +60,7 @@ test/               node:test + fixtures
 .github/            CI and release workflows, PR and issue templates, dependabot
 .husky/             git hooks
 CHANGELOG.md        written by /release-tag
-scripts/demo-home.js  builds a fake home with sample data for screenshots
-docs/images/        README screenshots
+site/               website and live demo for GitHub Pages; build.js, demo/demo-api.js
+scripts/demo-home.js  builds a fake home with sample data for the demo and screenshots
+docs/images/        README and website screenshots, icon.png
 ```

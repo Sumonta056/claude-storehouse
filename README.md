@@ -1,33 +1,128 @@
-<div align="center">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/icon.png" width="96" height="96" alt="Claude Storehouse icon: a terminal prompt with the Claude spark as the cursor">
+</p>
 
-# Claude Storehouse
+<h1 align="center">Claude Storehouse</h1>
 
-**One page for your whole Claude Code setup.**
+<p align="center">
+  <b>One page for your whole Claude Code setup.</b><br>
+  See, edit, switch on or off, and favorite every skill, agent, plugin, hook, MCP server, setting, and <code>CLAUDE.md</code>, for your global <code>~/.claude</code> and for the project you are in.
+</p>
 
-See, edit, switch on or off, and favorite every skill, agent, plugin, hook, MCP server, setting, and `CLAUDE.md`, for your global `~/.claude` and for the project you are in.
+<p align="center">
+  <a href="https://www.npmjs.com/package/claude-storehouse"><img alt="npm version" src="https://img.shields.io/npm/v/claude-storehouse?color=d97757&label=npm"></a>
+  <a href="https://github.com/Sumonta056/claude-storehouse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sumonta056/claude-storehouse/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://nodejs.org"><img alt="node" src="https://img.shields.io/node/v/claude-storehouse?color=339933"></a>
+  <img alt="1 runtime dependency" src="https://img.shields.io/badge/runtime%20dependencies-1-brightgreen">
+  <img alt="No build step" src="https://img.shields.io/badge/build-none-lightgrey">
+  <a href="https://github.com/Sumonta056/claude-storehouse/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/npm/l/claude-storehouse?color=blue"></a>
+</p>
 
-[![npm version](https://img.shields.io/npm/v/claude-storehouse?color=e2725b&label=npm)](https://www.npmjs.com/package/claude-storehouse)
-[![CI](https://github.com/Sumonta056/claude-storehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/Sumonta056/claude-storehouse/actions/workflows/ci.yml)
-[![node](https://img.shields.io/node/v/claude-storehouse?color=339933)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/claude-storehouse?color=blue)](https://github.com/Sumonta056/claude-storehouse/blob/main/LICENSE)
+<p align="center">
+  <a href="https://sumonta056.github.io/claude-storehouse/"><b>Website</b></a> ·
+  <a href="https://sumonta056.github.io/claude-storehouse/#demo"><b>Live demo</b></a> ·
+  <a href="#install"><b>Install</b></a> ·
+  <a href="https://www.npmjs.com/package/claude-storehouse"><b>npm</b></a>
+</p>
 
-```
+```bash
 npx claude-storehouse
 ```
 
-<img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/dashboard.png" alt="Claude Storehouse dashboard with counts for skills, agents, plugins, hooks and MCP servers, a favorites list, and the project files" width="900">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/dashboard.png" alt="Dashboard: API-equal cost and token usage by model, counts for skills, agents, plugins, hooks and MCP servers, favorites, and the project files" width="100%">
+</p>
 
-</div>
+---
 
-## Why
+## Contents
+
+- [Why Claude Storehouse](#why-claude-storehouse)
+- [Features](#features)
+- [Live demo](#live-demo)
+- [Install](#install)
+- [CLI options](#cli-options)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [How on/off works](#how-onoff-works)
+- [Safety and privacy](#safety-and-privacy)
+- [How it works](#how-it-works)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [Tests](#tests)
+- [Changelog](#changelog)
+- [License](#license)
+
+## Why Claude Storehouse
 
 After a few months with Claude Code you have dozens of skills, a handful of plugins from several marketplaces, hooks in two settings files, and MCP servers spread over `~/.claude.json` and `.mcp.json`. The only views are the `/plugin` menu, `/skills`, and raw JSON.
 
-Claude Storehouse reads all of it and shows it on one local page. Switching a skill off is one click instead of a JSON edit. Nothing leaves your machine.
+- **Everything in one place.** Global and project items side by side, with a scope filter.
+- **One click instead of a JSON edit.** Switches use the keys Claude Code itself reads.
+- **Nothing breaks.** Every write makes a backup first, and every change can be undone.
+- **Nothing leaves your machine.** A local server on `127.0.0.1`, no account, no analytics.
 
-## Quick start
+## Features
 
-Run it inside the project you want to manage:
+### Dashboard and usage
+
+- Counts for skills, agents, plugins, hooks, and MCP servers, with how many are on and off.
+- API-equal cost of your Claude Code use, by model, from the session files in `~/.claude/projects`.
+- Tokens, sessions, projects, and how much the prompt cache saved.
+- Only token counts are read from session files, never message text.
+- Your favorites, recent changes, and which Claude Code files this project has.
+
+### Skills and agents
+
+- Global, project, and plugin skills and agents in one list.
+- Each switch shows the file it writes before you click. A toast names the file after.
+- Filter by scope (All, Global, Project) and press `/` to search.
+- Plugin skills show "via plugin X" and follow their plugin. Fork one to `~/.claude/skills` to make your own version.
+
+![Skills page with on/off switches, favorites, and the file each switch writes](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/skills.png)
+
+### Favorites
+
+- Star the skills, agents, and plugins you use most, and drag them into order.
+- Group them in your own categories. Rename and delete a category, with undo.
+- A favorite stays listed when you switch it off, and shows "missing" when its file is gone.
+
+![Favorites page with items grouped into Plan, Build, and Review categories](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/favorites.png)
+
+### Plugins and mods
+
+- Every installed plugin with its marketplace, version, skills, agents, hooks, and MCP servers.
+- Switch a plugin off and all its parts go off with it.
+- Uninstall runs `claude plugin uninstall` for you, with the right scope.
+- The Mods page shows installed mods and the mods in `~/.claude/dev-mods`.
+
+![Plugins page with three plugins from two marketplaces, their versions, and on/off switches](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/plugins.png)
+
+### Hooks and MCP servers
+
+- Hooks from every settings file and plugin, by event and matcher.
+- MCP servers from `~/.claude.json`, `.mcp.json`, and plugins, with secrets masked.
+- Add a hook or an MCP server from a form, or remove one.
+
+![MCP servers page with transport, command, and source for each server](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/mcp.png)
+
+### Edit in place, undo anything
+
+- Open any file you own in the drawer, edit it, and save with `⌘S`. Plugin cache files stay read-only.
+- Every switch, star, and save shows in the Activity log with Undo.
+- The latest save of each file can be restored from its backup.
+- Create a missing `CLAUDE.md`, `.claude/settings.json`, `.claude/settings.local.json`, or `.mcp.json`.
+
+![A skill open in the drawer editor, with the Activity log and its undo button in the sidebar](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/editor.png)
+
+## Live demo
+
+Open **[the live demo](https://sumonta056.github.io/claude-storehouse/#demo)**. It is the real app code, running in your browser with a sample setup. Switches, stars, and edits change only that page. Reload to start again.
+
+The site builds the demo from `public/` on every push to `main`, so the demo always shows the current UI.
+
+## Install
+
+Run it inside the project you want to manage. You need Node 20 or newer.
 
 ```bash
 npx claude-storehouse
@@ -42,55 +137,26 @@ npm i -g claude-storehouse
 claude-storehouse
 ```
 
-Requires Node 20 or newer.
+## CLI options
 
-## Features
+| Flag            | Default          | Meaning                                              |
+| --------------- | ---------------- | ---------------------------------------------------- |
+| `--dir <path>`  | current folder   | Project folder to manage. Must exist.                |
+| `--home <path>` | your home folder | Folder that holds `.claude`. Must contain `.claude`. |
+| `--port <n>`    | free port        | Port to listen on. Exits with an error if busy.      |
+| `--no-open`     | off              | Do not open the browser.                             |
+| `--help`        |                  | Print usage.                                         |
+| `--version`     |                  | Print the version.                                   |
 
-|                             |                                                                                                                                           |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Everything in one place** | Skills, agents, plugins, hooks, MCP servers, settings, and `CLAUDE.md`, split by global and project scope.                                |
-| **On / off switches**       | Uses the keys Claude Code itself reads: `enabledPlugins`, `skillOverrides`, and the MCP disable lists.                                    |
-| **Edit in place**           | Open any file you own in the drawer, edit it, and save. Plugin cache files stay read-only.                                                |
-| **Favorites**               | Star the items you use most, group them in your own categories, and drag them into order. A favorite stays listed when you switch it off. |
-| **Undo**                    | Every toggle and favorite can be undone from the activity log. The latest save of each file can be restored.                              |
-| **Safe writes**             | Each write makes a backup first, writes a temp file, then renames it. A file that does not parse is never touched.                        |
-| **Fork plugin skills**      | Copy a plugin skill into `~/.claude/skills` to make your own version.                                                                     |
-| **Uninstall plugins**       | Runs `claude plugin uninstall` for you, with the right scope.                                                                             |
+## Keyboard shortcuts
 
-## Screenshots
-
-<table>
-  <tr>
-    <td><img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/skills.png" alt="Skills page with on/off switches, favorites, and the file each switch writes"></td>
-    <td><img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/mcp.png" alt="MCP servers page with transport, command, and source for each server"></td>
-  </tr>
-  <tr>
-    <td align="center">Skills: switch, star, and open any skill</td>
-    <td align="center">MCP servers from every source, with secrets masked</td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/favorites.png" alt="Favorites page with items grouped into Plan, Build, and Review categories"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center">Favorites grouped in your own categories</td>
-  </tr>
-</table>
-
-## Pages
-
-| Page      | Shows                                                                        |
-| --------- | ---------------------------------------------------------------------------- |
-| Dashboard | Counts, favorites, recent changes, and the files this project has            |
-| Favorites | Items you starred, in your own categories and order                          |
-| Skills    | Global, project, and plugin skills                                           |
-| Agents    | Global, project, and plugin agents                                           |
-| Plugins   | Installed plugins and whether they are on                                    |
-| Hooks     | Hooks from settings files and plugins                                        |
-| MCP       | Servers from `~/.claude.json`, `.mcp.json`, and plugins, with secrets masked |
-| Settings  | The global, project, and project-local settings files                        |
-| CLAUDE.md | Global and project memory files                                              |
-
-Filter by scope (All, Global, Project) and press `/` to search.
+| Key                  | Action                        |
+| -------------------- | ----------------------------- |
+| `/`                  | Search names and descriptions |
+| `⌘S` / `Ctrl+S`      | Save the open file            |
+| `⌘B`, `⌘I`           | Bold and italic in the editor |
+| `Esc`                | Close the drawer or a dialog  |
+| `↑` `↓` `Home` `End` | Move between items in a list  |
 
 ## How on/off works
 
@@ -106,24 +172,40 @@ Filter by scope (All, Global, Project) and press `/` to search.
 
 Global switches write `~/.claude/settings.json`. Project switches write `./.claude/settings.local.json`, never the shared `settings.json`. Claude Code applies changes at the next session.
 
-## CLI options
+## Safety and privacy
 
-| Flag            | Default          | Meaning                                              |
-| --------------- | ---------------- | ---------------------------------------------------- |
-| `--dir <path>`  | current folder   | Project folder to manage. Must exist.                |
-| `--home <path>` | your home folder | Folder that holds `.claude`. Must contain `.claude`. |
-| `--port <n>`    | free port        | Port to listen on. Exits with an error if busy.      |
-| `--no-open`     | off              | Do not open the browser.                             |
-| `--help`        |                  | Print usage.                                         |
-| `--version`     |                  | Print the version.                                   |
+| Topic         | Rule                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
+| Backups       | Before any write, the old file is copied to `~/.claude/backups/storehouse/`. The last 20 per file are kept.    |
+| Atomic writes | Each write goes to a temp file, then a rename. A file that does not parse is never touched.                    |
+| Delete        | Moves the item to `~/.claude/backups/storehouse/trash/`. Restore it from the Backups panel.                    |
+| Local only    | The server listens on `127.0.0.1` and rejects a foreign `Host` header.                                         |
+| Token         | Every API call needs the random token from the start URL. Without it the server returns 401.                   |
+| Allow-list    | Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only. |
+| Session files | The usage band reads only token counts. It never keeps or returns message text.                                |
+| Dependencies  | The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.            |
 
-## Safety
+## How it works
 
-- **Backups.** Before any write, the old file is copied to `~/.claude/backups/storehouse/`. The last 20 per file are kept. Delete moves the item to `~/.claude/backups/storehouse/trash/`.
-- **Local only.** The server listens on `127.0.0.1` and rejects a foreign `Host` header.
-- **Token.** Every API call needs the random token from the start URL. Without it the server returns 401.
-- **Allow-list.** Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only.
-- **No dependencies to trust.** The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.
+Claude Storehouse is plain JavaScript with ES modules on Node 20 or newer. There is no framework, no bundler, and no build step. The server scans the Claude Code files on each request, and the page re-renders from the content that each write returns.
+
+```
+bin/storehouse.js      CLI: flags, token, start the server, open the browser
+src/server.js          HTTP server on 127.0.0.1 and the route table
+src/api.js             API handlers: inventory, usage, files, toggles, favorites, undo
+src/api-config.js      API handlers: hooks, MCP servers, create, fork
+src/scan/*.js          Read-only scanners, one per item type, and the usage reader
+src/write/*.js         Atomic JSON writes with backups, toggles, files, favorites, activity
+public/                The dashboard UI: index.html, app.js, app.css, api.js, icon.svg
+site/                  Website and live demo, deployed to GitHub Pages
+  build.js             Builds _site/: records the demo data and copies public/ into demo/
+  demo/demo-api.js     In-browser stand-in for the server API, used only by the demo
+scripts/demo-home.js   Builds a fake home with sample data for the demo and screenshots
+docs/images/           README and website screenshots
+test/                  node:test suites and fixtures
+```
+
+The full behavior spec is in [`.claude/rules/business-logic.md`](https://github.com/Sumonta056/claude-storehouse/blob/main/.claude/rules/business-logic.md).
 
 ## Limitations
 
@@ -137,18 +219,35 @@ Global switches write `~/.claude/settings.json`. Project switches write `./.clau
 
 Issues and pull requests are welcome. Use the [issue templates](https://github.com/Sumonta056/claude-storehouse/issues/new/choose).
 
+1. Clone the repo and run `npm install`. It installs ESLint, Prettier, and the git hooks.
+2. Run the app against a fake home, never your real `~/.claude`:
+   ```bash
+   node scripts/demo-home.js /tmp/storehouse-demo
+   node bin/storehouse.js --dir /tmp/storehouse-demo/home/acme-api --home /tmp/storehouse-demo/home
+   ```
+3. Commits follow [Conventional Commits](https://www.conventionalcommits.org).
+4. Run `npm run check` and make sure it is green before you open a pull request.
+
+## Tests
+
+No test framework: Node's built-in test runner.
+
 ```bash
-git clone https://github.com/Sumonta056/claude-storehouse.git
-cd claude-storehouse
-npm install
-npm run check
-node bin/storehouse.js --dir <project> --home <fake-home> --no-open
+npm test               # all tests
+npm run check          # lint + format check + tests
+npm run site           # build the website and live demo into _site/
+python3 -m http.server 8811 -d _site   # then open http://127.0.0.1:8811/
 ```
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org). Tests never touch your real `~/.claude`. Run `node scripts/demo-home.js` to build a demo home with sample data.
+Tests never touch your real `~/.claude`. Each one makes a fake home with `fs.mkdtempSync`.
 
-See [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md) for release history.
+## Changelog
+
+- **1.0.0** — First stable release. Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
+  - Dashboard, Favorites, Skills, Agents, Plugins, Hooks, MCP servers, Settings, and CLAUDE.md pages, with a scope filter and search.
+  - On/off switches that use the keys Claude Code reads, with project switches in `settings.local.json`.
+  - Edit in place, favorites in your own categories, undo for every change, and backups for every write.
 
 ## License
 
-[MIT](https://github.com/Sumonta056/claude-storehouse/blob/main/LICENSE) © Sumonta Saha Mridul
+[MIT](https://github.com/Sumonta056/claude-storehouse/blob/main/LICENSE) © 2026 Sumonta Saha Mridul
