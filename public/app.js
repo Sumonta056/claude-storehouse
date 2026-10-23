@@ -1027,6 +1027,13 @@ function dupSource(item) {
   return item.scope === 'project' ? 'Project' : 'Global'
 }
 
+function tokChip(item) {
+  if (!['skills', 'agents'].includes(state.page) || (item.kind !== 'skill' && item.kind !== 'agent')) return ''
+  const n = listingTokens(item)
+  const title = `About ${tok(n)} in every session for the name and description. The full file, about ${tok(tokensOf(item.size ?? 0))}, loads on use.`
+  return `<span class="tokc" title="${esc(title)}">${esc(tok(n))}</span>`
+}
+
 function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, right = '', note = '' } = {}) {
   const open = menuKey === item.key && menuCtx === ctx
   const src =
@@ -1047,7 +1054,7 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, 
   return `<li class="${cls}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
     <div class="lead">${leadHtml(item)}</div>
     <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}${tokChip(item)}</div>
       <p class="desc">${esc(desc)}</p>
       ${metaHtml(item)}${note}
     </div>
@@ -1365,6 +1372,8 @@ function ctxNote(e, dups) {
 
 function ctxFileRow(e, max, dups) {
   const where = e.scope === 'global' ? 'Global' : 'Project'
+  const dir = state.inventory.project?.dir
+  const file = dir && e.path.startsWith(dir) ? `.${e.path.slice(dir.length)}` : tilde(e.path)
   const name =
     e.type === 'claudemd'
       ? `<button type="button" class="name btn-plain" data-go="claudemd">${esc(e.name)}</button>`
@@ -1372,7 +1381,7 @@ function ctxFileRow(e, max, dups) {
   return `<li class="lrow ctx-file">
     <div class="lead"><span class="lead-ic" role="img" aria-label="${esc(e.type === 'claudemd' ? 'CLAUDE.md file' : 'Rule file')}" title="${esc(tilde(e.path))}">${kindIcon('file', 18)}</span></div>
     <div class="body">
-      <div class="l1">${name}<span class="src">${esc(`${where} · ${tilde(e.path)}`)}</span></div>
+      <div class="l1">${name}<span class="src">${esc(`${where} · ${file}`)}</span></div>
       <p class="desc">${esc(e.description)}</p>
       ${e.conditional ? ctxNote(e, dups) : ''}
     </div>

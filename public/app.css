@@ -2848,6 +2848,15 @@ select {
 .lrow.ctx-file {
   cursor: default;
 }
+.lrow .tokc {
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--panel2);
+  font-size: 14px;
+  color: var(--text2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .mchip.okc {
   background: var(--ok-bg);
   color: var(--ok-text);
