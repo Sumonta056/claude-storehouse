@@ -125,9 +125,8 @@ async function collect(root) {
   return [...responses.values()]
 }
 
-function summarize(records, month) {
+function summarize(records) {
   const total = { cost: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, saved: 0 }
-  const thisMonth = { key: month, cost: 0, tokens: 0 }
   const sessions = new Set()
   const projects = new Set()
   const models = new Map()
@@ -135,12 +134,10 @@ function summarize(records, month) {
   for (const record of records) {
     if (record.session) sessions.add(record.session)
     projects.add(record.project)
-    const tokens = record.input + record.output + record.cacheWrite5m + record.cacheWrite1h + record.cacheRead
     total.input += record.input
     total.output += record.output
     total.cacheWrite += record.cacheWrite5m + record.cacheWrite1h
     total.cacheRead += record.cacheRead
-    if (record.month === month) thisMonth.tokens += tokens
     const price = priceOf(record.model)
     if (!price) {
       unpriced.add(record.model)
@@ -150,17 +147,15 @@ function summarize(records, month) {
     total.cost += cost
     total.saved += (record.cacheRead * (price.input - price.cacheRead)) / 1e6
     models.set(record.model, (models.get(record.model) ?? 0) + cost)
-    if (record.month === month) thisMonth.cost += cost
   }
   const inputSide = total.input + total.cacheWrite + total.cacheRead
   return {
+    ...total,
     responses: records.length,
     sessions: sessions.size,
     projects: projects.size,
     tokens: inputSide + total.output,
     cacheShare: inputSide ? total.cacheRead / inputSide : 0,
-    total,
-    month: thisMonth,
     models: [...models].map(([model, cost]) => ({ model, cost })).sort((a, b) => b.cost - a.cost),
     unpriced: [...unpriced]
   }
@@ -173,5 +168,11 @@ export async function scanUsage({ home, now = new Date() }) {
       root,
       collect(root).finally(() => running.delete(root))
     )
-  return summarize(await running.get(root), monthOf(now))
+  const records = await running.get(root)
+  const monthKey = monthOf(now)
+  return {
+    monthKey,
+    all: summarize(records),
+    month: summarize(records.filter((r) => r.month === monthKey))
+  }
 }

@@ -70,6 +70,8 @@ const items = new Map()
 let projectFiles = null
 let usage = null
 let usageError = ''
+const PERIOD_KEY = 'storehouse.usagePeriod'
+let usagePeriod = readPeriod()
 let bannerDismissed = false
 let bannerShown = false
 let dragKey = null
@@ -349,12 +351,28 @@ function monthName(key) {
   return new Date(year, month - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })
 }
 
+function readPeriod() {
+  try {
+    return localStorage.getItem(PERIOD_KEY) === 'all' ? 'all' : 'month'
+  } catch {
+    return 'month'
+  }
+}
+
+function setPeriod(period) {
+  usagePeriod = period
+  try {
+    localStorage.setItem(PERIOD_KEY, period)
+  } catch {}
+  renderDash()
+}
+
 function modelShares(u) {
-  if (!u.total.cost) return []
+  if (!u.cost) return []
   const top = u.models.slice(0, 3).map((m) => ({ name: modelName(m.model), cost: m.cost }))
-  const rest = u.total.cost - top.reduce((sum, m) => sum + m.cost, 0)
+  const rest = u.cost - top.reduce((sum, m) => sum + m.cost, 0)
   if (rest > 0.005) top.push({ name: 'Other', cost: rest })
-  return top.map((m, i) => ({ ...m, share: (m.cost / u.total.cost) * 100, cls: MODEL_CLASSES[i] }))
+  return top.map((m, i) => ({ ...m, share: (m.cost / u.cost) * 100, cls: MODEL_CLASSES[i] }))
 }
 
 function usageHtml() {
@@ -362,34 +380,50 @@ function usageHtml() {
   if (usageError)
     return `<section class="usage note-only"><p>Could not read usage from ${source}: ${esc(usageError)}</p></section>`
   if (!usage) return `<section class="usage note-only"><p>Reading usage from ${source}…</p></section>`
-  if (!usage.responses)
+  if (!usage.all.responses)
     return `<section class="usage note-only"><p>No Claude Code usage found in ${source}.</p></section>`
-  const u = usage
+  const u = usage[usagePeriod]
+  const label = usagePeriod === 'month' ? monthName(usage.monthKey) : 'All time'
   const shares = modelShares(u)
   const pct = (n) => `${n.toFixed(1)}%`
   const unpriced = u.unpriced.length
     ? `<br>No price for ${u.unpriced.map((m) => `<code>${esc(m)}</code>`).join(', ')}. Its tokens count, its cost does not.`
     : ''
-  const [dollars, cents] = money(u.total.cost).slice(1).split('.')
+  const [dollars, cents] = money(u.cost).slice(1).split('.')
+  const periods = [
+    ['month', 'This month'],
+    ['all', 'All time']
+  ]
+    .map(
+      ([k, text]) =>
+        `<button type="button" data-period="${k}" aria-pressed="${k === usagePeriod ? 'true' : 'false'}">${text}</button>`
+    )
+    .join('')
+  const legend = shares.length
+    ? `<div class="bar" role="img" aria-label="${esc(`Cost by model: ${shares.map((m) => `${m.name} ${pct(m.share)}`).join(', ')}`)}">${shares
+        .map((m) => `<span class="${m.cls}" style="width:${m.share}%"></span>`)
+        .join('')}</div>
+        <div class="legend">${shares.map((m) => `<span><i class="${m.cls}"></i>${esc(m.name)} ${pct(m.share)}</span>`).join('')}</div>`
+    : '<p>No priced usage in this period.</p>'
   return `<section class="usage" aria-label="Usage and cost">
       <div>
         <div class="k">API-equal value</div>
         <div class="big"><small>$</small>${esc(dollars)}.${esc(cents)}</div>
-        <p>All Claude Code usage on this machine, priced at current Anthropic API rates.<br>Read from ${source} · ${u.responses.toLocaleString('en-US')} responses${unpriced}</p>
+        <p>${esc(label)}. All Claude Code usage on this machine, priced at current Anthropic API rates.<br>Read from ${source}${unpriced}</p>
       </div>
       <div class="right">
-        <div class="k">${esc(monthName(u.month.key))}</div>
-        <div class="mon">${money(u.month.cost)}<span>${compact(u.month.tokens)} tokens</span></div>
-        <div class="bar" role="img" aria-label="${esc(`Cost by model: ${shares.map((m) => `${m.name} ${pct(m.share)}`).join(', ')}`)}">${shares
-          .map((m) => `<span class="${m.cls}" style="width:${m.share}%"></span>`)
-          .join('')}</div>
-        <div class="legend">${shares.map((m) => `<span><i class="${m.cls}"></i>${esc(m.name)} ${pct(m.share)}</span>`).join('')}</div>
+        <div class="rhead">
+          <div class="k">Cost by model</div>
+          <div class="scope period" role="group" aria-label="Usage period">${periods}</div>
+        </div>
+        <div class="mon">${compact(u.tokens)}<span>tokens · ${u.responses.toLocaleString('en-US')} responses</span></div>
+        ${legend}
       </div>
     </section>
     <div class="utiles">
       <div><b>${compact(u.tokens)}</b><span>Total tokens</span></div>
       <div><b>${u.sessions.toLocaleString('en-US')}</b><span>Sessions across ${u.projects} project${u.projects === 1 ? '' : 's'}</span></div>
-      <div><b class="g">${money(u.total.saved)}</b><span>Saved by prompt cache</span></div>
+      <div><b class="g">${money(u.saved)}</b><span>Saved by prompt cache</span></div>
       <div><b>${pct(u.cacheShare * 100)}</b><span>Input tokens served from cache</span></div>
     </div>`
 }
@@ -4431,6 +4465,8 @@ function wire() {
   main.addEventListener('click', (e) => {
     const goEl = e.target.closest('[data-go]')
     if (goEl) return go(goEl.dataset.go)
+    const periodEl = e.target.closest('[data-period]')
+    if (periodEl) return setPeriod(periodEl.dataset.period)
     const cfgEl = e.target.closest('[data-c]')
     if (cfgEl) {
       if (!cfgEl.disabled) onCfg(cfgEl)

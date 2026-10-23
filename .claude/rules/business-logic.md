@@ -77,6 +77,7 @@ Target file per scope:
 ## Usage band
 
 - The Dashboard shows API-equal cost, tokens, sessions, projects, and cache savings from `GET /api/usage`.
+- `GET /api/usage` returns `monthKey` and 2 periods, `all` and `month`, with the same fields. A switch at the top right of the band picks the period for the cost, the model bar, and the 4 tiles. The default is "This month". The browser keeps the last choice in `localStorage` key `storehouse.usagePeriod`.
 - `src/scan/usage.js` reads `<project>/*.jsonl` and `<project>/<session>/subagents/*.jsonl` line by line, and parses only lines that contain `"usage"`. It never keeps or returns message text.
 - It reads regular files only. It skips symlinks, unreadable folders, and other entries without an error.
 - One response can write many lines, and the early lines can hold partial counts. Count each `message.id` + `requestId` one time across all files, and keep the largest value of each token field. A line with no ids counts on its own.

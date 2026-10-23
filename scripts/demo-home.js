@@ -154,7 +154,13 @@ const today = new Date()
 sessions.forEach(([dir, model, turns], s) => {
   const lines = []
   for (let t = 0; t < turns; t++) {
-    const day = new Date(today.getFullYear(), today.getMonth(), Math.max(1, today.getDate() - ((s + t) % 9)), 10, t)
+    const day = new Date(
+      today.getFullYear(),
+      today.getMonth() - (s >= 3 ? 1 : 0),
+      Math.max(1, today.getDate() - ((s + t) % 9)),
+      10,
+      t
+    )
     lines.push(
       JSON.stringify({
         type: 'assistant',

@@ -33,6 +33,6 @@ test('site build makes the landing page and a live demo from the current public/
   const data = JSON.parse(raw)
   assert.equal(data.home, '/Users/demo')
   assert.ok(data.inventory.skills.length > 0)
-  assert.ok(data.usage.total.cost > 0)
+  assert.ok(data.usage.all.cost > 0)
   assert.ok(data.files['/Users/demo/.claude/CLAUDE.md'].content.length > 0)
 })

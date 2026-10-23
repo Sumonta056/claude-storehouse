@@ -103,9 +103,12 @@ test('GET /api/usage returns totals and requires the token', async () => {
   await withServer(async ({ api }) => {
     const res = await api('GET', '/api/usage')
     assert.equal(res.status, 200)
-    assert.equal(res.json.responses, 0)
-    for (const key of ['tokens', 'sessions', 'projects', 'cacheShare', 'total', 'month', 'models', 'unpriced']) {
-      assert.ok(key in res.json, key)
+    assert.match(res.json.monthKey, /^\d{4}-\d{2}$/)
+    for (const period of ['all', 'month']) {
+      assert.equal(res.json[period].responses, 0)
+      for (const key of ['cost', 'tokens', 'sessions', 'projects', 'saved', 'cacheShare', 'models', 'unpriced']) {
+        assert.ok(key in res.json[period], `${period}.${key}`)
+      }
     }
     const denied = await api('GET', '/api/usage', undefined, { 'x-storehouse-token': 'wrong' })
     assert.equal(denied.status, 401)

@@ -490,6 +490,13 @@ code {
   flex-direction: column;
   gap: 10px;
 }
+.usage .rhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .usage .mon {
   font-size: 28px;
   font-weight: 700;

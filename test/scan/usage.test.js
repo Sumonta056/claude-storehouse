@@ -43,14 +43,14 @@ test('prices each token type and counts a repeated message one time', async () =
     ])
     const result = await scanUsage({ home: fx.home, now: NOW })
     const cost = (1000 * 4 + 2000 * 20 + 1000 * 5 + 2000 * 8 + 4000 * 0.2) / 1e6
-    assert.equal(result.responses, 1)
-    assert.equal(result.tokens, 10000)
-    close(result.total.cost, cost)
-    close(result.total.saved, (4000 * (4 - 0.2)) / 1e6)
+    assert.equal(result.all.responses, 1)
+    assert.equal(result.all.tokens, 10000)
+    close(result.all.cost, cost)
+    close(result.all.saved, (4000 * (4 - 0.2)) / 1e6)
     close(result.month.cost, cost)
-    assert.equal(result.month.key, '2026-10')
+    assert.equal(result.monthKey, '2026-10')
     assert.equal(result.month.tokens, 10000)
-    close(result.cacheShare, 4000 / 8000)
+    close(result.all.cacheShare, 4000 / 8000)
   } finally {
     fx.cleanup()
   }
@@ -69,14 +69,21 @@ test('counts sessions, projects, months, and models across files', async () => {
       line({ id: 'c', session: 's3', model: 'claude-haiku-4-5-20251001', usage })
     ])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, 3)
-    assert.equal(result.sessions, 3)
-    assert.equal(result.projects, 2)
-    close(result.total.cost, 20 + 10 + 5)
+    assert.equal(result.all.responses, 3)
+    assert.equal(result.all.sessions, 3)
+    assert.equal(result.all.projects, 2)
+    close(result.all.cost, 20 + 10 + 5)
+    assert.deepEqual(
+      result.all.models.map((m) => m.model),
+      ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5-20251001']
+    )
+    assert.equal(result.month.responses, 2)
+    assert.equal(result.month.sessions, 2)
+    assert.equal(result.month.projects, 2)
     close(result.month.cost, 25)
     assert.deepEqual(
-      result.models.map((m) => m.model),
-      ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5-20251001']
+      result.month.models.map((m) => m.model),
+      ['claude-opus-5-5', 'claude-haiku-4-5-20251001']
     )
   } finally {
     fx.cleanup()
@@ -94,10 +101,11 @@ test('keeps tokens of an unknown model and skips damaged and synthetic lines', a
       ''
     ])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, 1)
-    assert.equal(result.tokens, 30)
-    assert.equal(result.total.cost, 0)
-    assert.deepEqual(result.unpriced, ['claude-future-9'])
+    assert.equal(result.all.responses, 1)
+    assert.equal(result.all.tokens, 30)
+    assert.equal(result.all.cost, 0)
+    assert.deepEqual(result.all.unpriced, ['claude-future-9'])
+    assert.deepEqual(result.month.unpriced, ['claude-future-9'])
   } finally {
     fx.cleanup()
   }
@@ -108,9 +116,9 @@ test('rereads a transcript after it changes', async () => {
   try {
     const usage = { input_tokens: 0, output_tokens: 1000000 }
     writeTranscript(fx.home, '-proj-a', 's1', [line({ id: 'a', usage })])
-    assert.equal((await scanUsage({ home: fx.home, now: NOW })).responses, 1)
+    assert.equal((await scanUsage({ home: fx.home, now: NOW })).all.responses, 1)
     writeTranscript(fx.home, '-proj-a', 's1', [line({ id: 'a', usage }), line({ id: 'b', usage })])
-    assert.equal((await scanUsage({ home: fx.home, now: NOW })).responses, 2)
+    assert.equal((await scanUsage({ home: fx.home, now: NOW })).all.responses, 2)
   } finally {
     fx.cleanup()
   }
@@ -120,9 +128,11 @@ test('returns zero totals when there are no transcripts', async () => {
   const fx = makeFixture()
   try {
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, 0)
-    assert.equal(result.cacheShare, 0)
-    assert.deepEqual(result.models, [])
+    for (const period of [result.all, result.month]) {
+      assert.equal(period.responses, 0)
+      assert.equal(period.cacheShare, 0)
+      assert.deepEqual(period.models, [])
+    }
   } finally {
     fx.cleanup()
   }
@@ -145,10 +155,10 @@ test('reads subagent transcripts and counts them under the parent project and se
     writeTranscript(fx.home, '-proj-a', 's1', [line({ id: 'a', usage })])
     writeTranscript(fx.home, '-proj-a', 's1/subagents/agent-x', [line({ id: 'b', usage })])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, 2)
-    assert.equal(result.sessions, 1)
-    assert.equal(result.projects, 1)
-    close(result.total.cost, 40)
+    assert.equal(result.all.responses, 2)
+    assert.equal(result.all.sessions, 1)
+    assert.equal(result.all.projects, 1)
+    close(result.all.cost, 40)
   } finally {
     fx.cleanup()
   }
@@ -162,8 +172,10 @@ test('keeps the largest count of each field when one response repeats', async ()
       line({ id: 'a', usage: { input_tokens: 10, output_tokens: 500 } })
     ])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, 1)
-    assert.equal(result.total.output, 500)
+    assert.equal(result.all.responses, 1)
+    assert.equal(result.all.output, 500)
+    assert.equal(result.month.responses, 1)
+    assert.equal(result.month.output, 500)
   } finally {
     fx.cleanup()
   }
@@ -175,8 +187,8 @@ test('counts each response without ids on its own', async () => {
     const bare = JSON.stringify({ sessionId: 's1', message: { model: 'claude-opus-5-5', usage: { output_tokens: 7 } } })
     writeTranscript(fx.home, '-proj-a', 's1', [bare, bare])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, 2)
-    assert.equal(result.total.output, 14)
+    assert.equal(result.all.responses, 2)
+    assert.equal(result.all.output, 14)
   } finally {
     fx.cleanup()
   }
@@ -187,7 +199,7 @@ test('prices a cache write with no breakdown as 5 minutes', async () => {
   try {
     writeTranscript(fx.home, '-proj-a', 's1', [line({ id: 'a', usage: { cache_creation_input_tokens: 1000000 } })])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    close(result.total.cost, 5)
+    close(result.all.cost, 5)
   } finally {
     fx.cleanup()
   }
@@ -203,7 +215,7 @@ test('puts a response in the month of its local time', async () => {
     ])
     const result = await scanUsage({ home: fx.home, now: NOW })
     assert.equal(result.month.tokens, 1)
-    assert.equal(result.tokens, 2)
+    assert.equal(result.all.tokens, 2)
   } finally {
     fx.cleanup()
   }
@@ -221,11 +233,11 @@ test('skips unreadable folders, symlinks, and a projects path that is a file', a
     fs.writeFileSync(outside, line({ id: 'c', usage }) + '\n')
     fs.symlinkSync(outside, path.join(projects, '-proj-a', 'linked.jsonl'))
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.equal(result.responses, process.getuid?.() === 0 ? 2 : 1)
+    assert.equal(result.all.responses, process.getuid?.() === 0 ? 2 : 1)
     fs.chmodSync(locked, 0o755)
     fs.rmSync(projects, { recursive: true })
     fs.writeFileSync(projects, 'not a folder')
-    assert.equal((await scanUsage({ home: fx.home, now: NOW })).responses, 0)
+    assert.equal((await scanUsage({ home: fx.home, now: NOW })).all.responses, 0)
   } finally {
     fx.cleanup()
   }
