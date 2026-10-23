@@ -1027,6 +1027,8 @@ function dupSource(item) {
   return item.scope === 'project' ? 'Project' : 'Global'
 }
 
+const FAV_KINDS = new Set(['skill', 'agent', 'plugin'])
+
 function tokChip(item) {
   if (!['skills', 'agents'].includes(state.page) || (item.kind !== 'skill' && item.kind !== 'agent')) return ''
   const n = listingTokens(item)
@@ -1062,7 +1064,7 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, 
     <div class="tail">
       ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
       ${keep ? '<button type="button" class="btn" data-act="keep">Keep only this</button>' : ''}
-      ${item.dev ? '' : `<button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`}
+      ${item.dev || !FAV_KINDS.has(item.kind) ? '' : `<button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`}
       <button type="button" class="icon-btn" data-act="menu" aria-haspopup="menu" aria-expanded="${open ? 'true' : 'false'}"${open ? ` aria-controls="menu-${slug(item.key)}"` : ''} aria-label="${esc(`More actions for ${item.name}`)}">${ICON.dots}</button>
     </div>
     ${open ? menuHtml(item) : ''}
@@ -1445,7 +1447,8 @@ function budgetHtml(list) {
 }
 
 function renderContext() {
-  const all = contextItems().filter(visible)
+  const every = contextItems()
+  const all = every.filter(visible)
   const shown = all.filter((e) => chipFilter.context === 'all' || e.type === chipFilter.context)
   const max = Math.max(1, ...all.map((e) => e.always))
   const dups = new Set(duplicateGroups().flatMap((g) => g.items.map((i) => i.key)))
@@ -1456,7 +1459,7 @@ function renderContext() {
     : all.length
       ? empty('No items match this filter.')
       : nothingMatches()
-  $('p-context').innerHTML = contextBandHtml(all) + budgetHtml(all) + chipsHtml('context', all, note) + body
+  $('p-context').innerHTML = contextBandHtml(all) + budgetHtml(every) + chipsHtml('context', all, note) + body
 }
 
 function catalogBody(page, list) {

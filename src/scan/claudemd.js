@@ -14,7 +14,7 @@ function describe(file) {
 
 function isConditional(text) {
   const { paths } = parseFrontmatter(text)
-  return Array.isArray(paths) ? paths.length > 0 : Boolean(paths)
+  return Array.isArray(paths) ? paths.length > 0 : Boolean(paths) && !/^\[\s*\]$/.test(paths)
 }
 
 function realOrNull(file) {

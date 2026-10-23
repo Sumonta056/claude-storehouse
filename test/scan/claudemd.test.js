@@ -93,3 +93,15 @@ test('symlinked rule is listed only when its real path is under home or project'
     fx.cleanup()
   }
 })
+
+test('rule with empty inline paths list is not conditional', () => {
+  const fx = makeFixture()
+  try {
+    const file = path.join(fx.projectDir, '.claude', 'rules', 'ui.md')
+    fs.writeFileSync(file, '---\npaths: []\n---\n\nBody\n')
+    const rule = scanClaudeMd({ home: fx.home, projectDir: fx.projectDir }).rules.find((r) => r.path === file)
+    assert.equal(rule.conditional, false)
+  } finally {
+    fx.cleanup()
+  }
+})
