@@ -66,17 +66,32 @@ This repo has 1 extra limit: a branch-protection hook from a Claude Code plugin 
 ## 5. After the tag
 
 1. Watch the release workflow: `gh run list --workflow release.yml --limit 1`, then `gh run watch <id> --exit-status`.
-2. Check npm: `npm view claude-storehouse version dist-tags`. `latest` equals the new version.
+2. Check npm without cache: `curl -s -H 'Cache-Control: no-cache' "https://registry.npmjs.org/claude-storehouse?t=$(date +%s)"`. `dist-tags.latest` equals the new version. `npm view` can show an old cached value for minutes.
 3. Check the GitHub Release has the tarball: `gh release view vX.Y.Z`.
 4. Check the npm page shows the new README and images.
+5. Install test in an empty scratch folder: `npm install claude-storehouse@X.Y.Z --prefer-online`, then `npx claude-storehouse --version`.
 
 ## When the release workflow fails
 
-| Error                                    | Cause                                                               | Fix                                                                                                                                                               |
-| ---------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tag does not match package.json          | Version bump not committed before the tag                           | Do not move the tag. Fix `main` and release the next patch.                                                                                                       |
-| CHANGELOG has no section                 | `CHANGELOG.md` heading is not `## [X.Y.Z]`                          | Same as above.                                                                                                                                                    |
-| npm 404 or 403 on publish with OIDC      | Trusted publisher not set up, or wrong workflow or environment name | On npmjs.com, package settings, Trusted Publisher: repo `Sumonta056/claude-storehouse`, workflow `release.yml`, environment `npm`. Then run the failed job again. |
-| Cannot publish over the previous version | Version already on npm                                              | Release the next patch.                                                                                                                                           |
+| Error                                    | Cause                                                                                                                                               | Fix                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tag does not match package.json          | Version bump not committed before the tag                                                                                                           | Do not move the tag. Fix `main` and release the next patch.                                                                                                                                                                                                                                                                                                                                                             |
+| CHANGELOG has no section                 | `CHANGELOG.md` heading is not `## [X.Y.Z]`                                                                                                          | Same as above.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| npm 404 or 403 on publish with OIDC      | npm found no trusted publisher that matches the run. The log shows `NODE_AUTH_TOKEN: XXXXX-...`: npm fell back to the setup-node placeholder token. | Check the GitHub side first: `gh api repos/Sumonta056/claude-storehouse/environments` and the run `path`. Then the user checks npmjs.com, package Settings, Trusted Publisher: owner `Sumonta056` with a capital S (the match is case-sensitive; `sumonta056` fails), repo `claude-storehouse`, workflow `release.yml`, environment `npm`. A new setting can take a minute to apply. Then `gh run rerun <id> --failed`. |
+| Cannot publish over the previous version | Version already on npm                                                                                                                              | Release the next patch.                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+## Fallback: publish from the local machine
+
+Use this when trusted publishing still fails and the user wants the version live now.
+
+1. Check that `HEAD` equals the tag: `git rev-parse HEAD vX.Y.Z^{commit}`. Check that `npm pack --dry-run` shows the right version.
+2. npm needs 2FA. A `!` command in Claude Code has no terminal, so npm cannot wait for a browser approval and prints the login URL masked as `***`. The user must run the publish in a real terminal window:
+   ```
+   cd /Users/cefalo_1/Documents/Projects/claude-storehouse
+   npx -y npm@11 publish --access public --auth-type=web
+   ```
+   With an authenticator app, `! npm publish --access public --otp=<6 digits>` also works from Claude Code.
+3. Check the registry (section 5, step 2). Then attach the tarball, because the workflow did not reach that step: `npm pack --pack-destination <scratchpad>`, then `gh release upload vX.Y.Z <scratchpad>/claude-storehouse-X.Y.Z.tgz --clobber`.
+4. This version has no provenance. Fix trusted publishing before the next release.
 
 Never delete or force-push a published tag without the user's approval of that exact action.
