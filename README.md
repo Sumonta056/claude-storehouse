@@ -88,6 +88,16 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 ![Duplicates page with two same-name groups marked Conflict and a Keep only this button on each item](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/duplicates.png)
 
+### See context cost
+
+- The Context page estimates the tokens that each item adds to every session before you type a word.
+- It counts CLAUDE.md files, rules in `.claude/rules/`, and skill and agent descriptions. The estimate is file bytes ÷ 4.
+- A meter shows the skill listing budget: 1% of the context window, about 2,000 tokens for 200K.
+- Items sort by tokens, each with its switch. Switch one off and the total goes down.
+- Each skill and agent row shows a small token chip.
+
+![Context page with the tokens loaded in every session, a bar by type, the skill listing budget, and items sorted by tokens](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/context.png)
+
 ### Favorites
 
 - Star the skills, agents, and plugins you use most, and drag them into order.
@@ -221,7 +231,8 @@ The full behavior spec is in [`.claude/rules/business-logic.md`](https://github.
 2. Agent off is a rename to `.md.disabled`.
 3. Hook off parks the entry in `~/.claude/storehouse.json`.
 4. Changes apply at the next Claude Code session.
-5. `commands`, `rules`, and `output-styles` are not shown yet.
+5. `commands` and `output-styles` are not shown yet. Rules are read-only and show only on the Context page.
+6. Context cost is an estimate. It does not measure MCP tool schemas or follow `@path` imports in CLAUDE.md.
 
 ## Contributing
 

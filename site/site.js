@@ -6,6 +6,7 @@
     dash: 'Dashboard',
     fav: 'Favorites',
     dups: 'Duplicates',
+    context: 'Context',
     skills: 'Skills',
     agents: 'Agents',
     plugins: 'Plugins',

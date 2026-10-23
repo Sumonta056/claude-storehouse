@@ -158,6 +158,7 @@
               <button role="tab" aria-selected="true" data-page="dash">Dashboard</button>
               <button role="tab" aria-selected="false" data-page="fav">Favorites</button>
               <button role="tab" aria-selected="false" data-page="dups">Duplicates</button>
+              <button role="tab" aria-selected="false" data-page="context">Context</button>
               <button role="tab" aria-selected="false" data-page="skills">Skills</button>
               <button role="tab" aria-selected="false" data-page="plugins">Plugins</button>
               <button role="tab" aria-selected="false" data-page="hooks">Hooks</button>
@@ -367,6 +368,32 @@
             <img
               src="screenshots/duplicates.png"
               alt="Duplicates page with two same-name groups, each marked Conflict, and a Keep only this button on each item"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+        <div class="wrap feature flip">
+          <div class="txt">
+            <h3>See context cost</h3>
+            <p>
+              The Context page estimates how many tokens each item adds to every session before you type a word, and
+              sorts the biggest first.
+            </p>
+            <ul>
+              <li>CLAUDE.md files, rules, skill and agent descriptions</li>
+              <li>A meter for the skill listing budget</li>
+              <li>Switch an item off and the total goes down</li>
+              <li>A token chip on each skill and agent row</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="context">See context cost in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/context.png"
+              alt="Context page with the tokens loaded in every session, a bar by type, the skill listing budget, and items sorted by tokens"
               loading="lazy"
               width="2880"
               height="1800"

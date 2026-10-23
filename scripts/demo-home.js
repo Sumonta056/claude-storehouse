@@ -127,6 +127,18 @@ agent(path.join(project, '.claude', 'agents'), 'repo-guide', 'Answer questions a
 agent(path.join(project, '.claude', 'agents'), 'code-reviewer', 'Review acme-api diffs against the team checklist.')
 write(path.join(project, '.claude', 'settings.json'), { permissions: { allow: ['Bash(npm test:*)'] } })
 write(path.join(project, 'CLAUDE.md'), '# acme-api\n\nRun `npm test` before you push.\n')
+write(
+  path.join(project, '.claude', 'rules', 'api-style.md'),
+  '# API style\n\n- Return JSON with a `data` key.\n- Use plural nouns in routes.\n- Validate input at the handler.\n- Never log a request body.\n'
+)
+write(
+  path.join(project, '.claude', 'rules', 'migrations.md'),
+  "---\npaths:\n  - 'db/migrations/**'\n---\n\n# Migrations\n\n- Each migration has a down step.\n- Never edit a migration that shipped.\n- Test the rollback on a copy of the database.\n"
+)
+write(
+  path.join(claude, 'rules', 'writing.md'),
+  '# Writing\n\n- Short sentences.\n- One idea per sentence.\n- Active voice.\n'
+)
 write(path.join(project, '.mcp.json'), {
   mcpServers: { sentry: { type: 'http', url: 'https://mcp.sentry.example/mcp' } }
 })
