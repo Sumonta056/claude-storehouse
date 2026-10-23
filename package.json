@@ -45,7 +45,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "open": "^10.1.0"
+    "open": "^11.0.4"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
