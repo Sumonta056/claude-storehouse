@@ -23,7 +23,7 @@ async function withServer(fn) {
     }
     const res = await fetch(base + route, init)
     const text = await res.text()
-    let json = null
+    let json
     try {
       json = JSON.parse(text)
     } catch {

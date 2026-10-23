@@ -76,7 +76,7 @@ function modeFor(dest, home) {
 }
 
 export function writeFileAtomic(file, content, home) {
-  let dest = file
+  let dest
   try {
     dest = fs.realpathSync(file)
   } catch {

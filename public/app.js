@@ -3599,7 +3599,7 @@ function saveSettingsForm() {
         try {
           data = JSON.parse(res.content ?? '')
         } catch (err) {
-          throw new Error(`${tilde(info.path)} does not parse: ${err.message}. Fix it in Raw JSON.`)
+          throw new Error(`${tilde(info.path)} does not parse: ${err.message}. Fix it in Raw JSON.`, { cause: err })
         }
       } catch (err) {
         if (err.status !== 404) throw err

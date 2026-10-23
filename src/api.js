@@ -113,7 +113,7 @@ function findHook(req, ctx) {
 
 function toggleLabel(req, ctx) {
   if (req.kind !== 'hook') return `${req.kind} ${req.name}`
-  let hook = null
+  let hook
   try {
     hook = findHook(req, ctx)
   } catch {
@@ -192,7 +192,7 @@ export function putFavoritesOrder({ body }, deps) {
 function listDir(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true }).map((entry) => {
     const full = path.join(dir, entry.name)
-    let stat = null
+    let stat
     try {
       stat = fs.statSync(full)
     } catch {

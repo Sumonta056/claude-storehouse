@@ -67,7 +67,7 @@ export function isProtectedTarget(file, ctx) {
   if (roots.includes(lexical) || roots.includes(real)) return true
   const containers = containerFolders(ctx)
   if (containers.includes(lexical) || containers.includes(real)) return true
-  let isDir = false
+  let isDir
   try {
     isDir = fs.statSync(lexical).isDirectory()
   } catch {

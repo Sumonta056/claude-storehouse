@@ -76,7 +76,7 @@ function rollback(file, result, ctx, cause) {
       if (result.existed) writeChecked(file, result.original, ctx)
       else fs.rmSync(file, { force: true })
     } catch (err) {
-      throw new Error(`${cause.message}; rollback of ${file} also failed: ${err.message}`)
+      throw new Error(`${cause.message}; rollback of ${file} also failed: ${err.message}`, { cause: err })
     }
   }
   throw cause

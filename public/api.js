@@ -28,7 +28,7 @@ async function request(method, path, body) {
     init.body = JSON.stringify(body)
   }
   const res = await fetch(path, init)
-  let json = null
+  let json
   try {
     json = await res.json()
   } catch {
