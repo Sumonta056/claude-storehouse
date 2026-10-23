@@ -92,11 +92,12 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 - The Context page estimates the tokens that each item adds to every session before you type a word.
 - It counts CLAUDE.md files, rules in `.claude/rules/`, and skill and agent descriptions. The estimate is file bytes ÷ 4.
-- A meter shows the skill listing budget: 1% of the context window, about 2,000 tokens for 200K.
+- The list shows only items that load. The Off chip lists switched-off items and the tokens they save.
 - Items sort by tokens, each with its switch. Switch one off and the total goes down.
-- Each skill and agent row shows a small token chip.
+- Rows on the Skills and Agents pages show a small token chip.
+- For exact numbers, run `/context` in Claude Code.
 
-![Context page with the tokens loaded in every session, a bar by type, the skill listing budget, and items sorted by tokens](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/context.png)
+![Context page with the tokens loaded in every session, a bar by type, filter chips, and items sorted by tokens](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/context.png)
 
 ### Favorites
 

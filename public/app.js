@@ -847,7 +847,8 @@ const CHIPS = {
     ['rules', 'Rules'],
     ['skills', 'Skills'],
     ['agents', 'Agents'],
-    ['mcp', 'MCP']
+    ['mcp', 'MCP'],
+    ['off', 'Off']
   ],
   dups: [
     ['all', 'All'],
@@ -1092,7 +1093,7 @@ function keepChip(page, item) {
 function chipCounts(page, list) {
   if (page === 'dups') return { all: list.length, needs: list.filter(needsAction).length }
   if (page === 'context')
-    return Object.fromEntries(CHIPS.context.map(([k]) => [k, list.filter((e) => k === 'all' || e.type === k).length]))
+    return Object.fromEntries(CHIPS.context.map(([k]) => [k, list.filter((e) => keepCtx(e, k)).length]))
   const shown = list.filter(visible)
   if (page === 'mods') {
     const own = shown.filter((m) => !m.dev)
@@ -1244,8 +1245,6 @@ async function keepOnly(item) {
 }
 
 const TOKEN_BYTES = 4
-const WINDOW_TOKENS = 200000
-const LISTING_BUDGET = WINDOW_TOKENS / 100
 const DESC_CAP = 1536
 const CTX_TYPES = [
   ['claudemd', 'CLAUDE.md', 'm0'],
@@ -1413,12 +1412,11 @@ function contextBandHtml(list) {
     plural(on('skills'), 'skill'),
     plural(on('agents'), 'agent')
   ]
-  const share = ((total / WINDOW_TOKENS) * 100).toFixed(1)
   return `<section class="usage" aria-label="Context cost">
       <div>
         <div class="k">Loaded in every session</div>
         <div class="big" id="ctx-total">${total.toLocaleString('en-US')}<small> tokens</small></div>
-        <p>Estimate: file bytes ÷ ${TOKEN_BYTES}. ${share}% of a 200K context window.<br>${esc(parts.join(' · '))} · MCP servers not measured · <code>@path</code> imports not followed</p>
+        <p>Estimate: file bytes ÷ ${TOKEN_BYTES}. Run <code>/context</code> in Claude Code for exact numbers.<br>${esc(parts.join(' · '))} · MCP servers not measured · <code>@path</code> imports not followed</p>
       </div>
       <div class="right">
         <div class="k">By type</div>
@@ -1431,35 +1429,29 @@ function contextBandHtml(list) {
     </section>`
 }
 
-function budgetHtml(list) {
-  const skills = list.filter((e) => e.type === 'skills')
-  const own = sumTokens(skills.filter((e) => e.scope !== 'plugin'))
-  const fromPlugins = sumTokens(skills.filter((e) => e.scope === 'plugin'))
-  const used = own + fromPlugins
-  const pct = (used / LISTING_BUDGET) * 100
-  const scale = Math.max(used, LISTING_BUDGET)
-  const over = used > LISTING_BUDGET
-  return `<div class="budget${over ? ' over' : ''}">
-      <div class="bt"><b>Skill listing budget</b><span>${used.toLocaleString('en-US')} of about ${LISTING_BUDGET.toLocaleString('en-US')} tokens · ${pct.toFixed(0)}%</span></div>
-      <div class="meter" role="img" aria-label="${esc(`${pct.toFixed(0)} percent of the skill listing budget used`)}"><span style="width:${(own / scale) * 100}%;background:var(--accent)"></span><span style="width:${(fromPlugins / scale) * 100}%;background:var(--purple)"></span></div>
-      <small>Claude Code lists skill names and descriptions in 1% of the context window: about ${LISTING_BUDGET.toLocaleString('en-US')} tokens for 200K. ${over ? '<b>Over budget:</b> Claude Code drops the descriptions of the skills you use least, and Claude can miss a skill.' : 'Over budget, Claude Code drops the descriptions of the skills you use least.'} Orange: your skills. Purple: plugin skills.</small>
-    </div>`
+function isOff(e) {
+  return Boolean(e.item) && !e.enabled
+}
+
+function keepCtx(e, f) {
+  if (f === 'off') return isOff(e)
+  return !isOff(e) && (f === 'all' || e.type === f)
 }
 
 function renderContext() {
-  const every = contextItems()
-  const all = every.filter(visible)
-  const shown = all.filter((e) => chipFilter.context === 'all' || e.type === chipFilter.context)
+  const all = contextItems().filter(visible)
+  const off = chipFilter.context === 'off'
+  const shown = all.filter((e) => keepCtx(e, chipFilter.context))
   const max = Math.max(1, ...all.map((e) => e.always))
   const dups = new Set(duplicateGroups().flatMap((g) => g.items.map((i) => i.key)))
   const note =
     'Sorted by tokens. Switch off a large item to give the context window back. Changes apply at the next session.'
   const body = shown.length
-    ? `<h2>Biggest items <span class="pill">${shown.length}</span><span class="hint">${esc(`${tok(sumTokens(shown))} at session start`)}</span></h2><ul class="rows" data-rows="context">${shown.map((e) => ctxRow(e, max, dups)).join('')}</ul>`
+    ? `<h2>${off ? 'Switched off' : 'Biggest items'} <span class="pill">${shown.length}</span><span class="hint">${esc(off ? `${tok(shown.reduce((sum, e) => sum + (e.cost ?? 0), 0))} saved while off` : `${tok(sumTokens(shown))} at session start`)}</span></h2><ul class="rows" data-rows="context">${shown.map((e) => ctxRow(e, max, dups)).join('')}</ul>`
     : all.length
       ? empty('No items match this filter.')
       : nothingMatches()
-  $('p-context').innerHTML = contextBandHtml(all) + budgetHtml(every) + chipsHtml('context', all, note) + body
+  $('p-context').innerHTML = contextBandHtml(all) + chipsHtml('context', all, note) + body
 }
 
 function catalogBody(page, list) {

@@ -112,7 +112,8 @@ The Context page estimates the tokens that each item adds to every session. The 
 
 - Estimate: `tokens = Math.ceil(bytes / 4)`. One constant, `TOKEN_BYTES`, in `public/app.js`.
 - A skill or agent costs its `name: description` bytes. The description is cut at 1,536 characters, the Claude Code cap.
-- Skill listing budget: 1% of the context window, about 2,000 tokens for 200K. Over budget, Claude Code drops the descriptions of the least-used skills. Source: code.claude.com/docs/en/skills.
+- No skill listing budget meter. Claude Code's listing budget is a character budget at 1% of the model's context window, changed by `skillListingBudgetFraction`, `SLASH_COMMAND_TOOL_CHAR_BUDGET`, and `skillOverrides: "name-only"`. Storehouse cannot know the model, so the page points to `/context`, which reports the listing after the budget. Source: code.claude.com/docs/en/skills, "Skill descriptions are cut short".
+- The list and the type chips show only items that load. The Off chip lists items that are off and the tokens they save.
 - The scanner reads rules recursively from `~/.claude/rules` and `./.claude/rules`. It skips names that start with `.`, non-`.md` files, symlinked folders, and symlinked files whose real path is outside the home folder and the project folder. A rule is conditional when its frontmatter `paths` has at least one entry.
 - An item that is off counts 0. Its row shows "Saves NN tok while off".
 - A skill with a duplicate name counts once for each copy. The row links to Duplicates.

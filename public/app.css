@@ -2868,42 +2868,6 @@ select {
 .mchip.dupc:hover {
   text-decoration: underline;
 }
-.budget {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-}
-.budget .bt {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-}
-.budget .meter {
-  display: flex;
-  height: 10px;
-  border-radius: 6px;
-  background: var(--panel2);
-  overflow: hidden;
-}
-.budget .meter span {
-  height: 100%;
-}
-.budget small {
-  font-size: 14px;
-  color: var(--muted);
-}
-.budget.over {
-  border-color: var(--red);
-}
-.budget.over .bt span,
-.budget.over small b {
-  color: var(--red);
-}
 .lrow .tail {
   flex: none;
   display: flex;
