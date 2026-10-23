@@ -133,3 +133,13 @@ test('frontmatter name differs from folder and overrides use it', () => {
     assert.ok(!items.some((i) => i.name === 'folder-x'))
   })
 })
+
+test('each skill has size in bytes of its file', () => {
+  withFixture((fx) => {
+    const items = run(fx)
+    assert.ok(items.length > 0)
+    for (const item of items) assert.equal(item.size, fs.statSync(item.path).size)
+    const loose = items.find((i) => i.name === 'loose')
+    assert.equal(loose.size, fs.statSync(path.join(fx.home, '.claude', 'skills', 'loose.md')).size)
+  })
+})

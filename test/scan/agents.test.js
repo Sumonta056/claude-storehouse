@@ -86,3 +86,15 @@ test('scanAgents reads model and tools from frontmatter', () => {
     fx.cleanup()
   }
 })
+
+test('each agent has size in bytes of its file', () => {
+  const fx = makeFixture()
+  try {
+    const items = run(fx)
+    assert.ok(items.length > 0)
+    for (const item of items) assert.equal(item.size, fs.statSync(item.path).size)
+    assert.ok(items.find((i) => i.name === 'parked').size > 0)
+  } finally {
+    fx.cleanup()
+  }
+})

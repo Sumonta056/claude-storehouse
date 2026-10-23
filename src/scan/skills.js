@@ -28,7 +28,8 @@ function describe(file, fallbackName) {
   const meta = parseFrontmatter(text)
   return {
     name: meta.name || fallbackName,
-    description: meta.description || firstBodyLine(meta.body)
+    description: meta.description || firstBodyLine(meta.body),
+    size: Buffer.byteLength(text)
   }
 }
 
@@ -56,6 +57,7 @@ function buildItem(file, fallback, scope, source, pluginId, enabledFor) {
     kind: 'skill',
     name: info.name,
     description: info.description,
+    size: info.size,
     scope,
     source,
     path: file,

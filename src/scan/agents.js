@@ -52,6 +52,7 @@ function readItem(file, fileName, scope, source, pluginId, enabled, readOnly) {
     description: meta.description || firstBodyLine(meta.body),
     model: typeof meta.model === 'string' ? meta.model : '',
     tools: toolList(meta.tools),
+    size: Buffer.byteLength(text),
     scope,
     source,
     path: file,
