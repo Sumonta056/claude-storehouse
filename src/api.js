@@ -143,7 +143,14 @@ export function postFavorite({ body }, deps) {
   const now = favorites.find((f) => f.id === favoriteId(req.kind, req.source, req.name))
   const entry =
     req.favorite && before
-      ? recordSave(deps, file, req.category === undefined ? `Kept ${label} as a favorite` : `Moved ${label} to ${now?.category ?? 'Uncategorized'}`, null)
+      ? recordSave(
+          deps,
+          file,
+          req.category === undefined
+            ? `Kept ${label} as a favorite`
+            : `Moved ${label} to ${now?.category ?? 'Uncategorized'}`,
+          null
+        )
       : deps.activity.record({
           kind: 'favorite',
           file,
@@ -157,7 +164,9 @@ export function postFavoriteCategory({ body }, deps) {
   const req = pick(body, ['op', 'name', 'newName'])
   const result = refused(() => editCategory(req, deps.ctx.home))
   const message =
-    req.op === 'rename' ? `Renamed category ${req.name} to ${String(req.newName).trim()}` : `${req.op === 'create' ? 'Added' : 'Deleted'} category ${String(req.name).trim()}`
+    req.op === 'rename'
+      ? `Renamed category ${req.name} to ${String(req.newName).trim()}`
+      : `${req.op === 'create' ? 'Added' : 'Deleted'} category ${String(req.name).trim()}`
   const entry = recordSave(deps, storehousePath(deps.ctx.home), message, result.backup)
   return ok({ ok: true, favorites: result.favorites, favoriteCategories: result.categories, entry })
 }
@@ -166,7 +175,12 @@ export function putFavoritesOrder({ body }, deps) {
   const ids = Array.isArray(body) ? body : body?.ids
   const move = Array.isArray(body) ? undefined : body?.move
   const favorites = refused(() => reorderFavorites(ids, deps.ctx.home, move))
-  const entry = recordSave(deps, storehousePath(deps.ctx.home), move ? 'Moved and reordered favorites' : 'Reordered favorites', null)
+  const entry = recordSave(
+    deps,
+    storehousePath(deps.ctx.home),
+    move ? 'Moved and reordered favorites' : 'Reordered favorites',
+    null
+  )
   return ok({ ok: true, favorites, favoriteCategories: readCategories(deps.ctx.home), entry })
 }
 

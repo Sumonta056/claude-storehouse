@@ -468,7 +468,7 @@ test('POST /api/favorite move is not undoable, and undo of unstar restores the c
     await api('POST', '/api/favorite', { ...fav, favorite: true, category: 'QA' })
     const move = await api('POST', '/api/favorite', { ...fav, favorite: true, category: 'Review' })
     assert.equal(move.json.favorites[0].category, 'Review')
-    let activity = await api('GET', '/api/activity')
+    const activity = await api('GET', '/api/activity')
     assert.equal(activity.json.entries[0].kind, 'save')
     const off = await api('POST', '/api/favorite', { ...fav, favorite: false })
     assert.deepEqual(off.json.favorites, [])
