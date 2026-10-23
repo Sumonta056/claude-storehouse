@@ -7,7 +7,8 @@ function unquote(value) {
 }
 
 const BLOCK = /^([>|])[+-]?$/
-const KEEP = new Set(['name', 'description', 'model', 'tools'])
+const KEEP = new Set(['name', 'description', 'model', 'tools', 'paths'])
+const LISTS = new Set(['tools', 'paths'])
 
 function indentOf(line) {
   return line.length - line.trimStart().length
@@ -50,7 +51,7 @@ export function parseFrontmatter(text) {
     const line = lines[i]
     i++
     const bare = line.match(/^([A-Za-z_][\w-]*):\s*$/)
-    if (bare && bare[1] === 'tools') {
+    if (bare && LISTS.has(bare[1])) {
       const list = []
       while (i < lines.length && /^\s+-\s+/.test(lines[i])) {
         list.push(unquote(lines[i].replace(/^\s+-\s+/, '').trim()))

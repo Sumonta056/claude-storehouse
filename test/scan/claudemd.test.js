@@ -65,3 +65,31 @@ test('scanClaudeMd without project lists only global rules', () => {
     fx.cleanup()
   }
 })
+
+test('rule with trailing space after closing frontmatter line is conditional', () => {
+  const fx = makeFixture()
+  try {
+    const file = path.join(fx.projectDir, '.claude', 'rules', 'ui.md')
+    fs.writeFileSync(file, "---\npaths:\n  - 'src/**'\n--- \n\nBody\n")
+    const rule = scanClaudeMd({ home: fx.home, projectDir: fx.projectDir }).rules.find((r) => r.path === file)
+    assert.equal(rule.conditional, true)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('symlinked rule is listed only when its real path is under home or project', () => {
+  const fx = makeFixture()
+  try {
+    const rules = path.join(fx.home, '.claude', 'rules')
+    const outside = path.join(path.dirname(fx.home), 'outside.md')
+    fs.writeFileSync(outside, '# Outside\n')
+    fs.symlinkSync(outside, path.join(rules, 'out.md'))
+    fs.symlinkSync(path.join(fx.home, '.claude', 'CLAUDE.md'), path.join(rules, 'in.md'))
+    const names = scanClaudeMd({ home: fx.home, projectDir: fx.projectDir }).rules.map((r) => path.basename(r.path))
+    assert.ok(names.includes('in.md'))
+    assert.ok(!names.includes('out.md'))
+  } finally {
+    fx.cleanup()
+  }
+})
