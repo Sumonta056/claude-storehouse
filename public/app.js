@@ -6,6 +6,7 @@ const PAGES = {
   skills: 'Skills',
   agents: 'Agents',
   plugins: 'Plugins',
+  mods: 'Mods',
   hooks: 'Hooks',
   mcp: 'MCP servers',
   settings: 'Settings',
@@ -109,7 +110,7 @@ function pluginLabel(id) {
 
 function normalize(inv) {
   items.clear()
-  const out = { skill: [], agent: [], plugin: [], hook: [], mcp: [] }
+  const out = { skill: [], agent: [], plugin: [], mod: [], hook: [], mcp: [] }
   for (const s of inv.skills) {
     const item = { ...s, key: keyOf('skill', s.source, s.name) }
     items.set(item.key, item)
@@ -139,10 +140,37 @@ function normalize(inv) {
       missing: p.missing,
       canToggle: !p.missing,
       favorite: p.favorite,
-      mtime: p.mtime ?? null
+      mtime: p.mtime ?? null,
+      isMod: Boolean(p.isMod),
+      modules: p.modules ?? []
     }
     items.set(item.key, item)
     out.plugin.push(item)
+    if (item.isMod) out.mod.push(item)
+  }
+  for (const m of inv.devMods ?? []) {
+    const item = {
+      kind: 'plugin',
+      dev: true,
+      key: keyOf('plugin', 'dev', m.id),
+      id: m.id,
+      name: m.name,
+      source: 'dev',
+      description: m.description,
+      scope: 'dev',
+      path: m.path,
+      enabled: true,
+      missing: false,
+      canToggle: false,
+      favorite: false,
+      mtime: m.mtime ?? null,
+      version: m.version,
+      session: m.session,
+      isMod: true,
+      modules: m.modules ?? []
+    }
+    items.set(item.key, item)
+    out.mod.push(item)
   }
   for (const h of inv.hooks) {
     const item = {
@@ -170,11 +198,11 @@ function normalize(inv) {
   return out
 }
 
-let catalog = { skill: [], agent: [], plugin: [], hook: [], mcp: [] }
+let catalog = { skill: [], agent: [], plugin: [], mod: [], hook: [], mcp: [] }
 
 function inScope(scope) {
   if (state.scope === 'all') return true
-  if (state.scope === 'global') return scope === 'global' || scope === 'plugin'
+  if (state.scope === 'global') return scope === 'global' || scope === 'plugin' || scope === 'dev'
   return scope === 'project'
 }
 
@@ -194,6 +222,12 @@ function visible(item) {
 
 function switchInfo(item) {
   if (item.kind === 'plugin') {
+    if (item.dev)
+      return {
+        disabled: true,
+        text: 'dev mod',
+        title: `Development mod in ~/.claude/dev-mods/${item.session}. It has no switch here.`
+      }
     if (item.missing)
       return { disabled: true, text: 'not installed', title: `${item.id} is listed but its folder is missing` }
     const file = item.scope === 'project' ? '.claude/settings.local.json' : '~/.claude/settings.json'
@@ -708,6 +742,18 @@ const ICON = {
   chev: '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>'
 }
 
+const KIND_PATH = {
+  skill: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
+  agent: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/>',
+  plugin: '<path d="M9 3v4M15 3v4M6 7h12v5a6 6 0 0 1-12 0zM12 18v3"/>',
+  hook: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  mcp: '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/>'
+}
+
+function kindIcon(kind, size = 24) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_PATH[kind] ?? ''}</svg>`
+}
+
 const CHIPS = {
   plugins: [
     ['all', 'All'],
@@ -738,6 +784,12 @@ const CHIPS = {
     ['on', 'On'],
     ['off', 'Off'],
     ['plugin', 'From plugins']
+  ],
+  mods: [
+    ['all', 'All'],
+    ['on', 'On'],
+    ['off', 'Off'],
+    ['dev', 'Dev']
   ]
 }
 
@@ -745,6 +797,11 @@ const SECTIONS = {
   plugins: [
     ['global', 'Global · installed for your user', ''],
     ['project', 'Project · installed for this folder', '']
+  ],
+  mods: [
+    ['global', 'Global · installed for your user', ''],
+    ['project', 'Project · installed for this folder', ''],
+    ['dev', 'Development · ~/.claude/dev-mods', 'Read-only. These mods have no switch.']
   ],
   skills: [
     ['global', 'Global · ~/.claude/skills', 'The switch writes skillOverrides in ~/.claude/settings.json'],
@@ -756,7 +813,7 @@ const SECTIONS = {
   ]
 }
 
-const chipFilter = { plugins: 'all', skills: 'all', agents: 'all', hooks: 'all', mcp: 'all' }
+const chipFilter = { plugins: 'all', mods: 'all', skills: 'all', agents: 'all', hooks: 'all', mcp: 'all' }
 const groupOpen = new Map()
 let menuKey = null
 let menuCtx = ''
@@ -822,7 +879,7 @@ function menuEntries(item) {
   const list = [['m-open', 'Open details']]
   if (item.canToggle) list.push(['m-toggle', item.enabled ? 'Switch off' : 'Switch on'])
   if (item.path) list.push(['m-finder', 'Reveal in Finder'])
-  if (item.kind === 'plugin') list.push(['m-uninstall', 'Uninstall plugin…', true])
+  if (item.kind === 'plugin' && !item.dev) list.push(['m-uninstall', 'Uninstall plugin…', true])
   return list
 }
 
@@ -838,6 +895,11 @@ function menuHtml(item) {
 }
 
 function metaHtml(item) {
+  if (item.kind === 'plugin' && item.modules?.length && (item.dev || state.page === 'mods')) {
+    const bits = item.modules.map((m) => `<span class="mchip">${esc(m)}</span>`)
+    if (item.dev) bits.push(`<span class="mchip">session ${esc(item.session.slice(0, 8))}</span>`)
+    return `<p class="meta chips-s">${bits.join('')}</p>`
+  }
   if (item.kind === 'plugin') {
     if (item.missing) return '<p class="meta muted">Use “Remove entry” to clean up installed_plugins.json.</p>'
     const parts = pluginParts(item.id)
@@ -859,21 +921,22 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null } = {}) {
   const desc = item.missing
     ? 'Listed in installed_plugins.json, but the plugin folder is gone.'
     : item.description || 'No description'
-  const ver = item.kind === 'plugin' ? shortVersion(pluginById(item.id)?.version) : ''
+  const fullVer = item.kind === 'plugin' ? (pluginById(item.id)?.version ?? item.version ?? '') : ''
+  const ver = shortVersion(fullVer)
   const cls = ['lrow', off ? 'off' : '', item.missing ? 'missing' : '', item.canToggle ? '' : 'locked']
     .filter(Boolean)
     .join(' ')
   return `<li class="${cls}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
     <div class="lead">${leadHtml(item)}</div>
     <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
       <p class="desc">${esc(desc)}</p>
       ${metaHtml(item)}
     </div>
-    ${ver ? `<span class="ver" title="${esc(pluginById(item.id)?.version ?? '')}">${esc(ver)}</span>` : ''}
+    ${ver ? `<span class="ver" title="${esc(fullVer)}">${esc(ver)}</span>` : ''}
     <div class="tail">
       ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
-      <button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>
+      ${item.dev ? '' : `<button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`}
       <button type="button" class="icon-btn" data-act="menu" aria-haspopup="menu" aria-expanded="${open ? 'true' : 'false'}"${open ? ` aria-controls="menu-${slug(item.key)}"` : ''} aria-label="${esc(`More actions for ${item.name}`)}">${ICON.dots}</button>
     </div>
     ${open ? menuHtml(item) : ''}
@@ -891,6 +954,7 @@ function switchable(page, item) {
 function keepChip(page, item) {
   const f = chipFilter[page]
   if (f === 'all') return true
+  if (page === 'mods') return f === 'dev' ? Boolean(item.dev) : !item.dev && (f === 'on') === Boolean(item.enabled)
   if (page === 'plugins')
     return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
   if (f === 'plugin') return item.scope === 'plugin'
@@ -899,6 +963,15 @@ function keepChip(page, item) {
 
 function chipCounts(page, list) {
   const shown = list.filter(visible)
+  if (page === 'mods') {
+    const own = shown.filter((m) => !m.dev)
+    return {
+      all: shown.length,
+      on: own.filter((m) => m.enabled).length,
+      off: own.filter((m) => !m.enabled).length,
+      dev: shown.length - own.length
+    }
+  }
   if (page === 'plugins') {
     const ok = shown.filter((p) => !p.missing)
     return {
@@ -968,7 +1041,7 @@ function catalogBody(page, list) {
       return `<h2>${esc(title)} <span class="pill">${shown.length}</span>${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</h2>${rowsHtml(shown)}`
     })
     .join('')
-  const html = own + (page === 'plugins' ? '' : pluginGroupsHtml(page, list))
+  const html = own + (page === 'plugins' || page === 'mods' ? '' : pluginGroupsHtml(page, list))
   if (html) return html
   if (chipFilter[page] !== 'all' && list.some(visible)) return empty(`No ${page} match this filter.`)
   return nothingMatches()
@@ -1063,6 +1136,7 @@ function renderNav() {
   $('n-skills').textContent = counts(catalog.skill).total
   $('n-agents').textContent = counts(catalog.agent).total
   $('n-plugins').textContent = counts(catalog.plugin).total
+  $('n-mods').textContent = counts(catalog.mod).total
   $('n-hooks').textContent = otherCounts(inv.hooks).total
   $('n-mcp').textContent = otherCounts(inv.mcp).total
   $('n-fav').textContent = favoriteEntries().filter((e) => !e.item || visible(e.item)).length
@@ -1162,6 +1236,12 @@ function renderPage() {
       'plugins',
       catalog.plugin,
       'The switch writes <code>enabledPlugins["name@marketplace"]</code>, the same as the <code>/plugin</code> menu.'
+    )
+  else if (page === 'mods')
+    renderCatalog(
+      'mods',
+      catalog.mod,
+      'A mod is a plugin with <code>"modules"</code> in <code>hooks/hooks.json</code>. The switch writes <code>enabledPlugins["name@marketplace"]</code>. Mods load only when <code>CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1</code> is set in your shell or settings <code>env</code>.'
     )
   else if (page === 'hooks') renderHooks()
   else if (page === 'mcp') renderMcp()
@@ -1438,11 +1518,44 @@ function ownerPlugin(item) {
   return isPluginOwned(item) ? (catalog.plugin.find((p) => p.id === ownerId(item)) ?? null) : null
 }
 
-function kindLabel(item) {
-  const word = KIND_WORD[item.kind] ?? item.kind
-  if (item.kind === 'plugin') return `${word} · ${item.source === 'plugin' ? item.scope : item.source}`
-  if (isPluginOwned(item)) return `${word} · from plugin ${pluginLabel(ownerId(item))}`
-  return `${word} · ${item.scope}`
+function drawerMetaHtml(item) {
+  const parts = [`<b class="k">${esc(item.isMod ? 'Mod' : (KIND_WORD[item.kind] ?? item.kind))}</b>`]
+  const add = (text, title) => parts.push(`<span${title ? ` title="${esc(title)}"` : ''}>${esc(text)}</span>`)
+  if (item.kind === 'plugin') {
+    add(item.dev ? 'in development' : item.source === 'plugin' ? item.scope : item.source)
+    const version = pluginById(item.id)?.version ?? item.version
+    if (version) add(shortVersion(version), version)
+    if (item.modules?.length) add(plural(item.modules.length, 'module'), item.modules.join(', '))
+    if (item.dev) add(`session ${item.session.slice(0, 8)}`, item.session)
+  } else if (isPluginOwned(item)) {
+    add(`via plugin ${pluginLabel(ownerId(item))}`)
+  } else if (item.scope) {
+    add(item.scope)
+  }
+  if (item.kind === 'agent') {
+    if (item.model) add(item.model)
+    if (item.tools?.length) add(plural(item.tools.length, 'tool'), item.tools.join(', '))
+  }
+  if (item.mtime) add(`changed ${ago(item.mtime)}`)
+  return parts.join('<i aria-hidden="true"> · </i>')
+}
+
+function stateHtml(item) {
+  if (hasSwitch(item)) {
+    const sw = switchInfo(item)
+    const label = `${item.enabled ? 'Switch off' : 'Switch on'} ${item.kind} ${item.name}`
+    return `<button type="button" class="sw-pill" role="switch" data-dact="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" aria-describedby="dr-st-file" title="${esc(sw.title)}"${sw.disabled ? ' disabled' : ''}><span class="sw" aria-hidden="true"></span>${item.enabled ? 'On' : 'Off'}</button><span class="sr-only" id="dr-st-file">${esc(sw.title)}</span>`
+  }
+  if (item.missing) return '<span class="st-chip bad">Missing</span>'
+  if (item.dev) return `<span class="st-chip" title="${esc(switchInfo(item).title)}">Read-only</span>`
+  const owner = ownerPlugin(item)
+  const on = owner ? owner.enabled : item.enabled !== false
+  const title = owner ? ` title="${esc(`Follows the plugin ${owner.name}`)}"` : ''
+  return `<span class="st-chip ${on ? 'on' : 'off'}"${title}>${on ? 'On' : 'Off'}</span>`
+}
+
+function hasSwitch(item) {
+  return !item.missing && !item.dev && !isPluginOwned(item) && item.kind !== 'hook' && item.kind !== 'mcp'
 }
 
 function drawerName(item) {
@@ -1456,10 +1569,13 @@ function drawerMenuEntries(item) {
 }
 
 function headTools(item) {
-  if (item.kind === 'hook' || item.kind === 'mcp') return ''
-  const starBtn = `<button type="button" class="icon-btn star" data-dact="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`
+  const state = stateHtml(item)
+  if (item.kind === 'hook' || item.kind === 'mcp') return state
+  const starBtn = item.dev
+    ? ''
+    : `<button type="button" class="icon-btn star" data-dact="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`
   const entries = drawerMenuEntries(item)
-  if (!entries.length) return starBtn
+  if (!entries.length) return state + starBtn
   const menu = dr.menu
     ? `<div class="menu" role="menu" id="dr-menu" aria-label="${esc(`More actions for ${item.name}`)}">${entries
         .map(
@@ -1468,7 +1584,7 @@ function headTools(item) {
         )
         .join('')}</div>`
     : ''
-  return `${starBtn}<div class="dr-more"><button type="button" class="icon-btn" data-dact="menu" id="dr-menu-btn" aria-haspopup="menu" aria-expanded="${dr.menu ? 'true' : 'false'}"${dr.menu ? ' aria-controls="dr-menu"' : ''} aria-label="More actions">${ICON.dots}</button>${menu}</div>`
+  return `${state}${starBtn}<div class="dr-more"><button type="button" class="icon-btn" data-dact="menu" id="dr-menu-btn" aria-haspopup="menu" aria-expanded="${dr.menu ? 'true' : 'false'}"${dr.menu ? ' aria-controls="dr-menu"' : ''} aria-label="More actions">${ICON.dots}</button>${menu}</div>`
 }
 
 function lockHtml(item) {
@@ -1486,45 +1602,18 @@ function lockHtml(item) {
     </div>`
 }
 
-function statusHtml(item) {
+function noteHtml(item) {
   if (item.kind === 'plugin' && item.missing) {
     return `<div class="dr-note bad" role="note"><div class="lock-t">${ICON.warn}<p><b>Plugin folder missing.</b> ${esc(item.id)} is listed in installed_plugins.json, but its folder is gone. Remove the entry to clean up.</p></div></div>`
   }
-  if (isPluginOwned(item)) return lockHtml(item)
-  if (item.kind === 'hook' || item.kind === 'mcp') return ''
-  const sw = switchInfo(item)
-  const label = `${item.enabled ? 'Switch off' : 'Switch on'} ${item.kind} ${item.name}`
-  const text = item.enabled ? '<b>On</b> <span class="muted">· loads in every session</span>' : '<b>Off</b>'
-  return `<div class="dr-status">
-      <button type="button" class="sw" role="switch" data-dact="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" aria-describedby="dr-st-file"${sw.disabled ? ' disabled' : ''}></button>
-      <span class="st-text">${text}</span>
-      <span class="st-file" id="dr-st-file">${esc(sw.title)}</span>
-    </div>`
+  if (item.dev) {
+    return `<div class="dr-note" role="note"><div class="lock-t">${ICON.lock}<p><b>Development mod.</b> It is not in installed_plugins.json, so it has no switch here.</p></div></div>`
+  }
+  return isPluginOwned(item) ? lockHtml(item) : ''
 }
 
-function factsHtml(item) {
-  const rows = []
-  if (isPluginOwned(item)) {
-    const p = ownerPlugin(item)
-    if (p) rows.push(['State', p.enabled ? `On, because ${p.name} is on` : `Off, because ${p.name} is off`])
-  } else if (item.kind === 'hook' || item.kind === 'mcp') {
-    rows.push(['State', item.enabled === false ? 'Off' : 'On'])
-  }
-  const path = `<dt>Path</dt><dd class="f-path"><code class="path" id="dr-path"></code><button type="button" class="icon-btn sm" data-dact="copy" id="dr-copy" aria-label="Copy path">${ICON.copy}</button></dd>`
-  if (item.mtime) rows.push(['Changed', ago(item.mtime)])
-  if (item.kind === 'plugin' && !item.missing) {
-    const p = pluginById(item.id)
-    if (p?.version) rows.push(['Version', p.version])
-    const parts = pluginParts(item.id)
-    rows.push(['Contents', parts.length ? parts.join(' · ') : 'No skills, agents, hooks, or MCP servers'])
-  }
-  if (item.kind === 'agent') {
-    if (item.model) rows.push(['Model', item.model])
-    if (item.tools?.length) rows.push(['Tools', item.tools.join(' · ')])
-  }
-  const lead = rows.length && rows[0][0] === 'State' ? rows.shift() : null
-  const html = (r) => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`
-  return (lead ? html(lead) : '') + path + rows.map(html).join('')
+function pathHtml() {
+  return `<div class="f-path"><code class="path"><bdo dir="ltr" id="dr-path"></bdo></code><button type="button" class="icon-btn sm" data-dact="copy" id="dr-copy" aria-label="Copy path">${ICON.copy}</button></div>`
 }
 
 function barHtml(item) {
@@ -1532,7 +1621,9 @@ function barHtml(item) {
   const editor = '<button type="button" class="btn p" data-dact="editor">Open in editor</button>'
   let left = ''
   let right = finder + editor
-  if (item.kind === 'plugin') {
+  if (item.kind === 'plugin' && item.dev) {
+    left = ''
+  } else if (item.kind === 'plugin') {
     left = `<button type="button" class="btn danger ghost" data-dact="uninstall">${item.missing ? 'Remove entry…' : 'Uninstall plugin…'}</button>`
     if (item.missing) right = ''
   } else if (isPluginOwned(item)) {
@@ -1548,7 +1639,7 @@ function barHtml(item) {
 
 function drawerFocusAct() {
   const el = document.activeElement
-  if (!el || !$('dr').contains(el) || $('dr-body').contains(el)) return null
+  if (!el || !$('dr').contains(el) || ($('dr-body').contains(el) && !$('dr-status')?.contains(el))) return null
   return el.dataset?.dact ?? null
 }
 
@@ -1557,15 +1648,21 @@ function syncDrawerHead() {
   const item = drawerItem()
   if (!item) return forceClose()
   const focused = drawerFocusAct()
-  $('dr-kind').textContent = kindLabel(item)
+  $('dr').dataset.kind = item.kind
+  $('dr-icon').innerHTML = kindIcon(item.kind)
   $('dr-name').textContent = drawerName(item)
+  $('dr-meta').innerHTML = drawerMetaHtml(item)
   $('dr-tools').innerHTML = headTools(item)
-  $('dr-desc').textContent = item.kind === 'hook' ? item.name || '(no command)' : item.description || 'No description.'
-  $('dr-status').innerHTML = statusHtml(item)
-  $('dr-facts').innerHTML = factsHtml(item)
+  if ($('dr-desc')) $('dr-desc').textContent = item.description || 'No description.'
+  if ($('dr-status')) $('dr-status').innerHTML = noteHtml(item)
+  $('dr-facts').innerHTML = pathHtml()
   $('dr-bar').innerHTML = barHtml(item)
   if (focused)
-    document.querySelector(`#dr .dr-top [data-dact="${focused}"], #dr .dr-bar [data-dact="${focused}"]`)?.focus()
+    document
+      .querySelector(
+        `#dr .dr-top [data-dact="${focused}"], #dr-status [data-dact="${focused}"], #dr .dr-bar [data-dact="${focused}"]`
+      )
+      ?.focus()
   if (item.kind !== 'plugin' && item.path !== dr.mainFile) {
     const wasMain = dr.file === dr.mainFile
     dr.mainFile = item.path
@@ -1583,16 +1680,51 @@ function closeDrawerMenu(refocus) {
 
 function showPath() {
   const box = $('dr-path')
-  if (box) box.textContent = dr.file ? tilde(dr.file) : dr.root ? tilde(dr.root) : ''
+  if (!box) return
+  box.textContent = dr.file ? tilde(dr.file) : dr.root ? tilde(dr.root) : ''
+  box.parentElement.title = box.textContent
 }
 
 function tabsHtml(tabs) {
-  return `<div class="tabs" role="tablist" aria-label="Drawer views">${tabs
+  return `<div class="tabwrap"><div class="tabs" role="tablist" aria-label="Drawer views">${tabs
     .map(
       ([id, label]) =>
         `<button type="button" role="tab" id="tab-${id}" data-tab="${id}" aria-controls="pane-${id}" aria-selected="${dr.tab === id ? 'true' : 'false'}">${esc(label)}</button>`
     )
-    .join('')}</div>`
+    .join('')}</div></div>`
+}
+
+const FMT = [
+  ['bold', 'B', 'Bold (Cmd+B)'],
+  ['italic', 'I', 'Italic (Cmd+I)'],
+  ['heading', 'H', 'Heading'],
+  null,
+  ['ul', '•', 'Bulleted list'],
+  ['ol', '1.', 'Numbered list'],
+  ['quote', '❝', 'Quote'],
+  null,
+  ['code', '&lt;/&gt;', 'Code'],
+  ['link', '[ ]( )', 'Link']
+]
+
+function drEditorHtml({ own, placeholder = '' }) {
+  const fmt = FMT.map((f) =>
+    f
+      ? `<button type="button" class="fmt-${f[0]}" data-dact="fmt" data-fmt="${f[0]}" title="${f[2]}" aria-label="${f[2]}">${f[1]}</button>`
+      : '<span class="sep" aria-hidden="true"></span>'
+  ).join('')
+  const bar = own
+    ? `<div class="edbar" role="toolbar" aria-label="Format">
+        <div class="fmt" id="dr-fmt">${fmt}</div>
+        <span class="grow"></span>
+        <span class="dirty" id="dr-dirty" aria-live="polite"></span>
+        <button type="button" class="btn p" data-dact="save" id="dr-save" disabled>Save</button>
+      </div>`
+    : ''
+  return `${bar}<div class="ed${own ? ' has-bar' : ''}">
+      <pre class="ed-hl" id="dr-hl" aria-hidden="true"></pre>
+      <textarea id="dr-txt" spellcheck="false" aria-label="File contents"${placeholder ? ` placeholder="${esc(placeholder)}" readonly` : ''}></textarea>
+    </div>`
 }
 
 function fileBodyHtml(item, withFiles) {
@@ -1604,37 +1736,74 @@ function fileBodyHtml(item, withFiles) {
   if (withFiles) tabs.push(['files', 'Files'])
   if (own) tabs.push(['backups', 'Backups'])
   return `${tabsHtml(tabs)}
-    <div class="pane md" id="pane-preview" role="tabpanel" aria-labelledby="tab-preview"></div>
+    <div class="pane md" id="pane-preview" role="tabpanel" aria-labelledby="tab-preview">
+      <p class="dr-desc" id="dr-desc"></p>
+      <div class="dr-notes" id="dr-status"></div>
+      <div id="dr-prev"></div>
+    </div>
     <div class="pane" id="pane-file" role="tabpanel" aria-labelledby="tab-file" hidden>
       <div class="filebar">
         <code id="dr-file"></code>
         <button type="button" class="btn" data-dact="main" id="dr-main" hidden>Back to ${esc(baseName(dr.mainFile))}</button>
-        ${own ? '<span class="dirty" id="dr-dirty" aria-live="polite"></span><button type="button" class="btn p" data-dact="save" id="dr-save" disabled>Save</button>' : ''}
       </div>
-      <textarea id="dr-txt" spellcheck="false" aria-label="File contents"></textarea>
+      ${drEditorHtml({ own })}
       <p class="note" id="dr-note"></p>
     </div>
     ${withFiles ? '<div class="pane" id="pane-files" role="tabpanel" aria-labelledby="tab-files" hidden></div>' : ''}
     ${own ? '<div class="pane" id="pane-backups" role="tabpanel" aria-labelledby="tab-backups" hidden></div>' : ''}`
 }
 
-function listLinks(list, kind) {
-  if (!list.length) return `<p class="note">No ${kind}.</p>`
-  return `<ul class="mini">${list
+function ovOn(x) {
+  const on = ownerPlugin(x)?.enabled ?? true
+  return x.kind === 'mcp' ? on && x.enabled !== false : on
+}
+
+function ovState(x) {
+  return ovOn(x) ? '<span class="badge on">On</span>' : '<span class="badge off">Off</span>'
+}
+
+function ovCard(item, desc) {
+  return `<li><button type="button" class="ov-card${ovOn(item) ? '' : ' off'}" data-dact="sub" data-key="${esc(item.key)}">
+      <span class="cb"><span class="cn">${esc(item.name)}</span>${desc ? `<span class="cd">${esc(desc)}</span>` : ''}</span>
+      ${ovState(item)}${ICON.chev}
+    </button></li>`
+}
+
+function ovSection(id, kind, label, count, body, none) {
+  return `<section class="ov-sec" id="ov-${id}" aria-labelledby="ov-${id}-h">
+      <h3 id="ov-${id}-h">${kindIcon(kind, 18)}${esc(label)} <span class="n">${count}</span></h3>
+      ${count ? body : `<p class="ov-empty">${esc(none)}</p>`}
+    </section>`
+}
+
+function ovHooksHtml(hooks) {
+  const info = new Map(HOOK_INFO)
+  const byEvent = new Map()
+  for (const h of hooks) {
+    if (!byEvent.has(h.event)) byEvent.set(h.event, [])
+    byEvent.get(h.event).push(h)
+  }
+  return [...byEvent]
     .map(
-      (s) =>
-        `<li><button type="button" class="btn-plain name" data-dact="sub" data-key="${esc(s.key)}">${esc(s.name)}</button><span class="note">${esc(s.description || '')}</span><button type="button" class="sw" role="switch" aria-checked="${s.enabled ? 'true' : 'false'}" aria-label="${esc(`${s.name} follows the plugin`)}" disabled></button></li>`
+      ([event, list]) => `<div class="ov-ev">
+        <div class="ov-ev-h"><b>${esc(event)}</b><span>${esc(info.get(event) ?? 'Claude Code event.')}</span></div>
+        <ul>${list
+          .map((h) => {
+            const runs = hookRunsFor(h)
+            return `<li><button type="button" class="btn-plain ov-ev-r" data-dact="sub" data-key="${esc(h.key)}"><span class="what">${esc(hookLabel(h))}</span>${runs ? `<span class="mchip">${esc(runs)}</span>` : ''}${ovState(h)}</button></li>`
+          })
+          .join('')}</ul>
+      </div>`
     )
-    .join('')}</ul>`
+    .join('')
 }
 
 function pluginBodyHtml(item) {
-  const p = pluginById(item.id)
-  const skills = catalog.skill.filter((s) => s.plugin === item.id)
-  const agents = catalog.agent.filter((a) => a.plugin === item.id)
-  const hooks = p?.hooks ?? []
-  const mcp = p?.mcp ?? []
-  const events = [...new Set(hooks.map((h) => h.event).filter(Boolean))]
+  const mine = (list) => list.filter((x) => x.plugin === item.id)
+  const skills = mine(catalog.skill)
+  const agents = mine(catalog.agent)
+  const hooks = mine(catalog.hook)
+  const mcp = mine(catalog.mcp)
   const tabs = item.missing
     ? [['overview', 'Overview']]
     : [
@@ -1642,20 +1811,59 @@ function pluginBodyHtml(item) {
         ['files', 'Files'],
         ['file', 'File']
       ]
+  const tile = (id, n, label) =>
+    `<button type="button" class="ov-tile${n ? '' : ' zero'}" data-dact="jump" data-to="ov-${id}"><b>${n}</b><span>${esc(label)}</span></button>`
+  const cards = (list, desc) => `<ul class="ov-cards">${list.map((x) => ovCard(x, desc(x))).join('')}</ul>`
   return `${tabsHtml(tabs)}
-    <div class="pane" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
-      <h3>Skills <span class="pill">${skills.length}</span></h3>${listLinks(skills, 'skills')}
-      <h3>Agents <span class="pill">${agents.length}</span></h3>${listLinks(agents, 'agents')}
-      <h3>Hooks <span class="pill">${hooks.length}</span></h3>
-      <p class="note">${hooks.length ? esc(events.join(', ')) : 'No hooks.'}</p>
-      <h3>MCP servers <span class="pill">${mcp.length}</span></h3>
-      ${mcp.length ? `<ul class="mini">${mcp.map((m) => `<li><code>${esc(m.name)}</code></li>`).join('')}</ul>` : '<p class="note">No MCP servers.</p>'}
-      <p class="note">Skills and agents follow the plugin switch. Plugin files are read-only.</p>
+    <div class="pane ov" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
+      <p class="dr-desc" id="dr-desc"></p>
+      <div class="dr-notes" id="dr-status"></div>
+      ${
+        item.modules?.length
+          ? ovSection(
+              'modules',
+              'plugin',
+              'Modules',
+              item.modules.length,
+              `<ul class="mini">${item.modules.map((m) => `<li><code>${esc(m)}</code></li>`).join('')}</ul><p class="ov-empty">Claude Code loads these modules only when <code>CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1</code>.</p>`,
+              ''
+            )
+          : ''
+      }
+      <div class="ov-tiles">
+        ${tile('skills', skills.length, 'Skills')}${tile('agents', agents.length, 'Agents')}${tile('hooks', hooks.length, 'Hooks')}${tile('mcp', mcp.length, 'MCP servers')}
+      </div>
+      ${item.dev ? '' : `<p class="ov-lock">${ICON.lock}<span>Everything in this plugin follows the plugin switch. Plugin files are read-only. To edit a skill, open it and use <b>Copy to my skills</b>.</span></p>`}
+      ${ovSection(
+        'skills',
+        'skill',
+        'Skills',
+        skills.length,
+        cards(skills, (s) => s.description),
+        'This plugin adds no skills.'
+      )}
+      ${ovSection(
+        'agents',
+        'agent',
+        'Agents',
+        agents.length,
+        cards(agents, (a) => a.description),
+        'This plugin adds no agents.'
+      )}
+      ${ovSection('hooks', 'hook', 'Hooks', hooks.length, ovHooksHtml(hooks), 'This plugin adds no hooks.')}
+      ${ovSection(
+        'mcp',
+        'mcp',
+        'MCP servers',
+        mcp.length,
+        cards(mcp, (m) => `${mcpTransport(m)} · ${m.description}`),
+        'This plugin adds no MCP servers.'
+      )}
     </div>
     <div class="pane" id="pane-files" role="tabpanel" aria-labelledby="tab-files" hidden></div>
     <div class="pane" id="pane-file" role="tabpanel" aria-labelledby="tab-file" hidden>
       <div class="filebar"><code id="dr-file"></code></div>
-      <textarea id="dr-txt" spellcheck="false" aria-label="File contents" placeholder="Pick a file in the Files tab." readonly></textarea>
+      ${drEditorHtml({ own: false, placeholder: 'Pick a file in the Files tab.' })}
     </div>`
 }
 
@@ -1664,12 +1872,108 @@ function setTab(tab) {
   for (const b of $('dr-body').querySelectorAll('[data-tab]'))
     b.setAttribute('aria-selected', String(b.dataset.tab === tab))
   for (const pane of $('dr-body').querySelectorAll('.pane')) pane.hidden = pane.id !== `pane-${tab}`
-  if (tab === 'preview') $('pane-preview').innerHTML = previewHtml($('dr-txt').value, dr.file)
+  if (tab === 'preview') paintPreview()
   if (tab === 'files') loadDir(dr.dir ?? dr.root)
   if (tab === 'backups') loadBackups()
 }
 
+function paintPreview() {
+  const hide = dr.file === dr.mainFile ? ['name', 'description'] : []
+  $('dr-desc').hidden = dr.file !== dr.mainFile
+  $('dr-prev').innerHTML = previewHtml($('dr-txt').value, dr.file, hide)
+}
+
+function isMd(file) {
+  return /\.md(\.disabled)?$/i.test(file ?? '')
+}
+
+function hlInline(text) {
+  return text
+    .split(/(`[^`]+`)/)
+    .map((part) => {
+      if (/^`[^`]+`$/.test(part)) return `<span class="hl-c">${part}</span>`
+      return part
+        .replace(/(\*\*[^*]+\*\*)/g, '<span class="hl-b">$1</span>')
+        .replace(/(^|[^\w*])(\*[^*\s](?:[^*]*[^*\s])?\*)(?!\w)/g, '$1<span class="hl-i">$2</span>')
+        .replace(/(\[[^\]]+\]\([^)\s]+\))/g, '<span class="hl-a">$1</span>')
+    })
+    .join('')
+}
+
+function highlight(src, file) {
+  if (!isMd(file)) return `${esc(src)}\n`
+  const lines = src.split('\n')
+  let front = lines[0] === '---'
+  let fence = false
+  return `${lines
+    .map((line, n) => {
+      const e = esc(line)
+      if (front) {
+        if (n > 0 && line === '---') front = false
+        if (line === '---') return `<span class="hl-fm">${e}</span>`
+        return e.replace(/^([\w-]+)(:)/, '<span class="hl-key">$1</span><span class="hl-fm">$2</span>')
+      }
+      if (/^\s*```/.test(line)) {
+        fence = !fence
+        return `<span class="hl-fence">${e}</span>`
+      }
+      if (fence) return `<span class="hl-c">${e}</span>`
+      if (/^#{1,6}\s/.test(line)) return `<span class="hl-h">${e}</span>`
+      if (/^>/.test(line)) return `<span class="hl-q">${e}</span>`
+      if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return `<span class="hl-fm">${e}</span>`
+      const li = /^(\s*)([-*+]|\d+[.)])(\s.*)$/.exec(e)
+      if (li) return `${li[1]}<span class="hl-li">${li[2]}</span>${hlInline(li[3])}`
+      return hlInline(e)
+    })
+    .join('\n')}\n`
+}
+
+function paintEditor() {
+  const hl = $('dr-hl')
+  const txt = $('dr-txt')
+  if (!hl || !txt) return
+  hl.innerHTML = highlight(txt.value, dr.file)
+  hl.scrollTop = txt.scrollTop
+  const fmt = $('dr-fmt')
+  if (fmt) fmt.hidden = !dr.editable || !isMd(dr.file)
+}
+
+function insertText(txt, text) {
+  txt.focus()
+  if (!document.execCommand('insertText', false, text)) {
+    txt.setRangeText(text, txt.selectionStart, txt.selectionEnd, 'end')
+    txt.dispatchEvent(new Event('input'))
+  }
+}
+
+function formatText(kind) {
+  const txt = $('dr-txt')
+  if (!txt || txt.readOnly || !isMd(dr.file)) return
+  const wraps = { bold: ['**', '**'], italic: ['*', '*'], code: ['`', '`'], link: ['[', '](https://)'] }
+  const prefixes = { heading: '## ', ul: '- ', ol: '1. ', quote: '> ' }
+  const { selectionStart: s, selectionEnd: e, value } = txt
+  if (wraps[kind]) {
+    const [a, b] = wraps[kind]
+    const sel = value.slice(s, e) || (kind === 'link' ? 'link text' : 'text')
+    insertText(txt, a + sel + b)
+    txt.setSelectionRange(s + a.length, s + a.length + sel.length)
+    return
+  }
+  const p = prefixes[kind]
+  if (!p) return
+  const start = value.lastIndexOf('\n', s - 1) + 1
+  txt.setSelectionRange(start, start)
+  insertText(txt, p)
+  txt.setSelectionRange(s + p.length, e + p.length)
+}
+
+function onEditorInput() {
+  updateDirty()
+  if (dr.tab === 'preview') paintPreview()
+}
+
 function updateDirty() {
+  paintEditor()
   const dirty = isDirty()
   const mark = $('dr-dirty')
   if (mark) mark.textContent = dirty ? '● unsaved' : ''
@@ -1720,7 +2024,7 @@ async function loadFile(file, { main = false } = {}) {
   if (dr.tab === 'backups') loadBackups()
   showPath()
   updateDirty()
-  if (dr.tab === 'preview') $('pane-preview').innerHTML = previewHtml(txt.value, dr.file)
+  if (dr.tab === 'preview') paintPreview()
 }
 
 async function loadDir(dir) {
@@ -1781,9 +2085,18 @@ function inline(text) {
       if (/^`[^`]+`$/.test(part)) return `<code>${part.slice(1, -1)}</code>`
       return part
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^\w*])\*([^*\s](?:[^*]*[^*\s])?)\*(?!\w)/g, '$1<em>$2</em>')
         .replace(/\[([^\]]+)\]\(([^\s]+?)\)(?=\s|$|[.,;:!?])/g, '$1 <span class="link">($2)</span>')
     })
     .join('')
+}
+
+function tableCells(line) {
+  return line
+    .trim()
+    .replace(/^\||\|$/g, '')
+    .split('|')
+    .map((c) => inline(esc(c.trim())))
 }
 
 function splitFront(src) {
@@ -1801,22 +2114,50 @@ function splitFront(src) {
 function markdown(body) {
   const lines = body.split(/\r?\n/)
   const out = []
-  const blockStart = /^(```|#{1,3}\s|\s*[-*+]\s|\s*\d+[.)]\s)/
+  const blockStart = /^(\s*```|#{1,6}\s|>|\s*\||\s*[-*+]\s|\s*\d+[.)]\s)/
+  const rule = /^\s*([-*_])(\s*\1){2,}\s*$/
+  const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
-    if (/^```/.test(line)) {
+    const fence = /^\s*```\s*([\w+-]*)/.exec(line)
+    if (fence) {
       const code = []
       i++
-      while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++])
+      while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++])
       i++
-      out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`)
+      const label = fence[1] ? `<figcaption>${esc(fence[1])}</figcaption>` : ''
+      out.push(`<figure class="code">${label}<pre><code>${esc(code.join('\n'))}</code></pre></figure>`)
       continue
     }
-    const h = /^(#{1,3})\s+(.*)$/.exec(line)
+    const h = /^(#{1,6})\s+(.*)$/.exec(line)
     if (h) {
-      out.push(`<h${h[1].length + 2}>${inline(esc(h[2]))}</h${h[1].length + 2}>`)
+      const level = Math.min(h[1].length + 2, 6)
+      out.push(`<h${level}>${inline(esc(h[2]))}</h${level}>`)
       i++
+      continue
+    }
+    if (rule.test(line)) {
+      out.push('<hr>')
+      i++
+      continue
+    }
+    if (/^>/.test(line)) {
+      const quote = []
+      while (i < lines.length && /^>/.test(lines[i])) quote.push(lines[i++].replace(/^>\s?/, ''))
+      out.push(`<blockquote>${markdown(quote.join('\n'))}</blockquote>`)
+      continue
+    }
+    if (/^\s*\|/.test(line) && tableSep.test(lines[i + 1] ?? '')) {
+      const head = tableCells(line)
+      i += 2
+      const rows = []
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(tableCells(lines[i++]))
+      out.push(
+        `<div class="tbl-md"><table><thead><tr>${head.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rows
+          .map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`)
+          .join('')}</tbody></table></div>`
+      )
       continue
     }
     const listKind = /^\s*[-*+]\s+/.test(line) ? 'ul' : /^\s*\d+[.)]\s+/.test(line) ? 'ol' : null
@@ -1839,14 +2180,37 @@ function markdown(body) {
   return out.join('')
 }
 
-function previewHtml(src, file) {
-  if (file && !/\.md(\.disabled)?$/i.test(file)) return `<pre><code>${esc(src)}</code></pre>`
+function fmValues(key, value) {
+  const v = value.trim()
+  const list = /^\[.*\]$/.test(v)
+    ? v.slice(1, -1).split(',')
+    : v.startsWith('- ')
+      ? v.slice(2).split(/\s+-\s+/)
+      : /tools$/i.test(key)
+        ? v.split(/,\s*/)
+        : [v]
+  return list.map((x) => x.trim().replace(/^(['"])(.*)\1$/, '$2')).filter(Boolean)
+}
+
+function fmCardHtml(meta) {
+  if (!meta.length) return ''
+  const rows = meta.map(([k, v]) => {
+    const values = fmValues(k, v)
+    const accent = k === 'model' ? ' k' : ''
+    const dd =
+      values.length > 1 || accent || /tools$/i.test(k)
+        ? values.map((x) => `<span class="fm-chip${accent}">${esc(x)}</span>`).join('')
+        : `<span>${esc(values[0] ?? '')}</span>`
+    return `<div class="fm-row"><dt>${esc(k)}</dt><dd>${dd}</dd></div>`
+  })
+  return `<section class="fm-card" aria-label="Frontmatter"><h3 class="fm-h">Frontmatter</h3><dl>${rows.join('')}</dl></section>`
+}
+
+function previewHtml(src, file, hide = []) {
+  if (file && !isMd(file)) return `<pre><code>${esc(src)}</code></pre>`
   const { meta, body } = splitFront(src)
-  const table = meta.length
-    ? `<table class="fm"><tbody>${meta.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`
-    : ''
   const html = markdown(body)
-  return table + (html || '<p class="note">Nothing to preview.</p>')
+  return fmCardHtml(meta.filter(([k]) => !hide.includes(k))) + (html || '<p class="note">Nothing to preview.</p>')
 }
 
 function openerKey(item) {
@@ -1883,7 +2247,13 @@ export function openDrawer(item) {
     dr.file = item.path
     dr.tab = 'preview'
     $('dr-body').innerHTML = fileBodyHtml(item, isFolderSkill(item))
-    $('dr-txt').addEventListener('input', updateDirty)
+  }
+  const txt = $('dr-txt')
+  if (txt) {
+    txt.addEventListener('input', onEditorInput)
+    txt.addEventListener('scroll', () => {
+      if ($('dr-hl')) $('dr-hl').scrollTop = txt.scrollTop
+    })
   }
   const box = $('dr')
   box.classList.add('open')
@@ -2119,6 +2489,8 @@ async function onDrawerClick(e) {
   if (act === 'plugin-uninstall' && owner) return void uninstallPlugin(owner)
   if (act === 'plugin-open' && owner) return openDrawer(owner)
   if (act === 'save') return void saveFile()
+  if (act === 'fmt') return formatText(b.dataset.fmt)
+  if (act === 'jump') return $(b.dataset.to)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   if (act === 'editor' || act === 'finder') return void openIn(act)
   if (act === 'delete') return void (item.kind === 'hook' || item.kind === 'mcp' ? deleteRow(item) : deleteItem())
   if (act === 'fork') return void forkItem()
@@ -2557,6 +2929,7 @@ function jsonBodyHtml(item) {
     note = 'Read-only. Env and header values are hidden. Open the file to see them.'
   }
   return `<div class="pane" id="pane-json" role="region" aria-label="JSON">
+      <div class="dr-notes" id="dr-status"></div>
       <pre class="md json"><code>${esc(JSON.stringify(json, null, 2))}</code></pre>
       <p class="note">${esc(note)}</p>
     </div>`
@@ -3557,6 +3930,9 @@ function wire() {
       else if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
         saveFile()
+      } else if ((e.metaKey || e.ctrlKey) && e.target.id === 'dr-txt' && (e.key === 'b' || e.key === 'i')) {
+        e.preventDefault()
+        formatText(e.key === 'b' ? 'bold' : 'italic')
       }
       return
     }

@@ -44,14 +44,23 @@ function listAgents(installPath) {
   }
 }
 
-function readHooks(installPath, id) {
+function readHooksFile(installPath) {
   const file = path.join(installPath, 'hooks', 'hooks.json')
   const result = readJson(file)
-  if (!result.ok || !isObject(result.data)) return []
-  return flattenHookGroups(result.data.hooks, { scope: 'plugin', file: 'plugin', path: file }).map((hook) => ({
+  return { file, data: result.ok && isObject(result.data) ? result.data : {} }
+}
+
+function readHooks(installPath, id) {
+  const { file, data } = readHooksFile(installPath)
+  return flattenHookGroups(data.hooks, { scope: 'plugin', file: 'plugin', path: file }).map((hook) => ({
     ...hook,
     plugin: id
   }))
+}
+
+export function readModules(installPath) {
+  const { data } = readHooksFile(installPath)
+  return Array.isArray(data.modules) ? data.modules.filter((m) => typeof m === 'string') : []
 }
 
 function serversFrom(data) {
@@ -62,7 +71,7 @@ function serversFrom(data) {
     .map(([name, config]) => ({ name, config }))
 }
 
-function readManifest(installPath) {
+export function readManifest(installPath) {
   const result = readJson(path.join(installPath, '.claude-plugin', 'plugin.json'))
   return result.ok && isObject(result.data) ? result.data : {}
 }
@@ -105,6 +114,7 @@ function buildPlugin(id, entry, enabledPlugins) {
   const installPath = typeof entry.installPath === 'string' ? entry.installPath : ''
   const missing = !installPath || !fs.existsSync(installPath)
   const manifest = missing ? {} : readManifest(installPath)
+  const modules = missing ? [] : readModules(installPath)
   return {
     id,
     name: typeof manifest.name === 'string' ? manifest.name : name,
@@ -120,7 +130,9 @@ function buildPlugin(id, entry, enabledPlugins) {
     skills: missing ? [] : listSkills(installPath),
     agents: missing ? [] : listAgents(installPath),
     hooks: missing ? [] : readHooks(installPath, id),
-    mcp: missing ? [] : readMcp(installPath, manifest)
+    mcp: missing ? [] : readMcp(installPath, manifest),
+    modules,
+    isMod: modules.length > 0
   }
 }
 

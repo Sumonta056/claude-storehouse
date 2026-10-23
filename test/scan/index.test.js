@@ -14,6 +14,10 @@ test('scanAll returns every section and errors array', () => {
     assert.ok(inv.skills.length > 0)
     assert.ok(inv.agents.length > 0)
     assert.ok(inv.plugins.length > 0)
+    assert.deepEqual(
+      inv.devMods.map((m) => m.id),
+      ['abc-session/band-mod']
+    )
     assert.ok(inv.mcp.length > 0)
     assert.deepEqual(Object.keys(inv.settings), ['global', 'project', 'projectLocal'])
     assert.equal(inv.settings.global.exists, true)

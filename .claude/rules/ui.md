@@ -12,7 +12,7 @@ paths:
 
 ## Pages
 
-Dashboard, Favorites, Skills, Agents, Plugins, Hooks, MCP, Settings, CLAUDE.md.
+Dashboard, Favorites, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUDE.md.
 
 ## Behavior
 

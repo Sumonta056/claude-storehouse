@@ -175,3 +175,32 @@ test('ignores an mcpServers path that escapes the plugin folder', () => {
     fx.cleanup()
   }
 })
+
+test('marks a plugin as a mod when hooks.json has modules', () => {
+  const fx = makeFixture()
+  try {
+    const plugins = run(fx)
+    const ecc = plugins.find((p) => p.id === 'ecc@ecc')
+    const sp = plugins.find((p) => p.id === 'superpowers@claude-plugins-official')
+    assert.equal(ecc.isMod, true)
+    assert.deepEqual(ecc.modules, ['./register.ts'])
+    assert.deepEqual(ecc.hooks, [])
+    assert.equal(sp.isMod, false)
+    assert.deepEqual(sp.modules, [])
+    assert.equal(plugins.find((p) => p.id === 'ghost@x').isMod, false)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('keeps only string entries in modules', () => {
+  const fx = makeFixture()
+  try {
+    const file = path.join(fx.home, '.claude', 'plugins', 'cache', 'ecc', 'ecc', '1.0.0', 'hooks', 'hooks.json')
+    fs.writeFileSync(file, JSON.stringify({ modules: ['./a.ts', 3, null, './b.ts'] }))
+    const ecc = run(fx).find((p) => p.id === 'ecc@ecc')
+    assert.deepEqual(ecc.modules, ['./a.ts', './b.ts'])
+  } finally {
+    fx.cleanup()
+  }
+})

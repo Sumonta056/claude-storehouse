@@ -3,6 +3,7 @@ import path from 'node:path'
 import { readJson } from '../write/json-file.js'
 import { scanSettings } from './settings.js'
 import { scanPlugins } from './plugins.js'
+import { scanDevMods } from './mods.js'
 import { scanSkills } from './skills.js'
 import { scanAgents } from './agents.js'
 import { scanMcp } from './mcp.js'
@@ -96,6 +97,7 @@ export function scanAll({ home, projectDir }) {
     skills,
     agents,
     plugins,
+    devMods: attempt(errors, 'devMods', () => scanDevMods({ home }), []),
     hooks: [
       ...settings.hooks.map((hook) => withId(hook, true, true, projectDir)),
       ...plugins.flatMap((plugin) => plugin.hooks.map((hook) => withId(hook, plugin.enabled, false, projectDir))),

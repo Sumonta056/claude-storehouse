@@ -111,6 +111,22 @@
               <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4" /></svg
             ><span class="lbl">Plugins</span><b id="n-plugins">0</b>
           </button>
+          <button type="button" data-p="mods">
+            <svg
+              class="ic"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 7h4a2 2 0 1 1 4 0h4v4a2 2 0 1 1 0 4v4h-4a2 2 0 1 0-4 0H4v-4a2 2 0 1 0 0-4z" /></svg
+            ><span class="lbl">Mods</span><b id="n-mods">0</b>
+          </button>
           <button type="button" data-p="hooks">
             <svg
               class="ic"
@@ -218,6 +234,7 @@
         <section class="page" id="p-skills"></section>
         <section class="page" id="p-agents"></section>
         <section class="page" id="p-plugins"></section>
+        <section class="page" id="p-mods"></section>
         <section class="page" id="p-hooks"></section>
         <section class="page" id="p-mcp"></section>
         <section class="page" id="p-settings"></section>
@@ -229,9 +246,10 @@
     <aside class="drawer" id="dr" role="dialog" aria-modal="true" aria-labelledby="dr-name" aria-hidden="true">
       <div class="dr-top">
         <div class="dh">
+          <div class="kicon" id="dr-icon" aria-hidden="true"></div>
           <div class="dh-name">
-            <span class="dr-kind" id="dr-kind"></span>
             <h2 class="dr-title" id="dr-name"></h2>
+            <p class="dr-meta" id="dr-meta"></p>
           </div>
           <div class="dh-tools" id="dr-tools"></div>
           <button type="button" class="icon-btn" id="dr-close" aria-label="Close">
@@ -249,9 +267,7 @@
             </svg>
           </button>
         </div>
-        <p class="dr-desc" id="dr-desc"></p>
-        <div id="dr-status"></div>
-        <dl class="facts" id="dr-facts"></dl>
+        <div class="facts" id="dr-facts"></div>
       </div>
       <div class="dr-body" id="dr-body"></div>
       <div class="dr-bar" id="dr-bar"></div>

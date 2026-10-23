@@ -27,18 +27,22 @@ The developer has about 110 skills and 28 plugins across 10 marketplaces. The da
 
 ## What Claude Code reads
 
-| Item              | Global                                                        | Project                                                    |
-| ----------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
-| Settings          | `~/.claude/settings.json`                                     | `./.claude/settings.json`, `./.claude/settings.local.json` |
-| CLAUDE.md         | `~/.claude/CLAUDE.md`                                         | `./CLAUDE.md`, `./CLAUDE.local.md`, `./.claude/CLAUDE.md`  |
-| Skills            | `~/.claude/skills/<name>/SKILL.md`                            | `./.claude/skills/<name>/SKILL.md`                         |
-| Agents            | `~/.claude/agents/<name>.md`                                  | `./.claude/agents/<name>.md`                               |
-| Hooks             | `settings.json` → `hooks.<Event>[]`                           | same keys in project settings                              |
-| MCP servers       | `~/.claude.json` → `mcpServers`, `projects.<path>.mcpServers` | `./.mcp.json`                                              |
-| Plugins installed | `~/.claude/plugins/installed_plugins.json`                    | —                                                          |
-| Plugin files      | `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`   | —                                                          |
+| Item                | Global                                                           | Project                                                    |
+| ------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| Settings            | `~/.claude/settings.json`                                        | `./.claude/settings.json`, `./.claude/settings.local.json` |
+| CLAUDE.md           | `~/.claude/CLAUDE.md`                                            | `./CLAUDE.md`, `./CLAUDE.local.md`, `./.claude/CLAUDE.md`  |
+| Skills              | `~/.claude/skills/<name>/SKILL.md`                               | `./.claude/skills/<name>/SKILL.md`                         |
+| Agents              | `~/.claude/agents/<name>.md`                                     | `./.claude/agents/<name>.md`                               |
+| Hooks               | `settings.json` → `hooks.<Event>[]`                              | same keys in project settings                              |
+| MCP servers         | `~/.claude.json` → `mcpServers`, `projects.<path>.mcpServers`    | `./.mcp.json`                                              |
+| Plugins installed   | `~/.claude/plugins/installed_plugins.json`                       | —                                                          |
+| Plugin files        | `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`      | —                                                          |
+| Mods installed      | a plugin whose `hooks/hooks.json` has `"modules": [...]`         | —                                                          |
+| Mods in development | `~/.claude/dev-mods/<session>/<name>/.claude-plugin/plugin.json` | —                                                          |
 
 A plugin folder contains `skills/<name>/SKILL.md`, `agents/<name>.md`, `hooks/hooks.json`, `.claude-plugin/plugin.json`, and optionally `.mcp.json`.
+
+A mod is a plugin that changes Claude Code itself. Claude Code loads its `modules` only when `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set in the shell or in settings `env`. The Mods page shows installed mods and the mods in `~/.claude/dev-mods`. Installed mods also stay on the Plugins page with a "Mod" flag.
 
 Scan rules:
 
@@ -52,6 +56,8 @@ Scan rules:
 | ------------------------- | ----------------------------------------------------------------------------------------------- | -------------- | --------------------- |
 | Plugin                    | `enabledPlugins[id] = false`                                                                    | `= true`       | yes                   |
 | Local or project skill    | `skillOverrides[name] = "off"`                                                                  | delete the key | yes                   |
+| Mod (installed)           | same as Plugin                                                                                  | same as Plugin | yes                   |
+| Mod in `dev-mods`         | no switch, read-only. No star, no uninstall.                                                    | —              | —                     |
 | Plugin skill, agent, hook | no own switch, follows the plugin. UI shows "via plugin X".                                     | —              | —                     |
 | MCP in `./.mcp.json`      | add to `disabledMcpjsonServers`, remove from `enabledMcpjsonServers`                            | the reverse    | yes                   |
 | MCP global                | add name to `projects.<dir>.disabledMcpServers` in `~/.claude.json`                             | remove it      | yes, per project      |

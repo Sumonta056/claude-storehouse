@@ -1,0 +1,1 @@
+{ "description": "ecc mod", "modules": ["./register.ts"] }
