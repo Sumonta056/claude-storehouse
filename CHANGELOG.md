@@ -6,6 +6,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-23
+
+This release adds a usage band that shows what your Claude Code use would cost at API prices, a Mods page, a new Activity panel, and a website with a live demo.
+
+### Added
+
+- Dashboard usage band: API-equal cost of your Claude Code use, by model, with total tokens, sessions, projects, and how much the prompt cache saved. It reads only token counts from the session files in `~/.claude/projects`, never message text. A model with no known price counts tokens but no cost, and the band names it.
+- Mods page: installed mods (plugins that change Claude Code itself) and the mods in `~/.claude/dev-mods`. Installed mods also stay on the Plugins page with a "Mod" flag. Mods in development are read-only.
+- App icon: a terminal prompt with the Claude spark as the cursor, in the browser tab.
+- Website at https://sumonta056.github.io/claude-storehouse/ with a live demo. The demo runs the real dashboard in your browser on a sample setup, so you can try switches, favorites, edits, and undo before you install.
+
+### Changed
+
+- Activity panel: an icon for each kind of change, the time of each change, and an empty state that says what shows there.
+- Hooks and MCP servers pages: a new layout.
+- Favorites: the star opens a category picker. Search for a category or type a new name to create it.
+- Drawer: a more compact header.
+- New README with a feature tour and screenshots of every main page.
+
+### Fixed
+
+- Skill and agent descriptions that span more than one line in the frontmatter now show in full.
+
 ## [1.0.0] - 2026-10-23
 
 First stable release. Claude Storehouse is a local web dashboard for your Claude Code setup. Run `npx claude-storehouse` in any folder to see, edit, switch on or off, and favorite every skill, agent, plugin, hook, MCP server, settings file, and `CLAUDE.md`, for your global `~/.claude` and for the current project.
@@ -64,5 +87,6 @@ First stable release. Claude Storehouse is a local web dashboard for your Claude
 - New README with screenshots, MIT license, and full npm package metadata.
 - Development: ESLint, Prettier, Husky, and commitlint; CI on Node 20 and 22 on Ubuntu and macOS; tag-driven npm publish with provenance.
 
-[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sumonta056/claude-storehouse/releases/tag/v1.0.0

@@ -243,6 +243,10 @@ Tests never touch your real `~/.claude`. Each one makes a fake home with `fs.mkd
 
 ## Changelog
 
+- **1.1.0** — Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
+  - Dashboard usage band: API-equal cost, tokens, sessions, and prompt-cache savings, from token counts only.
+  - Mods page for installed mods and mods in development.
+  - New Activity panel, app icon, and a website with a live demo.
 - **1.0.0** — First stable release. Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
   - Dashboard, Favorites, Skills, Agents, Plugins, Hooks, MCP servers, Settings, and CLAUDE.md pages, with a scope filter and search.
   - On/off switches that use the keys Claude Code reads, with project switches in `settings.local.json`.
