@@ -281,6 +281,39 @@ export async function postOpen({ body }, { ctx }) {
   return ok({ ok: true })
 }
 
+export function runClaude(args, opts) {
+  return new Promise((resolve, reject) => {
+    execFile('claude', args, { ...opts, timeout: 120000 }, (err, stdout, stderr) =>
+      err ? reject(Object.assign(err, { stderr })) : resolve({ stdout, stderr })
+    )
+  })
+}
+
+const CLI_SCOPES = new Set(['user', 'project', 'local'])
+
+export async function postPluginUninstall({ body }, deps) {
+  const { ctx } = deps
+  const id = requireString(body?.id, 'id')
+  const plugin = scanAll(ctx).plugins.find((p) => p.id === id)
+  if (!plugin) throw new HttpError(404, `plugin ${id} is not installed`)
+  const scope = CLI_SCOPES.has(plugin.installScope) ? plugin.installScope : 'user'
+  const args = ['plugin', 'uninstall', id, '--scope', scope]
+  const env = { ...process.env, HOME: ctx.home, CLAUDE_CONFIG_DIR: path.join(ctx.home, '.claude') }
+  const cwd = scope === 'user' ? ctx.home : ctx.projectDir ?? ctx.home
+  try {
+    await (deps.runClaude ?? runClaude)(args, { env, cwd })
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new HttpError(400, `claude CLI not found on PATH. Run this in a terminal: claude ${args.join(' ')}`)
+    }
+    const detail = String(err.stderr ?? '').trim() || err.message
+    throw new HttpError(400, `claude plugin uninstall failed: ${detail}`)
+  }
+  const file = path.join(ctx.home, '.claude', 'plugins', 'installed_plugins.json')
+  const entry = recordSave(deps, file, `Uninstalled plugin ${id}`, null)
+  return ok({ ok: true, entry })
+}
+
 function backupTime(backup, file) {
   const name = path.basename(backup)
   const stamp = name.slice(name.lastIndexOf('.') + 1)

@@ -25,6 +25,7 @@ const ROUTES = {
   'POST /api/create': config.postCreate,
   'POST /api/fork': config.postFork,
   'POST /api/open': api.postOpen,
+  'POST /api/plugin/uninstall': api.postPluginUninstall,
   'GET /api/backups': api.getBackups,
   'POST /api/restore': api.postRestore,
   'GET /api/activity': api.getActivity,
@@ -165,12 +166,13 @@ async function handleApi(req, res, url, deps) {
   }
 }
 
-export function startServer({ home, projectDir, port = 0, token }) {
+export function startServer({ home, projectDir, port = 0, token, runClaude }) {
   if (typeof token !== 'string' || token === '') throw new Error('token is required')
   const deps = {
     ctx: { home, projectDir: projectScope(home, projectDir) },
     activity: new Activity(),
-    token
+    token,
+    runClaude
   }
   let allowedHosts = new Set()
   const server = http.createServer((req, res) => {

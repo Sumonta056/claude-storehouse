@@ -111,6 +111,7 @@ function buildPlugin(id, entry, enabledPlugins) {
     marketplace,
     version: manifest.version ?? entry.version ?? '',
     scope: entry.scope === 'user' ? 'global' : 'project',
+    installScope: entry.scope,
     installPath,
     missing,
     mtime: missing ? null : mtimeOf(installPath),
