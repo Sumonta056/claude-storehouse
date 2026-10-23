@@ -33,6 +33,7 @@
   "scripts": {
     "test": "node --test test/*.test.js test/*/*.test.js",
     "start": "node bin/storehouse.js",
+    "site": "node site/build.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

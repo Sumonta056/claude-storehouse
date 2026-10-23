@@ -3,7 +3,7 @@ import globals from 'globals'
 import prettier from 'eslint-config-prettier'
 
 export default [
-  { ignores: ['node_modules/', 'test/fixtures/', '.superpowers/', '.impeccable/', '.claude/worktrees/'] },
+  { ignores: ['node_modules/', 'test/fixtures/', '.superpowers/', '.impeccable/', '.claude/worktrees/', '_site/'] },
   js.configs.recommended,
   {
     files: ['**/*.js'],
@@ -17,7 +17,7 @@ export default [
     }
   },
   {
-    files: ['public/**/*.js'],
+    files: ['public/**/*.js', 'site/site.js', 'site/demo/**/*.js'],
     languageOptions: { globals: globals.browser }
   },
   prettier

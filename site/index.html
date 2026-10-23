@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claude Storehouse</title>
+    <meta
+      name="description"
+      content="Claude Storehouse is a free local dashboard for your Claude Code setup. See, edit, switch on or off, and favorite every skill, agent, plugin, hook, MCP server, setting, and CLAUDE.md, for ~/.claude and for your project. One command: npx claude-storehouse."
+    />
+    <meta
+      name="keywords"
+      content="Claude Code, claude-storehouse, Claude Code skills, Claude Code plugins, MCP servers, Claude Code hooks, CLAUDE.md, settings.json, dashboard, npx"
+    />
+    <meta name="author" content="Sumonta Saha Mridul" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://sumonta056.github.io/claude-storehouse/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Claude Storehouse" />
+    <meta property="og:title" content="Claude Storehouse — one page for your whole Claude Code setup" />
+    <meta
+      property="og:description"
+      content="A local dashboard for Claude Code: skills, agents, plugins, hooks, MCP servers, settings, and CLAUDE.md, with on/off switches, favorites, undo, and safe writes."
+    />
+    <meta property="og:url" content="https://sumonta056.github.io/claude-storehouse/" />
+    <meta property="og:image" content="https://sumonta056.github.io/claude-storehouse/screenshots/dashboard.png" />
+    <meta property="og:image:width" content="2880" />
+    <meta property="og:image:height" content="1800" />
+    <meta
+      property="og:image:alt"
+      content="Claude Storehouse dashboard with usage, counts, favorites, and project files"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Claude Storehouse" />
+    <meta
+      name="twitter:description"
+      content="One local page for your whole Claude Code setup. Switch skills, plugins, hooks, and MCP servers on or off in one click."
+    />
+    <meta name="twitter:image" content="https://sumonta056.github.io/claude-storehouse/screenshots/dashboard.png" />
+    <meta name="theme-color" content="#0f1115" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Claude Storehouse",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Linux, Windows",
+        "description": "A local web dashboard for Claude Code: see, edit, switch on or off, and favorite skills, agents, plugins, hooks, MCP servers, settings, and CLAUDE.md.",
+        "url": "https://sumonta056.github.io/claude-storehouse/",
+        "image": "https://sumonta056.github.io/claude-storehouse/screenshots/dashboard.png",
+        "softwareVersion": "1.0.0",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Sumonta Saha Mridul", "url": "https://sumonta056.vercel.app/" },
+        "codeRepository": "https://github.com/Sumonta056/claude-storehouse"
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+    />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap top-in">
+        <a class="brand" href="#">
+          <img src="icon.svg" alt="" width="28" height="28" />
+          <span>Claude Storehouse</span>
+        </a>
+        <nav class="top-nav" aria-label="Sections">
+          <a href="#demo">Live demo</a>
+          <a href="#features">Features</a>
+          <a href="#switches">On / off</a>
+          <a href="#install">Install</a>
+        </nav>
+        <a class="btn ghost sm" href="https://github.com/Sumonta056/claude-storehouse" rel="noopener">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
+            />
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap">
+          <h1>Your Claude Code setup,<br /><span class="grad">on one page.</span></h1>
+          <p class="lead">
+            <strong>Claude Storehouse</strong> is a free local dashboard. It shows every skill, agent, plugin, hook, MCP
+            server, setting, and <code>CLAUDE.md</code> for your global <code>~/.claude</code> and for your project.
+            Switch them on or off in one click.
+          </p>
+          <div class="cta">
+            <a class="btn primary" href="#demo">Try the live demo</a>
+            <button class="btn ghost cmd" type="button" data-copy="npx claude-storehouse">
+              <span class="prompt">$</span> npx claude-storehouse <span class="copy-label">Copy</span>
+            </button>
+          </div>
+          <ul class="facts">
+            <li><b>1</b> command, any folder</li>
+            <li><b>1</b> runtime dependency</li>
+            <li><b>0</b> data leaves your machine</li>
+            <li><b>20</b> backups kept per file</li>
+          </ul>
+        </div>
+        <div class="wrap shots">
+          <figure class="frame tilt-l">
+            <div class="frame-bar"><i></i><i></i><i></i><span>Dashboard</span></div>
+            <img
+              src="screenshots/dashboard.png"
+              alt="Claude Storehouse dashboard: API-equal cost, token usage by model, counts for skills, agents, plugins, hooks and MCP servers, favorites, and project files"
+              width="2880"
+              height="1800"
+              fetchpriority="high"
+              data-zoom
+            />
+          </figure>
+          <figure class="frame tilt-r">
+            <div class="frame-bar"><i></i><i></i><i></i><span>Skills</span></div>
+            <img
+              src="screenshots/skills.png"
+              alt="Skills page with an on/off switch, a star, and the file each switch writes"
+              width="2880"
+              height="1800"
+              loading="lazy"
+              data-zoom
+            />
+          </figure>
+        </div>
+      </section>
+
+      <section id="demo" class="demo" aria-labelledby="demo-h">
+        <div class="wrap">
+          <p class="eyebrow">Live demo</p>
+          <h2 id="demo-h">Click around the real dashboard</h2>
+          <p class="lead">
+            This is the real app code, running in your browser with a sample setup. Switches, stars, and edits change
+            only this page. Reload to start again. Things to try:
+          </p>
+          <ul class="tries">
+            <li>Switch <b>api-design</b> off on Skills, then undo it in <b>Activity</b></li>
+            <li>Drag a favorite into the <b>Review</b> category</li>
+            <li>Open <b>CLAUDE.md</b>, edit it, and press <kbd>⌘S</kbd></li>
+            <li>Press <kbd>/</kbd> and type <b>review</b></li>
+            <li>Switch the <b>toolkit</b> plugin off and look at its skills</li>
+          </ul>
+          <div class="demo-bar">
+            <div class="demo-tabs" role="tablist" aria-label="Demo page">
+              <button role="tab" aria-selected="true" data-page="dash">Dashboard</button>
+              <button role="tab" aria-selected="false" data-page="fav">Favorites</button>
+              <button role="tab" aria-selected="false" data-page="skills">Skills</button>
+              <button role="tab" aria-selected="false" data-page="plugins">Plugins</button>
+              <button role="tab" aria-selected="false" data-page="hooks">Hooks</button>
+              <button role="tab" aria-selected="false" data-page="mcp">MCP</button>
+            </div>
+            <span class="spacer"></span>
+            <button class="btn ghost sm" id="demoReset" type="button">Reset demo</button>
+            <a class="btn ghost sm" id="demoOpen" href="demo/index.html#dash" target="_blank" rel="noopener"
+              >Open full screen ↗</a
+            >
+          </div>
+          <div class="demo-stage frame big">
+            <div class="frame-bar"><i></i><i></i><i></i><span id="demoTitle">127.0.0.1 · Dashboard</span></div>
+            <div class="demo-view">
+              <iframe
+                id="demoFrame"
+                title="Claude Storehouse live demo"
+                src="demo/index.html#dash"
+                loading="lazy"
+              ></iframe>
+            </div>
+          </div>
+          <p class="note">On a phone the demo is small. Open it full screen, or try it on a computer.</p>
+        </div>
+      </section>
+
+      <section id="features" class="features" aria-labelledby="feat-h">
+        <div class="wrap">
+          <p class="eyebrow">Features</p>
+          <h2 id="feat-h">Everything <code class="h-code">/plugin</code> and raw JSON do not show you</h2>
+        </div>
+
+        <div class="wrap feature">
+          <div class="txt">
+            <h3>Dashboard and usage</h3>
+            <p>
+              One look at your whole setup: how many items are on and off, your favorites, recent changes, and which
+              Claude Code files this project has.
+            </p>
+            <ul>
+              <li>API-equal cost of your Claude Code use, by model</li>
+              <li>Tokens, sessions, projects, and prompt-cache savings</li>
+              <li>Read from token counts only, never from message text</li>
+              <li>Counts for skills, agents, plugins, hooks, and MCP servers</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="dash">Open the Dashboard in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/dashboard.png"
+              alt="Dashboard with an API-equal value band, token totals, item counts, favorites, and the project file list"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+
+        <div class="wrap feature flip">
+          <div class="txt">
+            <h3>Skills and agents</h3>
+            <p>
+              Global, project, and plugin skills and agents in one list. Each switch shows the file it writes before you
+              click, and a toast names the file after.
+            </p>
+            <ul>
+              <li>Filter by scope: All, Global, or Project</li>
+              <li>Press <kbd>/</kbd> to search names and descriptions</li>
+              <li>Plugin skills show "via plugin X" and follow their plugin</li>
+              <li>Fork a plugin skill to <code>~/.claude/skills</code></li>
+            </ul>
+            <a class="more" href="#demo" data-demo="skills">Try the switches →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/skills.png"
+              alt="Skills page: global, project, and plugin skills, each with a switch, a star, and a menu"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+
+        <div class="wrap feature">
+          <div class="txt">
+            <h3>Favorites</h3>
+            <p>
+              Star the skills, agents, and plugins you use most. Group them in your own categories and drag them into
+              order.
+            </p>
+            <ul>
+              <li>A favorite stays in the list when you switch it off</li>
+              <li>A favorite whose item is gone shows "missing"</li>
+              <li>Rename and delete a category, with undo</li>
+              <li>Stored in <code>~/.claude/storehouse.json</code></li>
+            </ul>
+            <a class="more" href="#demo" data-demo="fav">Drag favorites in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/favorites.png"
+              alt="Favorites page with items grouped into Plan, Build, and Review categories"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+
+        <div class="wrap feature flip">
+          <div class="txt">
+            <h3>Plugins and mods</h3>
+            <p>
+              Every installed plugin with its marketplace, version, skills, agents, hooks, and MCP servers. Switch a
+              plugin off and all its parts go off with it.
+            </p>
+            <ul>
+              <li>Uses <code>enabledPlugins</code>, the key Claude Code reads</li>
+              <li>Uninstall runs <code>claude plugin uninstall</code> with the right scope</li>
+              <li>Mods page: installed mods and mods in development</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="plugins">Open Plugins in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/plugins.png"
+              alt="Plugins page with three plugins from two marketplaces, their versions, and on/off switches"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+
+        <div class="wrap feature">
+          <div class="txt">
+            <h3>Hooks and MCP servers</h3>
+            <p>
+              Hooks from every settings file and plugin, by event and matcher. MCP servers from
+              <code>~/.claude.json</code>, <code>.mcp.json</code>, and plugins, with secrets masked.
+            </p>
+            <ul>
+              <li>Switch a hook off: it parks safely and comes back on undo</li>
+              <li>MCP switches use Claude Code's own disable lists</li>
+              <li>Add a hook or an MCP server from a form</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="mcp">See MCP servers in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/mcp.png"
+              alt="MCP servers page with transport, command, and source for each server, and masked environment values"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+
+        <div class="wrap feature flip">
+          <div class="txt">
+            <h3>Edit in place, undo anything</h3>
+            <p>
+              Open any file you own in the drawer: a skill, an agent, <code>settings.json</code>, or
+              <code>CLAUDE.md</code>. Edit it and save with <kbd>⌘S</kbd>.
+            </p>
+            <ul>
+              <li>Every switch, star, and save shows in Activity with Undo</li>
+              <li>The latest save of each file can be restored</li>
+              <li>Plugin cache files stay read-only</li>
+              <li>A JSON file that does not parse is never written</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="claudemd">Edit CLAUDE.md in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/editor.png"
+              alt="A skill open in the drawer editor with Save, the file path, and the Activity log with undo buttons"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+      </section>
+
+      <section id="switches" class="envs wrap" aria-labelledby="sw-h">
+        <div class="env-grid">
+          <div>
+            <p class="eyebrow">How on / off works</p>
+            <h2 id="sw-h">The keys Claude Code itself reads</h2>
+            <p>
+              <b>Native switches.</b> Plugins, skills, and MCP servers use the keys that Claude Code reads. The
+              dashboard never says "off" while Claude still loads the item.
+            </p>
+            <p>
+              <b>Scope-safe.</b> Global switches write <code>~/.claude/settings.json</code>. Project switches write
+              <code>.claude/settings.local.json</code>, never the shared <code>settings.json</code>.
+            </p>
+            <p>
+              <b>Safe writes.</b> Each write copies the old file to a backup first, writes a temp file, then renames it.
+              Changes apply at the next session.
+            </p>
+          </div>
+          <div class="rules" aria-label="What each switch writes">
+            <div class="rule"><span class="kind">Plugin</span><code>enabledPlugins[id] = false</code></div>
+            <div class="rule"><span class="kind">Skill</span><code>skillOverrides[name] = "off"</code></div>
+            <div class="rule"><span class="kind">MCP · .mcp.json</span><code>disabledMcpjsonServers</code></div>
+            <div class="rule">
+              <span class="kind">MCP · global</span><code>projects.&lt;dir&gt;.disabledMcpServers</code>
+            </div>
+            <div class="rule"><span class="kind">Hook</span><code>parked in storehouse.json</code></div>
+            <div class="rule"><span class="kind">Agent</span><code>name.md → name.md.disabled</code></div>
+            <div class="try">
+              <span class="ok">✓</span>
+              <div>
+                <code>Wrote ~/.claude/settings.json · backup saved</code
+                ><small>The toast after each switch names the file that changed.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="install" aria-labelledby="inst-h">
+        <div class="wrap">
+          <p class="eyebrow">Install</p>
+          <h2 id="inst-h">Ready in one command</h2>
+          <p class="lead">No install step, no account, no config. You need Node 20 or newer.</p>
+          <div class="install-grid">
+            <aside class="dl-card">
+              <img src="icon.svg" alt="" width="64" height="64" />
+              <h3>claude-storehouse</h3>
+              <p class="dl-meta" id="npmMeta">Latest on npm</p>
+              <button class="btn primary dl-btn" type="button" data-copy="npx claude-storehouse">
+                <span class="prompt">$</span> npx claude-storehouse <span class="copy-label">Copy</span>
+              </button>
+              <p class="dl-links">
+                <a href="https://www.npmjs.com/package/claude-storehouse" rel="noopener">npm</a> ·
+                <a href="https://github.com/Sumonta056/claude-storehouse/releases" rel="noopener">Releases</a> ·
+                <a href="https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md" rel="noopener"
+                  >What is new</a
+                >
+              </p>
+              <details class="dev">
+                <summary>Install it once instead</summary>
+                <pre><code>npm i -g claude-storehouse
+claude-storehouse</code></pre>
+                <p>Then run <code>claude-storehouse</code> in any project folder.</p>
+              </details>
+            </aside>
+
+            <ol class="tut">
+              <li>
+                <div class="tut-txt">
+                  <h3>Check Node</h3>
+                  <p>Claude Storehouse needs Node 20 or newer. Claude Code users have it already.</p>
+                </div>
+                <div class="mock mock-term" aria-hidden="true">
+                  <code>$ node -v</code><span class="out">v22.11.0</span>
+                </div>
+              </li>
+              <li>
+                <div class="tut-txt">
+                  <h3>Open your project folder</h3>
+                  <p>The dashboard shows the global <code>~/.claude</code> and the project in the current folder.</p>
+                </div>
+                <div class="mock mock-term" aria-hidden="true"><code>$ cd ~/code/my-app</code></div>
+              </li>
+              <li>
+                <div class="tut-txt">
+                  <h3>Run the command</h3>
+                  <p>npx downloads the package and starts a server on <code>127.0.0.1</code>.</p>
+                </div>
+                <div class="mock mock-url">
+                  <code>npx claude-storehouse</code>
+                  <button class="btn ghost sm" type="button" data-copy="npx claude-storehouse">
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </li>
+              <li>
+                <div class="tut-txt">
+                  <h3>Use the page, then stop</h3>
+                  <p>
+                    Your browser opens on a local address with a one-time token. Press <kbd>Ctrl+C</kbd> in the terminal
+                    to stop.
+                  </p>
+                </div>
+                <div class="mock mock-pin" aria-hidden="true">
+                  <span class="kbd-big">Ctrl</span>
+                  <span class="muted">+</span>
+                  <span class="kbd-big">C</span>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <div class="two">
+            <div class="panel">
+              <h3>CLI options</h3>
+              <table>
+                <tr>
+                  <td><code>--dir &lt;path&gt;</code></td>
+                  <td>Project folder to manage. Default: the current folder.</td>
+                </tr>
+                <tr>
+                  <td><code>--home &lt;path&gt;</code></td>
+                  <td>Folder that holds <code>.claude</code>. Default: your home folder.</td>
+                </tr>
+                <tr>
+                  <td><code>--port &lt;n&gt;</code></td>
+                  <td>Port to listen on. Default: a free port.</td>
+                </tr>
+                <tr>
+                  <td><code>--no-open</code></td>
+                  <td>Do not open the browser.</td>
+                </tr>
+                <tr>
+                  <td><code>--help</code>, <code>--version</code></td>
+                  <td>Print usage or the version.</td>
+                </tr>
+              </table>
+              <h3 class="sub-h">Keyboard shortcuts</h3>
+              <table>
+                <tr>
+                  <td><kbd>/</kbd></td>
+                  <td>Search names and descriptions</td>
+                </tr>
+                <tr>
+                  <td><kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td>
+                  <td>Save the open file</td>
+                </tr>
+                <tr>
+                  <td><kbd>Esc</kbd></td>
+                  <td>Close the drawer or a dialog</td>
+                </tr>
+              </table>
+            </div>
+            <div class="panel">
+              <h3>Safety and privacy</h3>
+              <p>
+                No server outside your machine, no account, no analytics. Only token counts are read from session files,
+                never message text.
+              </p>
+              <table>
+                <tr>
+                  <td>Backups</td>
+                  <td>
+                    Each write copies the old file to <code>~/.claude/backups/storehouse/</code>. The last 20 per file
+                    stay.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Local only</td>
+                  <td>Listens on <code>127.0.0.1</code> and rejects a foreign <code>Host</code> header.</td>
+                </tr>
+                <tr>
+                  <td>Token</td>
+                  <td>Every API call needs the random token from the start URL.</td>
+                </tr>
+                <tr>
+                  <td>Allow-list</td>
+                  <td>
+                    Writes go only to <code>~/.claude</code>, <code>~/.claude.json</code>, and the project folder.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Delete</td>
+                  <td>Moves the file to a trash folder. Restore it from the Backups panel.</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-in">
+        <span
+          >Made by <a href="https://sumonta056.vercel.app/" rel="noopener">Sumonta</a> · MIT license · Not made by
+          Anthropic</span
+        >
+        <span
+          ><a href="https://github.com/Sumonta056/claude-storehouse" rel="noopener">GitHub</a> ·
+          <a href="https://www.npmjs.com/package/claude-storehouse" rel="noopener">npm</a> ·
+          <a href="https://github.com/Sumonta056/claude-storehouse/issues" rel="noopener">Report an issue</a> ·
+          <a href="https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md" rel="noopener"
+            >Changelog</a
+          ></span
+        >
+      </div>
+    </footer>
+
+    <dialog id="zoom" aria-label="Screenshot">
+      <button class="btn ghost sm close" type="button" aria-label="Close">✕</button>
+      <img src="screenshots/dashboard.png" alt="" />
+    </dialog>
+
+    <script src="site.js" defer></script>
+  </body>
+</html>

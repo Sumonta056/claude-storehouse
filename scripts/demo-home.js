@@ -129,4 +129,38 @@ write(path.join(project, '.mcp.json'), {
   mcpServers: { sentry: { type: 'http', url: 'https://mcp.sentry.example/mcp' } }
 })
 
+const sessions = [
+  ['-home-acme-api', 'claude-opus-5-5', 42],
+  ['-home-acme-api', 'claude-sonnet-5', 30],
+  ['-home-acme-web', 'claude-opus-5-5', 26],
+  ['-home-acme-web', 'claude-haiku-5', 18],
+  ['-home-infra', 'claude-sonnet-5', 22]
+]
+const today = new Date()
+sessions.forEach(([dir, model, turns], s) => {
+  const lines = []
+  for (let t = 0; t < turns; t++) {
+    const day = new Date(today.getFullYear(), today.getMonth(), Math.max(1, today.getDate() - ((s + t) % 9)), 10, t)
+    lines.push(
+      JSON.stringify({
+        type: 'assistant',
+        sessionId: `demo-session-${s + 1}`,
+        timestamp: day.toISOString(),
+        requestId: `req_${s}_${t}`,
+        message: {
+          id: `msg_${s}_${t}`,
+          model,
+          usage: {
+            input_tokens: 1200 + t * 40,
+            output_tokens: 900 + ((t * 137) % 1600),
+            cache_creation_input_tokens: t % 6 === 0 ? 18000 : 2400,
+            cache_read_input_tokens: 42000 + t * 3100
+          }
+        }
+      })
+    )
+  }
+  write(path.join(claude, 'projects', dir, `session-${s + 1}.jsonl`), lines.join('\n') + '\n')
+})
+
 console.log(JSON.stringify({ home, project }))
