@@ -1,6 +1,6 @@
 {
   "name": "claude-storehouse",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A local web dashboard for your Claude Code setup. See, edit, switch on or off, and favorite every skill, agent, plugin, hook, MCP server, setting, and CLAUDE.md, global and per project.",
   "keywords": [
     "claude",
