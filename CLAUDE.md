@@ -29,6 +29,7 @@ Key rules:
 
 - Skill `storehouse-config-safety`: switch table, write procedure, path allow-list, test rule. Load for any `src/write` or `src/scan` task.
 - Skill `storehouse-verify`: test command, fake home recipe, 10-point Chrome check. Load before you claim a task is done.
+- Skill `storehouse-release`: release to GitHub and npm, README and npm page, screenshots from a demo home. Load for any release or README task.
 - Agent `toggle-reviewer`: read-only reviewer for toggle and scanner code. Run after each `src/write` task.
 - `.claude/settings.json`: allows `npm test`, `node --test`, and the CLI. Denies edits to the real `~/.claude/settings.json` and `~/.claude.json`.
 
@@ -57,4 +58,6 @@ test/               node:test + fixtures
 .github/            CI and release workflows, PR and issue templates, dependabot
 .husky/             git hooks
 CHANGELOG.md        written by /release-tag
+scripts/demo-home.js  builds a fake home with sample data for screenshots
+docs/images/        README screenshots
 ```

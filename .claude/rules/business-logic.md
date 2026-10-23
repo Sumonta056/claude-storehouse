@@ -71,6 +71,7 @@ Target file per scope:
 
 - Stored in `~/.claude/storehouse.json` → `favorites[]` as `{ kind, id, source, order }`.
 - Global only, not per project.
+- Categories live in `favoriteCategories[]`. Each favorite has an optional `category`. Rename and delete of a category can be undone.
 - A favorite that is off stays in the list and shows the off state.
 - A favorite whose item is gone shows "missing" with a remove button.
 - Drag to reorder.

@@ -1,6 +1,23 @@
 {
   "name": "claude-storehouse",
   "version": "0.1.0",
+  "description": "A local web dashboard for your Claude Code setup. See, edit, switch on or off, and favorite every skill, agent, plugin, hook, MCP server, setting, and CLAUDE.md, global and per project.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "dashboard",
+    "skills",
+    "agents",
+    "plugins",
+    "mcp",
+    "hooks",
+    "cli",
+    "developer-tools",
+    "ai"
+  ],
+  "author": "Sumonta Saha Mridul",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "claude-storehouse": "bin/storehouse.js"
@@ -8,16 +25,19 @@
   "files": [
     "bin",
     "src",
-    "public"
+    "public",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js test/*/*.test.js",
     "start": "node bin/storehouse.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm test",
+    "check": "npm run lint && npm run format:check && npm test",
     "prepare": "husky"
   },
   "engines": {
