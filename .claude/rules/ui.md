@@ -5,7 +5,7 @@ paths:
 
 # UI rules
 
-- Files: one `public/index.html`, one `public/app.js`, one `public/app.css`, plus `public/api.js`. Vanilla JS, no framework.
+- Files: one `public/index.html`, one `public/app.js`, one `public/app.css`, plus `public/api.js` and the app icon `public/icon.svg`. Vanilla JS, no framework.
 - Font: Figtree from Google Fonts with a system fallback for offline use.
 - All functional text is 14 px or larger.
 - Approved layout: `.superpowers/brainstorm/*/content/dashboard-demo-v2.html`.
