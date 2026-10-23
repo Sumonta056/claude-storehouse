@@ -30,6 +30,36 @@ const SETTINGS_FILE = {
   projectLocal: '.claude/settings.local.json'
 }
 const MCP_ORIGIN = { user: '~/.claude.json', local: '~/.claude.json · this folder', mcpjson: '.mcp.json' }
+const HOOK_INFO = [
+  ['SessionStart', 'When a session starts, resumes, or clears.'],
+  ['InstructionsLoaded', 'When Claude Code loads a CLAUDE.md or rules file.'],
+  ['UserPromptSubmit', 'When you send a prompt, before Claude reads it. It can block the prompt.'],
+  ['PreToolUse', 'Before Claude runs a tool. It can block the tool.'],
+  ['PermissionRequest', 'When Claude asks you for permission. It can allow or deny for you.'],
+  ['PostToolUse', 'After a tool runs with success.'],
+  ['PostToolUseFailure', 'After a tool fails.'],
+  ['Notification', 'When Claude Code shows a notification, such as a permission prompt.'],
+  ['SubagentStart', 'When a subagent starts.'],
+  ['SubagentStop', 'When a subagent finishes.'],
+  ['TaskCreated', 'When Claude creates a task.'],
+  ['TaskCompleted', 'When a task is marked complete.'],
+  ['TeammateIdle', 'When a team agent is about to go idle.'],
+  ['Stop', 'When Claude finishes its reply. It can make Claude continue.'],
+  ['StopFailure', 'When a reply stops because of an API error.'],
+  ['PreCompact', 'Before Claude Code compacts the conversation.'],
+  ['PostCompact', 'After Claude Code compacts the conversation.'],
+  ['ConfigChange', 'When a settings file changes during the session.'],
+  ['WorktreeCreate', 'When Claude Code creates a git worktree.'],
+  ['WorktreeRemove', 'When Claude Code removes a git worktree.'],
+  ['Elicitation', 'When an MCP server asks you for input.'],
+  ['ElicitationResult', 'After you answer an MCP server request.'],
+  ['SessionEnd', 'When the session ends.']
+]
+const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest'])
+const SCRIPT_RE = /[\w@.-]+\.(?:sh|bash|zsh|js|mjs|cjs|ts|py|rb|cmd|ps1)\b/g
+const INLINE = { node: 'Node', bun: 'Bun', deno: 'Deno', python: 'Python', python3: 'Python', ruby: 'Ruby' }
+const SHELLS = new Set(['sh', 'bash', 'zsh'])
+const SHELL_WORDS = new Set(['if', 'for', 'while', 'case', '[', '[[', '{', '(', 'test', 'until'])
 
 export const state = { inventory: null, scope: 'all', query: '', page: 'dash' }
 
@@ -418,22 +448,60 @@ function favNameError(name) {
   return null
 }
 
+function itemLabel(item) {
+  return item.plugin ? `${item.name} · via plugin ${pluginLabel(item.plugin)}` : item.name
+}
+
+function favPopOptions(query) {
+  const q = query.trim().toLowerCase()
+  const all = [{ value: '', label: 'Uncategorized' }, ...favCats().map((c) => ({ value: c, label: c }))]
+  const shown = q ? all.filter((o) => o.label.toLowerCase().includes(q)) : all
+  if (q && !all.some((o) => o.label.toLowerCase() === q)) shown.push({ create: query.trim() })
+  return shown
+}
+
+function favPopListHtml() {
+  const { options, active, current } = favPop
+  return options
+    .map((o, i) => {
+      const cls = ['fp-opt', i === active ? 'active' : '', o.create ? 'create' : ''].filter(Boolean).join(' ')
+      const text = o.create ? `+ Create "${o.create}"` : o.label
+      const cur = !o.create && o.value === current ? '<span class="fp-cur" aria-label="current">✓</span>' : ''
+      return `<li role="option" id="fp-opt-${i}" class="${cls}" data-i="${i}" aria-selected="${i === active}"><span>${esc(text)}</span>${cur}</li>`
+    })
+    .join('')
+}
+
 function favPopHtml(item, fav) {
-  const current = fav ? (fav.category ?? '') : ''
-  const options = [['', 'Uncategorized'], ...favCats().map((c) => [c, c])]
   return `<form data-form="favpop">
     <h3 id="favpop-t">${fav ? 'Change category' : 'Add to favorites'}</h3>
-    <p class="sub">${esc(item.name)}</p>
-    <fieldset><legend class="sr">Category</legend>${options
-      .map(
-        ([value, label]) =>
-          `<label class="opt"><input type="radio" name="cat" value="${esc(value)}"${value === current ? ' checked' : ''}><span>${esc(label)}</span></label>`
-      )
-      .join('')}</fieldset>
-    <input type="text" name="newcat" maxlength="40" placeholder="+ New category" aria-label="New category name">
+    <p class="sub">${esc(itemLabel(item))}</p>
+    <input type="text" name="newcat" maxlength="40" placeholder="Search or create a category" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-controls="favpop-list" aria-label="Category">
+    <ul class="fp-list" id="favpop-list" role="listbox" aria-label="Categories"></ul>
     <p class="err" role="alert" hidden></p>
     <div class="bar">${fav ? '<button type="button" class="btn danger ghost" data-pop="remove">Remove</button>' : '<button type="button" class="btn ghost" data-pop="cancel">Cancel</button>'}<button type="submit" class="btn p">Save</button></div>
   </form>`
+}
+
+function drawFavPopList() {
+  const { el, options, active } = favPop
+  el.querySelector('.fp-list').innerHTML = favPopListHtml()
+  el.querySelector('input[name="newcat"]').setAttribute(
+    'aria-activedescendant',
+    options.length ? `fp-opt-${active}` : ''
+  )
+  el.querySelector(`#fp-opt-${active}`)?.scrollIntoView({ block: 'nearest' })
+}
+
+function filterFavPop(query) {
+  const options = favPopOptions(query)
+  const q = query.trim().toLowerCase()
+  const exact = options.findIndex((o) => !o.create && o.label.toLowerCase() === q)
+  const current = q ? -1 : options.findIndex((o) => o.value === favPop.current)
+  favPop.options = options
+  favPop.active = Math.max(0, exact, current)
+  favPop.el.querySelector('.err').hidden = true
+  drawFavPopList()
 }
 
 function placeFavPop() {
@@ -456,16 +524,33 @@ function openFavPop(item, trigger) {
   el.setAttribute('aria-labelledby', 'favpop-t')
   el.innerHTML = favPopHtml(item, fav)
   document.body.append(el)
-  favPop = { el, item, trigger, inDrawer: Boolean(trigger?.closest('#dr')) }
+  favPop = {
+    el,
+    item,
+    trigger,
+    inDrawer: Boolean(trigger?.closest('#dr')),
+    current: fav ? (fav.category ?? '') : '',
+    options: [],
+    active: 0
+  }
+  filterFavPop('')
   placeFavPop()
-  el.querySelector('input[name="cat"]:checked')?.focus()
-  el.addEventListener('input', (e) => {
-    if (e.target.name !== 'newcat') return
-    const typed = e.target.value.trim() !== ''
-    for (const r of el.querySelectorAll('input[name="cat"]')) r.disabled = typed
-    el.querySelector('.err').hidden = true
+  const input = el.querySelector('input[name="newcat"]')
+  input.focus()
+  input.addEventListener('input', () => filterFavPop(input.value))
+  input.addEventListener('keydown', (e) => {
+    const step = { ArrowDown: 1, ArrowUp: -1 }[e.key]
+    if (!step || !favPop.options.length) return
+    e.preventDefault()
+    favPop.active = (favPop.active + step + favPop.options.length) % favPop.options.length
+    drawFavPopList()
   })
   el.addEventListener('click', (e) => {
+    const opt = e.target.closest('[data-i]')
+    if (opt) {
+      favPop.active = Number(opt.dataset.i)
+      return submitFavPop(el.querySelector('form'))
+    }
     const act = e.target.closest('[data-pop]')?.dataset.pop
     if (act === 'cancel') closeFavPop()
     else if (act === 'remove') {
@@ -505,21 +590,21 @@ function favBody(item, favorite, category) {
 }
 
 function submitFavPop(form) {
-  const { item } = favPop
-  const typed = form.elements.newcat.value.trim()
-  const picked = form.querySelector('input[name="cat"]:checked')?.value ?? ''
+  const { item, options, active } = favPop
+  const choice = options[active]
   const fav = favOf(item)
-  if (typed) {
-    const error = favNameError(typed)
-    if (error) {
-      const p = form.querySelector('.err')
-      p.textContent = error
-      p.hidden = false
-      form.elements.newcat.focus()
-      return
-    }
-  } else if (fav && (fav.category ?? '') === picked) return closeFavPop()
-  const category = typed || picked || null
+  const fail = (message) => {
+    const p = form.querySelector('.err')
+    p.textContent = message
+    p.hidden = false
+    form.elements.newcat.focus()
+  }
+  if (!choice) return fail('Type a category name.')
+  if (choice.create) {
+    const error = favNameError(choice.create)
+    if (error) return fail(error)
+  } else if (fav && (fav.category ?? '') === choice.value) return closeFavPop()
+  const category = choice.create ?? (choice.value || null)
   const label = category ?? 'Uncategorized'
   closeFavPop()
   star(favBody(item, true, category), fav ? `Moved ${item.name} to ${label}` : `Starred ${item.name} in ${label}`)
@@ -641,6 +726,18 @@ const CHIPS = {
     ['on', 'On'],
     ['off', 'Off'],
     ['plugin', 'From plugins']
+  ],
+  hooks: [
+    ['all', 'All'],
+    ['on', 'On'],
+    ['off', 'Off'],
+    ['plugin', 'From plugins']
+  ],
+  mcp: [
+    ['all', 'All'],
+    ['on', 'On'],
+    ['off', 'Off'],
+    ['plugin', 'From plugins']
   ]
 }
 
@@ -659,7 +756,7 @@ const SECTIONS = {
   ]
 }
 
-const chipFilter = { plugins: 'all', skills: 'all', agents: 'all' }
+const chipFilter = { plugins: 'all', skills: 'all', agents: 'all', hooks: 'all', mcp: 'all' }
 const groupOpen = new Map()
 let menuKey = null
 let menuCtx = ''
@@ -757,7 +854,7 @@ function metaHtml(item) {
 
 function rowHtml(item, ctx = '', { draggable = false, cat = null } = {}) {
   const open = menuKey === item.key && menuCtx === ctx
-  const src = rowSource(item)
+  const src = ctx === 'fav' && item.plugin ? `via plugin ${pluginLabel(item.plugin)}` : rowSource(item)
   const off = item.canToggle && !item.enabled
   const desc = item.missing
     ? 'Listed in installed_plugins.json, but the plugin folder is gone.'
@@ -787,13 +884,17 @@ function rowsHtml(list, ctx = '') {
   return `<ul class="rows" data-rows="${ctx}">${list.map((i) => rowHtml(i, ctx)).join('')}</ul>`
 }
 
+function switchable(page, item) {
+  return page === 'mcp' ? item.canToggle : item.scope !== 'plugin'
+}
+
 function keepChip(page, item) {
   const f = chipFilter[page]
   if (f === 'all') return true
   if (page === 'plugins')
     return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
   if (f === 'plugin') return item.scope === 'plugin'
-  return item.scope !== 'plugin' && (f === 'on') === Boolean(item.enabled)
+  return switchable(page, item) && (f === 'on') === Boolean(item.enabled)
 }
 
 function chipCounts(page, list) {
@@ -807,12 +908,12 @@ function chipCounts(page, list) {
       broken: shown.length - ok.length
     }
   }
-  const own = shown.filter((i) => i.scope !== 'plugin')
+  const own = shown.filter((i) => switchable(page, i))
   return {
     all: shown.length,
     on: own.filter((i) => i.enabled).length,
     off: own.filter((i) => !i.enabled).length,
-    plugin: shown.length - own.length
+    plugin: shown.filter((i) => i.scope === 'plugin').length
   }
 }
 
@@ -1185,7 +1286,7 @@ async function toggle(item) {
         (h) => h.event === item.event && h.command === item.command && h.file === item.file && h.enabled === enabled
       )
       const row = moved
-        ? [...document.querySelectorAll('#p-hooks tr[data-key]')].find((r) => r.dataset.key === moved.key)
+        ? [...document.querySelectorAll('#p-hooks [data-key]')].find((r) => r.dataset.key === moved.key)
         : null
       row?.querySelector('[data-act="toggle"]')?.focus()
     }
@@ -2116,10 +2217,6 @@ function viaPlugin(item) {
   return `<span class="via-lock" title="${esc(`Follows the plugin ${name}. Switch or uninstall it on the Plugins page.`)}">${ICON.lock}<span>via plugin ${esc(name)}</span></span>`
 }
 
-function tableHtml(label, head, rows) {
-  return `<div class="tbl"><table class="data" aria-label="${esc(label)}"><thead><tr>${head.map(([h, sr]) => `<th scope="col">${sr ? `<span class="sr">${esc(sr)}</span>` : esc(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`
-}
-
 function pageBar(note, actions) {
   return `<div class="pagebar"><p class="note">${note}</p><div class="pb-a">${actions}</div></div>`
 }
@@ -2130,37 +2227,95 @@ function addButton(name, label) {
   return `<button type="button" class="btn${open ? '' : ' p'}" id="${id}-open" data-c="${id}-open" aria-expanded="${open}" aria-controls="${name}-form">${open ? 'Close form' : label}</button>`
 }
 
-function renderHooks() {
-  const list = catalog.hook.filter(visible)
-  const rows = list
-    .map((h) => {
-      const label = `${h.event} hook ${h.name}`
-      const del = h.plugin
-        ? ''
-        : `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
-      const source = h.plugin
-        ? viaPlugin(h)
-        : `<span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}<span class="src">${esc(h.parked ? '~/.claude/storehouse.json' : (SETTINGS_FILE[h.file] ?? h.file))}</span></span>`
-      return `<tr data-key="${esc(h.key)}" class="${[h.enabled ? '' : 'off', h.plugin ? 'locked' : ''].filter(Boolean).join(' ')}">
-        <td data-label="On" class="sw-cell">${cellSwitch(h, label)}</td>
-        <td data-label="Event" class="ev">${esc(h.event)}</td>
-        <td data-label="Matcher"><code class="cchip">${esc(h.matcher)}</code></td>
-        <td data-label="Command" class="wide"><button type="button" class="btn-plain cmd cchip" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(h.name || '(no command)')}</button></td>
-        <td data-label="Source">${source}</td>
-        <td class="end">${del}</td>
-      </tr>`
+function unquote(token) {
+  return token.replace(/^(['"])(.*)\1$/, '$2')
+}
+
+function hookLabel(h) {
+  const command = String(h.command ?? '').trim()
+  if (!command) return h.type === 'prompt' ? 'Prompt hook' : h.type === 'agent' ? 'Agent hook' : '(no command)'
+  const scripts = command.match(SCRIPT_RE)
+  if (scripts) return baseName(scripts[scripts.length - 1])
+  const tokens = command.match(/'[^']*'|"[^"]*"|\S+/g) ?? []
+  const first = unquote(tokens[0] ?? '')
+  const flag = tokens[1]
+  if (INLINE[first] && (flag === '-e' || flag === '-c')) return `Inline ${INLINE[first]} script`
+  if (SHELLS.has(first) && flag === '-c') return 'Inline shell script'
+  if (SHELL_WORDS.has(first) || /^[A-Z_]+=/.test(first)) return 'Inline shell script'
+  return baseName(first) || command
+}
+
+function hookRunsFor(h) {
+  const m = String(h.matcher ?? '').trim()
+  const any = !m || m === '*' || m === '.*'
+  const names = m.split('|').join(', ')
+  if (TOOL_EVENTS.has(h.event)) return any ? 'All tools' : `Tools: ${names}`
+  if (h.event === 'SessionStart') return any ? 'Every start' : `On: ${names}`
+  return any ? '' : `Matcher: ${m}`
+}
+
+function hookSource(h) {
+  if (h.plugin) return viaPlugin(h)
+  const file = h.parked ? '~/.claude/storehouse.json' : (SETTINGS_FILE[h.file] ?? h.file)
+  return `<span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}<span class="src">${esc(file)}</span></span>`
+}
+
+function hookRowHtml(h) {
+  const what = hookLabel(h)
+  const label = `${h.event} hook ${what}`
+  const runs = hookRunsFor(h)
+  const off = h.canToggle && !h.enabled
+  const del = h.plugin
+    ? ''
+    : `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
+  const cls = ['lrow', 'hrow', off ? 'off' : '', h.plugin ? 'locked' : ''].filter(Boolean).join(' ')
+  return `<li class="${cls}" data-key="${esc(h.key)}">
+    <div class="lead">${cellSwitch(h, label)}</div>
+    <div class="body">
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(what)}</button>${runs ? `<span class="mchip">${esc(runs)}</span>` : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
+      <div class="meta-row">${hookSource(h)}${h.timeout ? `<span class="src">${esc(`${h.timeout}s timeout`)}</span>` : ''}</div>
+      ${h.command ? `<details class="cmd-box"><summary>Show command</summary><pre>${esc(h.command)}</pre></details>` : ''}
+    </div>
+    <div class="tail">${del}</div>
+  </li>`
+}
+
+function hookGroupsHtml(list) {
+  const byEvent = new Map(HOOK_INFO.map(([e]) => [e, []]))
+  for (const h of list) {
+    if (!byEvent.has(h.event)) byEvent.set(h.event, [])
+    byEvent.get(h.event).push(h)
+  }
+  const info = new Map(HOOK_INFO)
+  const body = [...byEvent]
+    .filter(([, rows]) => rows.length)
+    .map(([event, rows]) => {
+      const gk = `hook:${event}`
+      const open = groupOpen.get(gk) ?? true
+      const panel = `gp-hook-${slug(event)}`
+      return `<div class="pgroup">
+        <h3 class="ghead"><button type="button" class="gbtn" id="gb-hook-${slug(event)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(event)}</span><span class="gdesc">${esc(info.get(event) ?? 'Claude Code event.')}</span><span class="gcount">${esc(plural(rows.length, 'hook'))}</span></button></h3>
+        <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? `<ul class="rows">${rows.map(hookRowHtml).join('')}</ul>` : ''}</div>
+      </div>`
     })
     .join('')
-  const table = !catalog.hook.length
+  return `<div class="groups ev-groups">${body}</div>`
+}
+
+function renderHooks() {
+  const list = catalog.hook.filter((h) => visible(h) && keepChip('hooks', h))
+  const body = !catalog.hook.length
     ? empty('No hooks in ~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json, or plugins.')
     : list.length
-      ? tableHtml('Hooks', [['', 'On'], ['Event'], ['Matcher'], ['Command'], ['Source'], ['', 'Actions']], rows)
-      : nothingMatches()
+      ? hookGroupsHtml(list)
+      : chipFilter.hooks !== 'all' && catalog.hook.some(visible)
+        ? empty('No hooks match this filter.')
+        : nothingMatches()
   const bar = pageBar(
-    'Your own hooks can be switched and deleted. Off moves a hook into <code>~/.claude/storehouse.json</code> (parkedHooks); On puts it back. Plugin hooks follow their plugin.',
+    'A hook runs a command when an event happens in Claude Code. Hooks are grouped by event, in the order the events happen in a session. Off moves your hook into <code>~/.claude/storehouse.json</code>. Plugin hooks follow their plugin.',
     `<button type="button" class="btn" data-go="settings">Edit settings files</button>${addButton('hook', 'Add hook')}`
   )
-  $('p-hooks').innerHTML = `${bar}${hookFormHtml()}${table}`
+  $('p-hooks').innerHTML = `${bar}${hookFormHtml()}${chipsHtml('hooks', catalog.hook, '')}${body}`
 }
 
 function hookFormHtml() {
@@ -2213,46 +2368,69 @@ function submitHook() {
   })
 }
 
+function mcpTransport(m) {
+  return m.transport === 'stdio' ? 'Local · stdio' : `Remote · ${m.transport}`
+}
+
+function mcpRowHtml(m, counts) {
+  const label = `MCP server ${m.name}`
+  const target = m.command ?? m.url ?? ''
+  const keys = [
+    ...Object.keys(isPlain(m.config?.env) ? m.config.env : {}).map((k) => `env ${k}`),
+    ...Object.keys(isPlain(m.config?.headers) ? m.config.headers : {}).map((k) => `header ${k}`)
+  ]
+  const off = m.canToggle && !m.enabled
+  const canDelete = !m.plugin && ['user', 'local', 'mcpjson'].includes(m.origin)
+  const del = canDelete
+    ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
+    : ''
+  const others = catalog.mcp.filter((o) => o.name === m.name && o.key !== m.key).map((o) => o.source)
+  const dup =
+    counts.get(m.name) > 1
+      ? `<span class="flag" title="${esc(`Also from: ${others.join(', ')}`)}">${esc(`Name used ${counts.get(m.name)} times`)}</span>`
+      : ''
+  const source = m.plugin
+    ? `${viaPlugin(m)}<span class="src">${esc(`Claude Code name: plugin:${pluginLabel(m.plugin)}:${m.name}`)}</span>`
+    : `<span class="tags">${scopeTag(m.scope)}<span class="src">${esc(m.source)}</span></span>`
+  const cls = ['lrow', 'mrow', off ? 'off' : '', m.plugin ? 'locked' : ''].filter(Boolean).join(' ')
+  return `<li class="${cls}" data-key="${esc(m.key)}">
+    <div class="lead">${cellSwitch(m, label)}</div>
+    <div class="body">
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button><span class="mchip">${esc(mcpTransport(m))}</span>${off ? '<span class="flag">Off</span>' : ''}${dup}</div>
+      ${target ? `<code class="one-line" title="${esc(target)}">${esc(target)}</code>` : ''}
+      <div class="meta-row">${source}${keys.map((k) => `<span class="mchip key">${esc(k)}</span>`).join('')}</div>
+    </div>
+    <div class="tail">${del}</div>
+  </li>`
+}
+
 function renderMcp() {
-  const list = catalog.mcp.filter(visible)
-  const rows = list
-    .map((m) => {
-      const label = `MCP server ${m.name}`
-      const keys = [
-        ...Object.keys(isPlain(m.config?.env) ? m.config.env : {}),
-        ...Object.keys(isPlain(m.config?.headers) ? m.config.headers : {})
-      ]
-      const canDelete = !m.plugin && ['user', 'local', 'mcpjson'].includes(m.origin)
-      const del = canDelete
-        ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
-        : ''
-      const source = m.plugin
-        ? viaPlugin(m)
-        : `<span class="tags">${scopeTag(m.scope)}<span class="src">${esc(m.source)}</span></span>`
-      return `<tr data-key="${esc(m.key)}" class="${[m.enabled ? '' : 'off', m.plugin ? 'locked' : ''].filter(Boolean).join(' ')}">
-        <td data-label="On" class="sw-cell">${cellSwitch(m, label)}</td>
-        <td data-label="Name"><button type="button" class="btn-plain cmd" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button></td>
-        <td data-label="Transport"><span class="mchip">${esc(m.transport)}</span></td>
-        <td data-label="Command / URL" class="wide"><code class="cchip">${esc(m.command ?? m.url ?? '')}</code>${keys.length ? `<div class="note">${esc(`${m.config?.headers ? 'keys' : 'env'}: ${keys.join(', ')}`)}</div>` : ''}</td>
-        <td data-label="Source">${source}</td>
-        <td class="end">${del}</td>
-      </tr>`
+  const list = catalog.mcp.filter((m) => visible(m) && keepChip('mcp', m))
+  const counts = new Map()
+  for (const m of catalog.mcp) counts.set(m.name, (counts.get(m.name) ?? 0) + 1)
+  const sections = [
+    ['global', 'Global', 'From ~/.claude.json. Claude Code loads them in every folder.'],
+    ['project', 'Project', 'From ./.mcp.json or this folder in ~/.claude.json.'],
+    ['plugin', 'From plugins', 'They follow their plugin. The switch turns a server off for this folder only.']
+  ]
+  const html = sections
+    .map(([scope, title, hint]) => {
+      const shown = list.filter((m) => (scope === 'plugin' ? m.scope === 'plugin' : m.scope === scope))
+      if (!shown.length) return ''
+      return `<h2>${esc(title)} <span class="pill">${shown.length}</span><span class="hint">${esc(hint)}</span></h2><ul class="rows">${shown.map((m) => mcpRowHtml(m, counts)).join('')}</ul>`
     })
     .join('')
-  const table = !catalog.mcp.length
+  const body = !catalog.mcp.length
     ? empty('No MCP servers in ~/.claude.json, .mcp.json, or plugins.')
-    : list.length
-      ? tableHtml(
-          'MCP servers',
-          [['', 'On'], ['Name'], ['Transport'], ['Command / URL'], ['Source'], ['', 'Actions']],
-          rows
-        )
-      : nothingMatches()
+    : html ||
+      (chipFilter.mcp !== 'all' && catalog.mcp.some(visible)
+        ? empty('No MCP servers match this filter.')
+        : nothingMatches())
   const bar = pageBar(
-    'Global servers live in <code>~/.claude.json</code>. Project servers live in <code>./.mcp.json</code>. Plugin servers follow their plugin and cannot be deleted here. Changes apply at the next Claude Code session.',
+    'An MCP server gives Claude extra tools. A local server runs as a process on your computer. A remote server is a URL. Changes apply at the next Claude Code session.',
     addButton('mcp', 'Add MCP server')
   )
-  $('p-mcp').innerHTML = `${bar}${mcpFormHtml()}${table}`
+  $('p-mcp').innerHTML = `${bar}${mcpFormHtml()}${chipsHtml('mcp', catalog.mcp, '')}${body}`
 }
 
 function mcpFormHtml() {
@@ -3464,7 +3642,7 @@ function wire() {
       if (name === 'm-uninstall') return void uninstallPlugin(item)
       return
     }
-    if (act?.dataset.act === 'open' || !e.target.closest('button, a, input, .menu, .pnote')) openDrawer(item)
+    if (act?.dataset.act === 'open' || !e.target.closest('button, a, input, details, .menu, .pnote')) openDrawer(item)
   })
   document.addEventListener('click', (e) => {
     if (menuKey && !e.target.closest('.menu, [data-act="menu"]')) closeMenu(false)
