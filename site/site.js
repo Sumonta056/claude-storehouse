@@ -5,6 +5,7 @@
   const PAGE_NAMES = {
     dash: 'Dashboard',
     fav: 'Favorites',
+    dups: 'Duplicates',
     skills: 'Skills',
     agents: 'Agents',
     plugins: 'Plugins',

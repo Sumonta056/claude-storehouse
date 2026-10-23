@@ -80,6 +80,14 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 ![Skills page with on/off switches, favorites, and the file each switch writes](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/skills.png)
 
+### Find duplicates
+
+- The Duplicates page groups skills, agents, and MCP servers of one type that use the same name.
+- A group shows Conflict when more than one item in it is on, so you know Claude Code loads both.
+- Keep only this switches off the other items in the group. Plugin items name the plugin that controls them.
+
+![Duplicates page with two same-name groups marked Conflict and a Keep only this button on each item](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/duplicates.png)
+
 ### Favorites
 
 - Star the skills, agents, and plugins you use most, and drag them into order.
