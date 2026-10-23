@@ -16,7 +16,7 @@ The developer has about 110 skills and 28 plugins across 10 marketplaces. The da
 ## Non-goals
 
 - Install or update plugins or marketplaces. Use `/plugin`. Uninstall is allowed: it calls `claude plugin uninstall <id> --scope <scope>`.
-- Run Claude, start sessions, or read session history.
+- Run Claude, start sessions, or read session text. The usage band reads only token counts from transcripts.
 - Multi-user, remote, or hosted use.
 - A database, a cloud account, or a UI build pipeline.
 
@@ -39,6 +39,7 @@ The developer has about 110 skills and 28 plugins across 10 marketplaces. The da
 | Plugin files        | `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`      | —                                                          |
 | Mods installed      | a plugin whose `hooks/hooks.json` has `"modules": [...]`         | —                                                          |
 | Mods in development | `~/.claude/dev-mods/<session>/<name>/.claude-plugin/plugin.json` | —                                                          |
+| Session transcripts | `~/.claude/projects/<project>/<session>.jsonl`                   | —                                                          |
 
 A plugin folder contains `skills/<name>/SKILL.md`, `agents/<name>.md`, `hooks/hooks.json`, `.claude-plugin/plugin.json`, and optionally `.mcp.json`.
 
@@ -72,6 +73,18 @@ Target file per scope:
 | global                    | `~/.claude/settings.json`                                |
 | project                   | `./.claude/settings.local.json`                          |
 | MCP global and plugin MCP | `~/.claude.json` under `projects.<absolute project dir>` |
+
+## Usage band
+
+- The Dashboard shows API-equal cost, tokens, sessions, projects, and cache savings from `GET /api/usage`.
+- `src/scan/usage.js` reads `<project>/*.jsonl` and `<project>/<session>/subagents/*.jsonl` line by line, and parses only lines that contain `"usage"`. It never keeps or returns message text.
+- It reads regular files only. It skips symlinks, unreadable folders, and other entries without an error.
+- One response can write many lines, and the early lines can hold partial counts. Count each `message.id` + `requestId` one time across all files, and keep the largest value of each token field. A line with no ids counts on its own.
+- Records per file are cached in memory by `mtime` and size. Calls that overlap share one scan. A full scan of 3 GB takes about 5 seconds; a cached scan reads only changed files.
+- Prices live in `src/scan/prices.js`, per million tokens: input, output, cache read. Cache write is 1.25 × input for 5 minutes and 2 × input for 1 hour. Cache-read price differs by model. Update the table when Anthropic changes prices. The cost is an estimate: it leaves out long-context, fast-mode, and Batch prices.
+- An unknown model counts tokens but no cost, and the band names it.
+- "Saved by prompt cache" is cache-read tokens × (input price − cache-read price).
+- A project is one folder under `~/.claude/projects`. "This month" uses local time.
 
 ## Favorites
 

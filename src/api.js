@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { scanAll } from './scan/index.js'
+import { scanUsage } from './scan/usage.js'
 import { storehousePath } from './scan/hooks.js'
 import { toggle, mutateJson, Refusal } from './write/toggles.js'
 import { setFavorite, reorderFavorites, editCategory } from './write/favorites.js'
@@ -86,6 +87,10 @@ function pick(source, fields) {
 
 export function getInventory(_req, { ctx }) {
   return ok(scanAll(ctx))
+}
+
+export async function getUsage(_req, { ctx }) {
+  return ok(await scanUsage(ctx))
 }
 
 function shorten(text, max = 60) {

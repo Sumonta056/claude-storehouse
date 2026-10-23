@@ -26,4 +26,4 @@ Dashboard, Favorites, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUD
 - After any toggle, a banner says: "Claude Code applies this at the next session."
 - Plugin skills show a "Fork to local" button.
 - MCP secrets are masked.
-- All data comes from `GET /api/inventory`. Re-render from the content each write returns.
+- All data comes from `GET /api/inventory`, except the Dashboard usage band, which loads `GET /api/usage` one time per page load. Re-render from the content each write returns.

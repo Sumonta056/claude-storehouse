@@ -66,6 +66,8 @@ export const state = { inventory: null, scope: 'all', query: '', page: 'dash' }
 
 const items = new Map()
 let projectFiles = null
+let usage = null
+let usageError = ''
 let bannerDismissed = false
 let bannerShown = false
 let dragKey = null
@@ -320,6 +322,86 @@ function otherCounts(list) {
   return { total: shown.length, on: shown.filter((i) => i.enabled).length }
 }
 
+const MODEL_CLASSES = ['m0', 'm1', 'm2', 'm3']
+
+function money(value) {
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function compact(value) {
+  return value.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 2 })
+}
+
+function modelName(model) {
+  const parts = model
+    .replace(/^claude-/, '')
+    .split('-')
+    .filter((p) => !/^\d{8}$/.test(p))
+  const words = parts.filter((p) => !/^\d+$/.test(p)).map((p) => p[0].toUpperCase() + p.slice(1))
+  const version = parts.filter((p) => /^\d+$/.test(p)).join('.')
+  return [...words, version].filter(Boolean).join(' ')
+}
+
+function monthName(key) {
+  const [year, month] = key.split('-').map(Number)
+  return new Date(year, month - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })
+}
+
+function modelShares(u) {
+  if (!u.total.cost) return []
+  const top = u.models.slice(0, 3).map((m) => ({ name: modelName(m.model), cost: m.cost }))
+  const rest = u.total.cost - top.reduce((sum, m) => sum + m.cost, 0)
+  if (rest > 0.005) top.push({ name: 'Other', cost: rest })
+  return top.map((m, i) => ({ ...m, share: (m.cost / u.total.cost) * 100, cls: MODEL_CLASSES[i] }))
+}
+
+function usageHtml() {
+  const source = '<code>~/.claude/projects</code>'
+  if (usageError)
+    return `<section class="usage note-only"><p>Could not read usage from ${source}: ${esc(usageError)}</p></section>`
+  if (!usage) return `<section class="usage note-only"><p>Reading usage from ${source}…</p></section>`
+  if (!usage.responses)
+    return `<section class="usage note-only"><p>No Claude Code usage found in ${source}.</p></section>`
+  const u = usage
+  const shares = modelShares(u)
+  const pct = (n) => `${n.toFixed(1)}%`
+  const unpriced = u.unpriced.length
+    ? `<br>No price for ${u.unpriced.map((m) => `<code>${esc(m)}</code>`).join(', ')}. Its tokens count, its cost does not.`
+    : ''
+  const [dollars, cents] = money(u.total.cost).slice(1).split('.')
+  return `<section class="usage" aria-label="Usage and cost">
+      <div>
+        <div class="k">API-equal value</div>
+        <div class="big"><small>$</small>${esc(dollars)}.${esc(cents)}</div>
+        <p>All Claude Code usage on this machine, priced at current Anthropic API rates.<br>Read from ${source} · ${u.responses.toLocaleString('en-US')} responses${unpriced}</p>
+      </div>
+      <div class="right">
+        <div class="k">${esc(monthName(u.month.key))}</div>
+        <div class="mon">${money(u.month.cost)}<span>${compact(u.month.tokens)} tokens</span></div>
+        <div class="bar" role="img" aria-label="${esc(`Cost by model: ${shares.map((m) => `${m.name} ${pct(m.share)}`).join(', ')}`)}">${shares
+          .map((m) => `<span class="${m.cls}" style="width:${m.share}%"></span>`)
+          .join('')}</div>
+        <div class="legend">${shares.map((m) => `<span><i class="${m.cls}"></i>${esc(m.name)} ${pct(m.share)}</span>`).join('')}</div>
+      </div>
+    </section>
+    <div class="utiles">
+      <div><b>${compact(u.tokens)}</b><span>Total tokens</span></div>
+      <div><b>${u.sessions.toLocaleString('en-US')}</b><span>Sessions across ${u.projects} project${u.projects === 1 ? '' : 's'}</span></div>
+      <div><b class="g">${money(u.total.saved)}</b><span>Saved by prompt cache</span></div>
+      <div><b>${pct(u.cacheShare * 100)}</b><span>Input tokens served from cache</span></div>
+    </div>`
+}
+
+async function loadUsage() {
+  try {
+    usage = await get('/api/usage')
+    usageError = ''
+  } catch (err) {
+    usageError = err.message
+  }
+  if (state.page === 'dash' && state.inventory) renderDash()
+}
+
 function renderDash() {
   const inv = state.inventory
   const tiles = [
@@ -349,6 +431,7 @@ function renderDash() {
     ? `<div class="warn"><b>${inv.errors.length} file${inv.errors.length > 1 ? 's' : ''} could not be read.</b> ${inv.errors.map((e) => `<code>${esc(tilde(e.path))}</code>: ${esc(e.error)}`).join('; ')}</div>`
     : ''
   $('p-dash').innerHTML = `${errors}
+    ${usageHtml()}
     <div class="stats">${tiles}</div>
     <div class="two">
       <div><h2>Favorites ${more}</h2>${favHtml}${recentHtml()}</div>
@@ -4128,6 +4211,7 @@ async function start() {
   try {
     await refresh()
     loadActivity()
+    loadUsage()
     await loadProjectFiles()
     render()
   } catch (err) {
