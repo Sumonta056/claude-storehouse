@@ -15,7 +15,13 @@ async function withServer(runClaude, fn) {
     calls.push({ args, opts })
     return runClaude(args, opts)
   }
-  const server = await startServer({ home: fx.home, projectDir: fx.projectDir, port: 0, token: TOKEN, runClaude: runner })
+  const server = await startServer({
+    home: fx.home,
+    projectDir: fx.projectDir,
+    port: 0,
+    token: TOKEN,
+    runClaude: runner
+  })
   const api = async (method, route, body) => {
     const res = await fetch(`http://127.0.0.1:${server.port}${route}`, {
       method,
@@ -51,7 +57,13 @@ test('uninstall of a project plugin passes its scope and runs in the project fol
   await withServer(success, async ({ fx, api, calls }) => {
     const res = await api('POST', '/api/plugin/uninstall', { id: 'code-review@claude-plugins-official' })
     assert.equal(res.status, 200)
-    assert.deepEqual(calls[0].args, ['plugin', 'uninstall', 'code-review@claude-plugins-official', '--scope', 'project'])
+    assert.deepEqual(calls[0].args, [
+      'plugin',
+      'uninstall',
+      'code-review@claude-plugins-official',
+      '--scope',
+      'project'
+    ])
     assert.equal(calls[0].opts.cwd, fx.projectDir)
   })
 })

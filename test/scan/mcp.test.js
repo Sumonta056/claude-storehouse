@@ -63,7 +63,15 @@ test('scanMcp masks env and header values but keeps keys', () => {
 })
 
 test('scanMcp returns empty when nothing is configured', () => {
-  assert.deepEqual(scanMcp({ home: '/nonexistent-a', projectDir: '/nonexistent-b', plugins: [], mcpJsonLists: { enabled: [], disabled: [] } }), [])
+  assert.deepEqual(
+    scanMcp({
+      home: '/nonexistent-a',
+      projectDir: '/nonexistent-b',
+      plugins: [],
+      mcpJsonLists: { enabled: [], disabled: [] }
+    }),
+    []
+  )
 })
 
 test('scanMcp builds disabledKey from the plugin id prefix, not the manifest name', () => {
@@ -76,7 +84,12 @@ test('scanMcp builds disabledKey from the plugin id prefix, not the manifest nam
       mcp: [{ name: 'srv', config: { command: 'a' } }]
     }
   ]
-  const list = scanMcp({ home: '/nonexistent-a', projectDir: '/nonexistent-b', plugins, mcpJsonLists: { enabled: [], disabled: [] } })
+  const list = scanMcp({
+    home: '/nonexistent-a',
+    projectDir: '/nonexistent-b',
+    plugins,
+    mcpJsonLists: { enabled: [], disabled: [] }
+  })
   assert.equal(list[0].disabledKey, 'plugin:idname:srv')
   assert.equal(list[0].plugin, 'idname@mk')
 })

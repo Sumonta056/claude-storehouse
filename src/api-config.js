@@ -38,9 +38,12 @@ export function postHook({ body }, deps) {
   const scope = requireScope(body?.scope, ctx)
   const event = requireKey(body.event, 'event')
   const command = requireString(body.command, 'command')
-  if (body.matcher !== undefined && typeof body.matcher !== 'string') throw new HttpError(400, 'matcher must be a string')
+  if (body.matcher !== undefined && typeof body.matcher !== 'string')
+    throw new HttpError(400, 'matcher must be a string')
   const file = hookSettingsPath(scope, ctx)
-  const group = body.matcher ? { matcher: body.matcher, hooks: [{ type: 'command', command }] } : { hooks: [{ type: 'command', command }] }
+  const group = body.matcher
+    ? { matcher: body.matcher, hooks: [{ type: 'command', command }] }
+    : { hooks: [{ type: 'command', command }] }
   const result = refused(() =>
     mutateJson(file, ctx, (data) => {
       const hooks = objectAt(data, 'hooks', file)
@@ -65,7 +68,8 @@ export function deleteHook({ body }, deps) {
     const file = storehousePath(ctx.home)
     const result = refused(() =>
       mutateJson(file, ctx, (data) => {
-        if (Array.isArray(data.parkedHooks)) data.parkedHooks = data.parkedHooks.filter((e) => !isObject(e) || e.id !== id)
+        if (Array.isArray(data.parkedHooks))
+          data.parkedHooks = data.parkedHooks.filter((e) => !isObject(e) || e.id !== id)
       })
     )
     const entry = recordSave(deps, file, `Deleted parked hook ${item.command}`, result.backup)
@@ -85,8 +89,14 @@ function mcpTarget(scope, origin, ctx) {
     requireProject(ctx)
     return {
       file: claudeJson,
-      servers: (data, file) => objectAt(objectAt(objectAt(data, 'projects', file), ctx.projectDir, file), 'mcpServers', file),
-      existing: (data, file) => objectIfPresent(objectIfPresent(objectIfPresent(data, 'projects', file), ctx.projectDir, file), 'mcpServers', file)
+      servers: (data, file) =>
+        objectAt(objectAt(objectAt(data, 'projects', file), ctx.projectDir, file), 'mcpServers', file),
+      existing: (data, file) =>
+        objectIfPresent(
+          objectIfPresent(objectIfPresent(data, 'projects', file), ctx.projectDir, file),
+          'mcpServers',
+          file
+        )
     }
   }
   requireScope(scope, ctx)
@@ -162,7 +172,10 @@ const CREATE = {
   claudemd: projectMd(['CLAUDE.md']),
   claudemdLocal: projectMd(['CLAUDE.local.md']),
   claudemdClaudeDir: projectMd(['.claude', 'CLAUDE.md']),
-  globalClaudemd: (ctx, t) => [path.join(ctx.home, '.claude', 'CLAUDE.md'), claudeMdTemplate(t, 'Global Claude instructions')],
+  globalClaudemd: (ctx, t) => [
+    path.join(ctx.home, '.claude', 'CLAUDE.md'),
+    claudeMdTemplate(t, 'Global Claude instructions')
+  ],
   projectSettings: (ctx) => [path.join(requireProject(ctx), '.claude', 'settings.json'), '{}\n'],
   projectSettingsLocal: (ctx) => [path.join(requireProject(ctx), '.claude', 'settings.local.json'), '{}\n'],
   mcpJson: (ctx) => [path.join(requireProject(ctx), '.mcp.json'), '{\n  "mcpServers": {}\n}\n']
@@ -174,7 +187,8 @@ export function postCreate({ body }, deps) {
   if (typeof what !== 'string' || !Object.hasOwn(CREATE, what)) {
     throw new HttpError(400, `what must be one of ${Object.keys(CREATE).join(', ')}`)
   }
-  if (body.template !== 'default' && body.template !== 'empty') throw new HttpError(400, 'template must be default or empty')
+  if (body.template !== 'default' && body.template !== 'empty')
+    throw new HttpError(400, 'template must be default or empty')
   const [file, content] = CREATE[what](ctx, body.template)
   const access = isAllowed(file, ctx)
   if (!access.allowed || access.readOnly) throw new HttpError(403, `${file} is not writable`)
@@ -197,7 +211,8 @@ export function postFork({ body }, deps) {
   if (body?.kind !== undefined && body.kind !== 'skill') throw new HttpError(400, 'only skills can be forked')
   const name = requireString(body?.name, 'name')
   const pluginId = requireString(body.plugin, 'plugin')
-  if (name === '.' || name === '..' || /[\\/\0]/.test(name)) throw new HttpError(400, 'name must be a plain folder name')
+  if (name === '.' || name === '..' || /[\\/\0]/.test(name))
+    throw new HttpError(400, 'name must be a plain folder name')
   const plugin = scanAll(ctx).plugins.find((p) => p.id === pluginId && !p.missing)
   const source = plugin ? path.join(plugin.installPath, 'skills', name) : null
   if (!plugin || !plugin.skills.includes(name) || !fs.existsSync(source)) {

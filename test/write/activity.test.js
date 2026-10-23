@@ -36,7 +36,10 @@ test('record returns entry without undo payload and list is newest first', () =>
   assert.equal(b.canUndo, false)
   assert.equal('undo' in a, false)
   const list = activity.list()
-  assert.deepEqual(list.map((e) => e.message), ['two', 'one'])
+  assert.deepEqual(
+    list.map((e) => e.message),
+    ['two', 'one']
+  )
   assert.deepEqual(Object.keys(list[0]).sort(), ['canUndo', 'file', 'id', 'kind', 'message', 'time'])
   assert.notEqual(a.id, b.id)
   assert.equal(typeof a.id, 'string')
@@ -142,7 +145,10 @@ test('restoreBackup refuses a backup outside the backup folder or with wrong nam
     const r = writeText(file, 'changed\n', ctx)
     const other = path.join(ctx.home, '.claude', 'settings.json')
     assert.equal(restoreBackup(r.backup, other, ctx.home).ok, false)
-    assert.equal(restoreBackup(path.join(path.dirname(r.backup), '..', 'storehouse', path.basename(r.backup)), file, ctx.home).ok, true)
+    assert.equal(
+      restoreBackup(path.join(path.dirname(r.backup), '..', 'storehouse', path.basename(r.backup)), file, ctx.home).ok,
+      true
+    )
     assert.equal(restoreBackup(path.join(path.dirname(r.backup), 'nope'), file, ctx.home).ok, false)
   })
 })

@@ -88,7 +88,10 @@ export function scanAll({ home, projectDir }) {
   const byScope = Object.fromEntries(settings.files.map((file) => [file.scope, file]))
 
   const inventory = {
-    project: { dir: projectDir ?? null, hasClaudeDir: projectDir ? fs.existsSync(path.join(projectDir, '.claude')) : false },
+    project: {
+      dir: projectDir ?? null,
+      hasClaudeDir: projectDir ? fs.existsSync(path.join(projectDir, '.claude')) : false
+    },
     global: { dir: globalDir },
     skills,
     agents,

@@ -182,7 +182,10 @@ test('mcp global off adds to disabledMcpServers in .claude.json for projectDir',
 
     const again = toggle({ kind: 'mcp', name: 'kubernetes', scope: 'global', origin: 'user', enabled: false }, ctx)
     assert.equal(again.ok, true)
-    assert.equal(read(files.claudeJson).projects[fx.projectDir].disabledMcpServers.filter((k) => k === 'kubernetes').length, 1)
+    assert.equal(
+      read(files.claudeJson).projects[fx.projectDir].disabledMcpServers.filter((k) => k === 'kubernetes').length,
+      1
+    )
   })
 })
 
@@ -212,11 +215,18 @@ test('mcp toggle creates projects entry when missing', () => {
 
 test('mcp plugin off adds plugin:<plugin>:<name>', () => {
   withFixture(({ fx, ctx, files }) => {
-    const r = toggle({ kind: 'mcp', name: 'context7', scope: 'plugin', origin: 'plugin', plugin: SP, enabled: false }, ctx)
+    const r = toggle(
+      { kind: 'mcp', name: 'context7', scope: 'plugin', origin: 'plugin', plugin: SP, enabled: false },
+      ctx
+    )
     assertBackup(r)
     assert.equal(r.file, files.claudeJson)
     const data = read(files.claudeJson)
-    assert.deepEqual(data.projects[fx.projectDir].disabledMcpServers, ['aws', 'plugin:superpowers:demo', 'plugin:superpowers:context7'])
+    assert.deepEqual(data.projects[fx.projectDir].disabledMcpServers, [
+      'aws',
+      'plugin:superpowers:demo',
+      'plugin:superpowers:context7'
+    ])
     assert.ok(data.mcpServers.kubernetes)
     const inv = scanAll(ctx)
     assert.equal(inv.mcp.find((m) => m.name === 'context7').enabled, false)
@@ -227,7 +237,15 @@ test('hook off parks entry and removes it from settings, on restores same index'
   withFixture(({ ctx, files }) => {
     const before = read(files.global)
     const off = toggle(
-      { kind: 'hook', name: '~/.claude/hooks/pre-bash.sh', scope: 'global', file: 'global', event: 'PreToolUse', index: { event: 'PreToolUse', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: '~/.claude/hooks/pre-bash.sh',
+        scope: 'global',
+        file: 'global',
+        event: 'PreToolUse',
+        index: { event: 'PreToolUse', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assertBackup(off)
@@ -263,7 +281,10 @@ test('hook off parks entry and removes it from settings, on restores same index'
     assert.deepEqual(read(files.global), before)
     assert.deepEqual(read(files.storehouse).parkedHooks, [])
     const back = scanAll(ctx).hooks.find((h) => h.command === '~/.claude/hooks/pre-bash.sh')
-    assert.equal(scanAll(ctx).hooks.some((h) => h.id === parked.id), false)
+    assert.equal(
+      scanAll(ctx).hooks.some((h) => h.id === parked.id),
+      false
+    )
     assert.equal(back.enabled, true)
     assert.deepEqual(back.index, { event: 'PreToolUse', group: 0, hook: 0 })
     assert.deepEqual(on.undo, {
@@ -285,7 +306,15 @@ test('hook round trip inside a shared group restores the same position', () => {
     seed.hooks.Stop.push({ matcher: 'x', hooks: [{ type: 'command', command: 'echo third' }] })
     fs.writeFileSync(files.global, JSON.stringify(seed, null, 2))
     const off = toggle(
-      { kind: 'hook', name: '~/.claude/hooks/stop.sh', scope: 'global', file: 'global', event: 'Stop', index: { event: 'Stop', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: '~/.claude/hooks/stop.sh',
+        scope: 'global',
+        file: 'global',
+        event: 'Stop',
+        index: { event: 'Stop', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assertBackup(off)
@@ -298,10 +327,21 @@ test('hook round trip inside a shared group restores the same position', () => {
 
 test('hook round trip on project settings and keeps storehouse favorites', () => {
   withFixture(({ ctx, files }) => {
-    fs.writeFileSync(files.storehouse, JSON.stringify({ favorites: [{ kind: 'skill', id: 'a' }], parkedHooks: [], extra: 1 }))
+    fs.writeFileSync(
+      files.storehouse,
+      JSON.stringify({ favorites: [{ kind: 'skill', id: 'a' }], parkedHooks: [], extra: 1 })
+    )
     const before = read(files.project)
     const off = toggle(
-      { kind: 'hook', name: 'echo guard-rm', scope: 'project', file: 'project', event: 'PreToolUse', index: { event: 'PreToolUse', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: 'echo guard-rm',
+        scope: 'project',
+        file: 'project',
+        event: 'PreToolUse',
+        index: { event: 'PreToolUse', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assertBackup(off)
@@ -327,7 +367,15 @@ test('parked hooks get an id distinct from the active hook id', () => {
     assert.equal(active.canToggle, true)
     assert.equal(typeof active.id, 'string')
     const off = toggle(
-      { kind: 'hook', name: active.command, scope: 'global', file: 'global', event: 'Stop', index: active.index, enabled: false },
+      {
+        kind: 'hook',
+        name: active.command,
+        scope: 'global',
+        file: 'global',
+        event: 'Stop',
+        index: active.index,
+        enabled: false
+      },
       ctx
     )
     assert.equal(off.ok, true, off.error)
@@ -363,22 +411,44 @@ test('parked project hooks stay with their project', () => {
     fs.mkdirSync(path.join(other, '.claude'), { recursive: true })
     const ctxB = { home: fx.home, projectDir: other }
     const off = toggle(
-      { kind: 'hook', name: 'echo guard-rm', scope: 'project', file: 'project', event: 'PreToolUse', index: { event: 'PreToolUse', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: 'echo guard-rm',
+        scope: 'project',
+        file: 'project',
+        event: 'PreToolUse',
+        index: { event: 'PreToolUse', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assert.equal(off.ok, true, off.error)
     const entry = read(files.storehouse).parkedHooks[0]
     assert.equal(entry.projectDir, fx.projectDir)
     const global = toggle(
-      { kind: 'hook', name: '~/.claude/hooks/stop.sh', scope: 'global', file: 'global', event: 'Stop', index: { event: 'Stop', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: '~/.claude/hooks/stop.sh',
+        scope: 'global',
+        file: 'global',
+        event: 'Stop',
+        index: { event: 'Stop', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assert.equal(global.ok, true, global.error)
     assert.equal(Object.hasOwn(read(files.storehouse).parkedHooks[1], 'projectDir'), false)
 
     const seenB = scanAll(ctxB).hooks
-    assert.equal(seenB.some((h) => h.id === off.undo.name), false)
-    assert.equal(seenB.some((h) => h.id === global.undo.name), true)
+    assert.equal(
+      seenB.some((h) => h.id === off.undo.name),
+      false
+    )
+    assert.equal(
+      seenB.some((h) => h.id === global.undo.name),
+      true
+    )
     const refused = toggle(off.undo, ctxB)
     assert.equal(refused.ok, false)
     assert.equal(fs.existsSync(path.join(other, '.claude', 'settings.json')), false)
@@ -478,7 +548,15 @@ test('hook off rolls back the parked entry when the settings write fails', () =>
         if (file === files.project) throw new Error('settings boom')
       }
     }
-    const req = { kind: 'hook', name: 'echo guard-rm', scope: 'project', file: 'project', event: 'PreToolUse', index: { event: 'PreToolUse', group: 0, hook: 0 }, enabled: false }
+    const req = {
+      kind: 'hook',
+      name: 'echo guard-rm',
+      scope: 'project',
+      file: 'project',
+      event: 'PreToolUse',
+      index: { event: 'PreToolUse', group: 0, hook: 0 },
+      enabled: false
+    }
     const r = toggle(req, failCtx)
     assert.equal(r.ok, false)
     assert.ok(r.error.includes('settings boom'))
@@ -505,7 +583,16 @@ test('hook off rolls back the parked entry when the settings write fails', () =>
 test('refuses plugin hook', () => {
   withFixture(({ ctx }) => {
     const r = toggle(
-      { kind: 'hook', name: 'echo hi', scope: 'plugin', plugin: SP, file: 'plugin', event: 'SessionStart', index: { event: 'SessionStart', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: 'echo hi',
+        scope: 'plugin',
+        plugin: SP,
+        file: 'plugin',
+        event: 'SessionStart',
+        index: { event: 'SessionStart', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assert.equal(r.ok, false)
@@ -553,7 +640,10 @@ test('refuses when settings file is broken json', () => {
     assert.equal(fs.readFileSync(files.global, 'utf8'), '{ nope')
 
     fs.writeFileSync(files.claudeJson, '{ nope')
-    const m = toggle({ kind: 'mcp', name: 'context7', scope: 'plugin', origin: 'plugin', plugin: SP, enabled: false }, ctx)
+    const m = toggle(
+      { kind: 'mcp', name: 'context7', scope: 'plugin', origin: 'plugin', plugin: SP, enabled: false },
+      ctx
+    )
     assert.equal(m.ok, false)
     assert.ok(m.error.includes(files.claudeJson))
     assert.equal(fs.readFileSync(files.claudeJson, 'utf8'), '{ nope')
@@ -567,7 +657,15 @@ test('refuses a toggle with an unknown name', () => {
       { kind: 'plugin', name: 'nope@x', scope: 'global', enabled: false },
       { kind: 'skill', name: 'nope', scope: 'global', enabled: false },
       { kind: 'mcp', name: 'nope', scope: 'global', origin: 'user', enabled: false },
-      { kind: 'hook', name: 'nope', scope: 'global', file: 'global', event: 'Stop', index: { event: 'Stop', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: 'nope',
+        scope: 'global',
+        file: 'global',
+        event: 'Stop',
+        index: { event: 'Stop', group: 0, hook: 0 },
+        enabled: false
+      },
       { kind: 'hook', name: 'nope', scope: 'global', enabled: true },
       { kind: 'agent', name: 'nope', scope: 'global', enabled: false },
       { kind: 'widget', name: 'x', scope: 'global', enabled: false }
@@ -592,7 +690,15 @@ test('every successful toggle returns a backup path that exists', () => {
       { kind: 'mcp', name: 'redis', scope: 'project', origin: 'mcpjson', enabled: true },
       { kind: 'mcp', name: 'kubernetes', scope: 'global', origin: 'user', enabled: false },
       { kind: 'mcp', name: 'demo', scope: 'plugin', origin: 'plugin', plugin: SP, enabled: true },
-      { kind: 'hook', name: '~/.claude/hooks/stop.sh', scope: 'global', file: 'global', event: 'Stop', index: { event: 'Stop', group: 0, hook: 0 }, enabled: false }
+      {
+        kind: 'hook',
+        name: '~/.claude/hooks/stop.sh',
+        scope: 'global',
+        file: 'global',
+        event: 'Stop',
+        index: { event: 'Stop', group: 0, hook: 0 },
+        enabled: false
+      }
     ]
     for (const req of requests) {
       const r = toggle(req, ctx)

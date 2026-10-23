@@ -36,7 +36,9 @@ export function readFavorites(home) {
   if (!Array.isArray(data.favorites)) return []
   const categories = new Set(categoriesOf(data))
   return data.favorites
-    .filter((f) => isObject(f) && typeof f.kind === 'string' && typeof f.name === 'string' && typeof f.source === 'string')
+    .filter(
+      (f) => isObject(f) && typeof f.kind === 'string' && typeof f.name === 'string' && typeof f.source === 'string'
+    )
     .map((f, index) => ({
       id: favoriteId(f.kind, f.source, f.name),
       kind: f.kind,

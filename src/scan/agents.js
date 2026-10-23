@@ -78,7 +78,15 @@ function scanFolder(root, scope, source) {
     if (entry.name.startsWith('.')) continue
     if (!(entry.isFile() || entry.isSymbolicLink())) continue
     if (stripSuffix(entry.name) === null) continue
-    const item = readItem(path.join(root, entry.name), entry.name, scope, source, null, !entry.name.endsWith('.md.disabled'), false)
+    const item = readItem(
+      path.join(root, entry.name),
+      entry.name,
+      scope,
+      source,
+      null,
+      !entry.name.endsWith('.md.disabled'),
+      false
+    )
     if (item) out.push(item)
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))

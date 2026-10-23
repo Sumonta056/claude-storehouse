@@ -87,8 +87,7 @@ export function isAllowed(file, { home, projectDir }) {
   const projects = project ? [project, resolveReal(project)] : []
   const homes = [path.resolve(home), resolveReal(home)]
 
-  const realAllowed =
-    underAny(real, dirs) || underAny(real, projects) || jsons.includes(real)
+  const realAllowed = underAny(real, dirs) || underAny(real, projects) || jsons.includes(real)
   const symlinkIntoHome = underAny(lexical, dirs) && underAny(real, homes) && visibleUnderHome(real, homes)
 
   if (!realAllowed && !symlinkIntoHome) {

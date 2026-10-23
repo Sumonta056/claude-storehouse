@@ -77,7 +77,10 @@ test('C1 a JSON toggle keeps the 0600 mode of ~/.claude.json and settings.json',
     const inv = scanAll(ctx)
     const global = inv.mcp.find((m) => m.origin === 'user')
     assert.ok(global, 'fixture has a global MCP server')
-    assert.equal(toggle({ kind: 'mcp', name: global.name, scope: 'global', origin: 'user', enabled: false }, ctx).ok, true)
+    assert.equal(
+      toggle({ kind: 'mcp', name: global.name, scope: 'global', origin: 'user', enabled: false }, ctx).ok,
+      true
+    )
     assert.equal(toggle({ kind: 'skill', name: 'html-report', scope: 'global', enabled: false }, ctx).ok, true)
     assert.equal(mode(claudeJson), 0o600)
     assert.equal(mode(settings), 0o600)
@@ -252,7 +255,10 @@ test('I3 scanAll with projectDir null lists only global and plugin items', () =>
     assert.equal(inv.project.hasClaudeDir, false)
     assert.ok(inv.skills.length > 0)
     for (const list of [inv.skills, inv.agents, inv.hooks, inv.mcp]) {
-      assert.equal(list.some((item) => item.scope === 'project'), false)
+      assert.equal(
+        list.some((item) => item.scope === 'project'),
+        false
+      )
     }
     assert.equal(inv.settings.project, undefined)
     assert.equal(inv.settings.projectLocal, undefined)
@@ -260,7 +266,10 @@ test('I3 scanAll with projectDir null lists only global and plugin items', () =>
     assert.equal(inv.claudeMd.projectLocal, null)
     assert.equal(inv.claudeMd.projectClaudeDir, null)
     assert.equal(inv.claudeMd.global.exists, true)
-    assert.equal(inv.mcp.every((m) => m.canToggle === false), true)
+    assert.equal(
+      inv.mcp.every((m) => m.canToggle === false),
+      true
+    )
   } finally {
     fx.cleanup()
   }
@@ -275,7 +284,11 @@ test('I3 project routes answer 400 when project scope is off', async () => {
       const cases = [
         ['POST', '/api/toggle', { kind: 'skill', name: 'deploy-checklist', scope: 'project', enabled: false }],
         ['POST', '/api/toggle', { kind: 'mcp', name: 'postgres', scope: 'project', origin: 'mcpjson', enabled: false }],
-        ['POST', '/api/toggle', { kind: 'plugin', name: 'superpowers@claude-plugins-official', scope: 'project', enabled: false }],
+        [
+          'POST',
+          '/api/toggle',
+          { kind: 'plugin', name: 'superpowers@claude-plugins-official', scope: 'project', enabled: false }
+        ],
         ['POST', '/api/create', { what: 'claudemd', template: 'default' }],
         ['POST', '/api/create', { what: 'projectSettingsLocal', template: 'empty' }],
         ['POST', '/api/mcp', { scope: 'project', name: 'x', config: { command: 'x' } }],
@@ -286,9 +299,20 @@ test('I3 project routes answer 400 when project scope is off', async () => {
         assert.equal(res.status, 400, `${route} ${JSON.stringify(body)}`)
       }
       const global = inv.json.mcp.find((m) => m.origin === 'user')
-      const mcpOff = await api('POST', '/api/toggle', { kind: 'mcp', name: global.name, scope: 'global', origin: 'user', enabled: false })
+      const mcpOff = await api('POST', '/api/toggle', {
+        kind: 'mcp',
+        name: global.name,
+        scope: 'global',
+        origin: 'user',
+        enabled: false
+      })
       assert.equal(mcpOff.status, 400)
-      const skillOff = await api('POST', '/api/toggle', { kind: 'skill', name: 'html-report', scope: 'global', enabled: false })
+      const skillOff = await api('POST', '/api/toggle', {
+        kind: 'skill',
+        name: 'html-report',
+        scope: 'global',
+        enabled: false
+      })
       assert.equal(skillOff.status, 200)
       assert.equal(fs.existsSync(path.join(fx.home, '.claude', 'settings.local.json')), false)
     },
@@ -300,11 +324,16 @@ test('I3 server started with projectDir home runs in global-only mode', async ()
   const fx = makeFixture()
   const server = await startServer({ home: fx.home, projectDir: fx.home, port: 0, token: TOKEN })
   try {
-    const res = await fetch(`http://127.0.0.1:${server.port}/api/file?path=${encodeURIComponent(path.join(fx.home, '.zshrc'))}`, {
-      headers: { 'x-storehouse-token': TOKEN }
-    })
+    const res = await fetch(
+      `http://127.0.0.1:${server.port}/api/file?path=${encodeURIComponent(path.join(fx.home, '.zshrc'))}`,
+      {
+        headers: { 'x-storehouse-token': TOKEN }
+      }
+    )
     assert.equal(res.status, 403)
-    const inv = await (await fetch(`http://127.0.0.1:${server.port}/api/inventory`, { headers: { 'x-storehouse-token': TOKEN } })).json()
+    const inv = await (
+      await fetch(`http://127.0.0.1:${server.port}/api/inventory`, { headers: { 'x-storehouse-token': TOKEN } })
+    ).json()
     assert.equal(inv.project.dir, null)
   } finally {
     await server.close()
@@ -326,7 +355,12 @@ test('I4 .mcp.json lists merge across global, project and projectLocal settings;
   const fx = makeFixture()
   try {
     writeJson(path.join(fx.projectDir, '.mcp.json'), {
-      mcpServers: { postgres: { command: 'a' }, redis: { command: 'b' }, linear: { command: 'c' }, jira: { command: 'd' } }
+      mcpServers: {
+        postgres: { command: 'a' },
+        redis: { command: 'b' },
+        linear: { command: 'c' },
+        jira: { command: 'd' }
+      }
     })
     const globalFile = path.join(fx.home, '.claude', 'settings.json')
     const global = JSON.parse(fs.readFileSync(globalFile, 'utf8'))

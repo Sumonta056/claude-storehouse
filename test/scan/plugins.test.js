@@ -38,7 +38,10 @@ test('includes project-scope plugin only for matching projectDir', () => {
     assert.equal(matches.length, 1)
     assert.equal(matches[0].scope, 'project')
     const other = scanPlugins({ home: fx.home, projectDir: path.join(fx.projectDir, 'nope'), enabledPlugins: {} })
-    assert.equal(other.some((p) => p.id.startsWith('code-review@')), false)
+    assert.equal(
+      other.some((p) => p.id.startsWith('code-review@')),
+      false
+    )
   } finally {
     fx.cleanup()
   }
@@ -122,7 +125,10 @@ test('reads inline mcpServers from plugin.json and de-duplicates with .mcp.json 
     const base = JSON.parse(fs.readFileSync(manifest, 'utf8'))
     fs.writeFileSync(
       manifest,
-      JSON.stringify({ ...base, mcpServers: { inline: { command: 'npx', args: ['x'] }, dup: { command: 'from-manifest' } } })
+      JSON.stringify({
+        ...base,
+        mcpServers: { inline: { command: 'npx', args: ['x'] }, dup: { command: 'from-manifest' } }
+      })
     )
     fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { dup: { command: 'from-mcpjson' } } }))
     const mcp = run(fx).find((p) => p.id === 'ecc@ecc').mcp
@@ -146,7 +152,10 @@ test('reads mcpServers given as a relative path string in plugin.json', () => {
     const base = JSON.parse(fs.readFileSync(manifest, 'utf8'))
     fs.writeFileSync(manifest, JSON.stringify({ ...base, mcpServers: './config/servers.json' }))
     fs.mkdirSync(path.join(dir, 'config'), { recursive: true })
-    fs.writeFileSync(path.join(dir, 'config', 'servers.json'), JSON.stringify({ mcpServers: { viafile: { command: 'node' } } }))
+    fs.writeFileSync(
+      path.join(dir, 'config', 'servers.json'),
+      JSON.stringify({ mcpServers: { viafile: { command: 'node' } } })
+    )
     const mcp = run(fx).find((p) => p.id === 'ecc@ecc').mcp
     assert.deepEqual(mcp, [{ name: 'viafile', config: { command: 'node' } }])
   } finally {

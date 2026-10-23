@@ -31,7 +31,9 @@ test('loadStore creates the store file when missing', () => {
 test('setFavorite adds then removes', () => {
   withFixture(({ fx }) => {
     const added = setFavorite({ kind: 'skill', name: 'a', source: 'local', favorite: true }, fx.home)
-    assert.deepEqual(added, [{ id: 'skill:local:a', kind: 'skill', name: 'a', source: 'local', order: 0, category: null }])
+    assert.deepEqual(added, [
+      { id: 'skill:local:a', kind: 'skill', name: 'a', source: 'local', order: 0, category: null }
+    ])
     const again = setFavorite({ kind: 'skill', name: 'a', source: 'local', favorite: true }, fx.home)
     assert.equal(again.length, 1)
     const removed = setFavorite({ kind: 'skill', name: 'a', source: 'local', favorite: false }, fx.home)
@@ -69,7 +71,14 @@ test('reorderFavorites sets order by position', () => {
   withFixture(({ fx }) => {
     for (const name of ['a', 'b', 'c']) setFavorite({ kind: 'skill', name, source: 'local', favorite: true }, fx.home)
     const list = reorderFavorites(['skill:local:c', 'skill:local:a', 'skill:local:b'], fx.home)
-    assert.deepEqual(list.map((f) => [f.id, f.order]), [['skill:local:c', 0], ['skill:local:a', 1], ['skill:local:b', 2]])
+    assert.deepEqual(
+      list.map((f) => [f.id, f.order]),
+      [
+        ['skill:local:c', 0],
+        ['skill:local:a', 1],
+        ['skill:local:b', 2]
+      ]
+    )
   })
 })
 
@@ -77,7 +86,10 @@ test('reorderFavorites keeps unlisted favorites after listed ones and ignores un
   withFixture(({ fx }) => {
     for (const name of ['a', 'b', 'c']) setFavorite({ kind: 'skill', name, source: 'local', favorite: true }, fx.home)
     const list = reorderFavorites(['skill:local:c', 'nope'], fx.home)
-    assert.deepEqual(list.map((f) => f.id), ['skill:local:c', 'skill:local:a', 'skill:local:b'])
+    assert.deepEqual(
+      list.map((f) => f.id),
+      ['skill:local:c', 'skill:local:a', 'skill:local:b']
+    )
   })
 })
 
@@ -124,13 +136,24 @@ test('a parked-hook toggle keeps favorites in storehouse.json', () => {
   withFixture(({ fx, ctx, storeFile }) => {
     setFavorite({ kind: 'skill', name: 'a', source: 'local', favorite: true }, fx.home)
     const off = toggle(
-      { kind: 'hook', name: 'echo guard-rm', scope: 'project', file: 'project', event: 'PreToolUse', index: { event: 'PreToolUse', group: 0, hook: 0 }, enabled: false },
+      {
+        kind: 'hook',
+        name: 'echo guard-rm',
+        scope: 'project',
+        file: 'project',
+        event: 'PreToolUse',
+        index: { event: 'PreToolUse', group: 0, hook: 0 },
+        enabled: false
+      },
       ctx
     )
     assert.equal(off.ok, true, off.error)
     const store = JSON.parse(fs.readFileSync(storeFile, 'utf8'))
     assert.equal(store.parkedHooks.length, 1)
-    assert.deepEqual(store.favorites.map((f) => f.id), ['skill:local:a'])
+    assert.deepEqual(
+      store.favorites.map((f) => f.id),
+      ['skill:local:a']
+    )
   })
 })
 
@@ -139,7 +162,8 @@ function backupsOf(home) {
   return fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => n.startsWith('storehouse.json.')) : []
 }
 
-const star = (home, name, extra = {}) => setFavorite({ kind: 'skill', name, source: 'local', favorite: true, ...extra }, home)
+const star = (home, name, extra = {}) =>
+  setFavorite({ kind: 'skill', name, source: 'local', favorite: true, ...extra }, home)
 
 test('setFavorite with a new category creates it and files the favorite under it', () => {
   withFixture(({ fx, storeFile }) => {
@@ -177,7 +201,7 @@ test('setFavorite refuses a bad category name', () => {
 
 function readFavoritesSafe(home) {
   const file = path.join(home, '.claude', 'storehouse.json')
-  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).favorites ?? [] : []
+  return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')).favorites ?? []) : []
 }
 
 test('editCategory create refuses duplicates without case', () => {
@@ -196,7 +220,14 @@ test('editCategory rename updates its favorites and keeps others', () => {
     star(fx.home, 'c')
     const r = editCategory({ op: 'rename', name: 'Review', newName: 'Code review' }, fx.home)
     assert.deepEqual(r.categories, ['Code review', 'QA'])
-    assert.deepEqual(r.favorites.map((f) => [f.name, f.category]), [['a', 'Code review'], ['b', 'QA'], ['c', null]])
+    assert.deepEqual(
+      r.favorites.map((f) => [f.name, f.category]),
+      [
+        ['a', 'Code review'],
+        ['b', 'QA'],
+        ['c', null]
+      ]
+    )
     assert.throws(() => editCategory({ op: 'rename', name: 'QA', newName: 'code REVIEW' }, fx.home), /already exists/)
     assert.equal(editCategory({ op: 'rename', name: 'QA', newName: 'qa' }, fx.home).categories[1], 'qa')
     assert.throws(() => editCategory({ op: 'rename', name: 'Nope', newName: 'X' }, fx.home), /does not exist/)
@@ -209,7 +240,13 @@ test('editCategory delete moves its favorites to Uncategorized', () => {
     star(fx.home, 'b', { category: 'QA' })
     const r = editCategory({ op: 'delete', name: 'Review' }, fx.home)
     assert.deepEqual(r.categories, ['QA'])
-    assert.deepEqual(r.favorites.map((f) => [f.name, f.category]), [['a', null], ['b', 'QA']])
+    assert.deepEqual(
+      r.favorites.map((f) => [f.name, f.category]),
+      [
+        ['a', null],
+        ['b', 'QA']
+      ]
+    )
     const store = JSON.parse(fs.readFileSync(storeFile, 'utf8'))
     assert.equal(Object.hasOwn(store.favorites[0], 'category'), false)
   })
@@ -220,7 +257,13 @@ test('reorderFavorites with a move changes one category in the same write', () =
     star(fx.home, 'a', { category: 'Review' })
     star(fx.home, 'b', { category: 'QA' })
     const list = reorderFavorites(['skill:local:b', 'skill:local:a'], fx.home, { id: 'skill:local:a', category: 'QA' })
-    assert.deepEqual(list.map((f) => [f.name, f.category, f.order]), [['b', 'QA', 0], ['a', 'QA', 1]])
+    assert.deepEqual(
+      list.map((f) => [f.name, f.category, f.order]),
+      [
+        ['b', 'QA', 0],
+        ['a', 'QA', 1]
+      ]
+    )
     assert.throws(() => reorderFavorites([], fx.home, { id: 'skill:local:a', category: 'Nope' }), /does not exist/)
     assert.throws(() => reorderFavorites([], fx.home, 'x'), /move must be/)
   })
@@ -228,7 +271,10 @@ test('reorderFavorites with a move changes one category in the same write', () =
 
 test('an old store without categories reads every favorite as Uncategorized', () => {
   withFixture(({ fx, storeFile }) => {
-    fs.writeFileSync(storeFile, JSON.stringify({ favorites: [{ kind: 'skill', name: 'a', source: 'local', category: 'Ghost' }] }))
+    fs.writeFileSync(
+      storeFile,
+      JSON.stringify({ favorites: [{ kind: 'skill', name: 'a', source: 'local', category: 'Ghost' }] })
+    )
     const list = scanAll({ home: fx.home, projectDir: fx.projectDir })
     assert.equal(list.favorites[0].category, null)
     assert.deepEqual(list.favoriteCategories, [])
@@ -264,12 +310,21 @@ test('reorderFavorites refuses a move without category or with an unknown id', (
 
 test('hand-edited category names are trimmed, and reserved or duplicate names are dropped', () => {
   withFixture(({ fx, storeFile }) => {
-    fs.writeFileSync(storeFile, JSON.stringify({ favoriteCategories: [' B ', 'Uncategorized', 'b', 3], favorites: [{ kind: 'skill', name: 'a', source: 'local', category: ' B ' }] }))
+    fs.writeFileSync(
+      storeFile,
+      JSON.stringify({
+        favoriteCategories: [' B ', 'Uncategorized', 'b', 3],
+        favorites: [{ kind: 'skill', name: 'a', source: 'local', category: ' B ' }]
+      })
+    )
     const inv = scanAll({ home: fx.home, projectDir: fx.projectDir })
     assert.deepEqual(inv.favoriteCategories, ['B'])
     assert.equal(inv.favorites[0].category, 'B')
     const r = editCategory({ op: 'rename', name: 'B', newName: 'C' }, fx.home)
-    assert.deepEqual(r.favorites.map((f) => f.category), ['C'])
+    assert.deepEqual(
+      r.favorites.map((f) => f.category),
+      ['C']
+    )
   })
 })
 

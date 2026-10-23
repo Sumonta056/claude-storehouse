@@ -101,7 +101,12 @@ test('GET /api/inventory returns sections', async () => {
 
 test('POST /api/toggle then inventory shows change', async () => {
   await withServer(async ({ fx, api }) => {
-    const res = await api('POST', '/api/toggle', { kind: 'skill', name: 'html-report', scope: 'global', enabled: false })
+    const res = await api('POST', '/api/toggle', {
+      kind: 'skill',
+      name: 'html-report',
+      scope: 'global',
+      enabled: false
+    })
     assert.equal(res.status, 200, res.text)
     const inv = await api('GET', '/api/inventory')
     const skill = inv.json.skills.find((s) => s.name === 'html-report' && s.scope === 'global')
@@ -114,7 +119,13 @@ test('POST /api/toggle then inventory shows change', async () => {
 
 test('toggle refusal is 400 with error', async () => {
   await withServer(async ({ api }) => {
-    const res = await api('POST', '/api/toggle', { kind: 'skill', name: 'brainstorming', scope: 'plugin', plugin: SP, enabled: false })
+    const res = await api('POST', '/api/toggle', {
+      kind: 'skill',
+      name: 'brainstorming',
+      scope: 'plugin',
+      plugin: SP,
+      enabled: false
+    })
     assert.equal(res.status, 400)
     assert.ok(res.json.error)
   })
@@ -169,7 +180,18 @@ test('PUT /api/file refuses invalid JSON and read-only files', async () => {
     assert.equal(bad.status, 400)
     assert.ok(bad.json.error)
     assert.equal(fs.readFileSync(file, 'utf8'), before)
-    const cached = path.join(fx.home, '.claude', 'plugins', 'cache', 'claude-plugins-official', 'superpowers', '1.0.0', 'skills', 'brainstorming', 'SKILL.md')
+    const cached = path.join(
+      fx.home,
+      '.claude',
+      'plugins',
+      'cache',
+      'claude-plugins-official',
+      'superpowers',
+      '1.0.0',
+      'skills',
+      'brainstorming',
+      'SKILL.md'
+    )
     const ro = await api('PUT', '/api/file', { path: cached, content: 'x' })
     assert.equal(ro.status, 403)
   })
@@ -180,7 +202,10 @@ test('GET /api/file on a folder lists entries dirs first', async () => {
     const res = await api('GET', `/api/file?path=${encodeURIComponent(path.join(fx.home, '.claude', 'skills'))}`)
     assert.equal(res.status, 200)
     const types = res.json.entries.map((e) => e.type)
-    assert.deepEqual(types, [...types].sort((a, b) => (a === b ? 0 : a === 'dir' ? -1 : 1)))
+    assert.deepEqual(
+      types,
+      [...types].sort((a, b) => (a === b ? 0 : a === 'dir' ? -1 : 1))
+    )
     assert.ok(res.json.entries.some((e) => e.name === 'html-report' && e.type === 'dir'))
     assert.ok(res.json.entries.some((e) => e.name === 'loose.md' && e.type === 'file'))
   })
@@ -226,7 +251,10 @@ test('POST /api/create claudemd writes file', async () => {
     const res = await api('POST', '/api/create', { what: 'claudemd', template: 'default' })
     assert.equal(res.status, 200, res.text)
     const text = fs.readFileSync(path.join(fx.projectDir, 'CLAUDE.md'), 'utf8')
-    assert.equal(text, `# ${path.basename(fx.projectDir)}\n\n## What this project is\n\n## Commands\n\n## Conventions\n\n## Do not\n`)
+    assert.equal(
+      text,
+      `# ${path.basename(fx.projectDir)}\n\n## What this project is\n\n## Commands\n\n## Conventions\n\n## Do not\n`
+    )
     const again = await api('POST', '/api/create', { what: 'claudemd', template: 'default' })
     assert.equal(again.status, 409)
     const local = await api('POST', '/api/create', { what: 'projectSettingsLocal', template: 'empty' })
@@ -236,7 +264,12 @@ test('POST /api/create claudemd writes file', async () => {
 
 test('POST /api/hook then GET /api/inventory shows it, DELETE removes it', async () => {
   await withServer(async ({ fx, api }) => {
-    const res = await api('POST', '/api/hook', { scope: 'global', event: 'SessionStart', matcher: 'startup', command: 'echo hi' })
+    const res = await api('POST', '/api/hook', {
+      scope: 'global',
+      event: 'SessionStart',
+      matcher: 'startup',
+      command: 'echo hi'
+    })
     assert.equal(res.status, 200, res.text)
     const inv = await api('GET', '/api/inventory')
     const hook = inv.json.hooks.find((h) => h.command === 'echo hi')
@@ -290,7 +323,10 @@ test('DELETE /api/file of a global skill removes its skillOverrides key', async 
 
 test('body over 2 MB is 413 and bad JSON is 400', async () => {
   await withServer(async ({ fx, api }) => {
-    const big = JSON.stringify({ path: path.join(fx.projectDir, 'CLAUDE.md'), content: 'x'.repeat(2 * 1024 * 1024 + 10) })
+    const big = JSON.stringify({
+      path: path.join(fx.projectDir, 'CLAUDE.md'),
+      content: 'x'.repeat(2 * 1024 * 1024 + 10)
+    })
     const res = await api('PUT', '/api/file', big)
     assert.equal(res.status, 413)
     const bad = await api('POST', '/api/toggle', '{ nope')
@@ -340,8 +376,20 @@ test('PUT /api/favorites/order records a non-undoable activity entry', async () 
 test('unexpected write failure is 500, refusals are 400', async () => {
   const { refused, HttpError } = await import('../src/api.js')
   const { Refusal } = await import('../src/write/toggles.js')
-  assert.throws(() => refused(() => { throw new Refusal('no') }), (err) => err instanceof HttpError && err.status === 400)
-  assert.throws(() => refused(() => { throw new Error('boom') }), (err) => !(err instanceof HttpError) && err.message === 'boom')
+  assert.throws(
+    () =>
+      refused(() => {
+        throw new Refusal('no')
+      }),
+    (err) => err instanceof HttpError && err.status === 400
+  )
+  assert.throws(
+    () =>
+      refused(() => {
+        throw new Error('boom')
+      }),
+    (err) => !(err instanceof HttpError) && err.message === 'boom'
+  )
   await withServer(async ({ fx, api }) => {
     const dir = path.join(fx.home, '.claude')
     const original = console.error
@@ -426,7 +474,12 @@ test('POST /api/restore brings back a backup and logs it', async () => {
 
 test('POST /api/favorite stars a skill and logs it', async () => {
   await withServer(async ({ api }) => {
-    const res = await api('POST', '/api/favorite', { kind: 'skill', name: 'html-report', source: 'local', favorite: true })
+    const res = await api('POST', '/api/favorite', {
+      kind: 'skill',
+      name: 'html-report',
+      source: 'local',
+      favorite: true
+    })
     assert.equal(res.status, 200, res.text)
     const inv = await api('GET', '/api/inventory')
     assert.ok(inv.json.favorites.some((f) => f.name === 'html-report'))
@@ -443,8 +496,18 @@ test('POST /api/favorites/category creates, renames, and deletes a category', as
     assert.deepEqual(made.json.favoriteCategories, ['Review'])
     const dup = await api('POST', '/api/favorites/category', { op: 'create', name: 'review' })
     assert.equal(dup.status, 400)
-    await api('POST', '/api/favorite', { kind: 'skill', name: 'html-report', source: 'local', favorite: true, category: 'Review' })
-    const renamed = await api('POST', '/api/favorites/category', { op: 'rename', name: 'Review', newName: 'Code review' })
+    await api('POST', '/api/favorite', {
+      kind: 'skill',
+      name: 'html-report',
+      source: 'local',
+      favorite: true,
+      category: 'Review'
+    })
+    const renamed = await api('POST', '/api/favorites/category', {
+      op: 'rename',
+      name: 'Review',
+      newName: 'Code review'
+    })
     assert.equal(renamed.json.favorites[0].category, 'Code review')
     const inv = await api('GET', '/api/inventory')
     assert.deepEqual(inv.json.favoriteCategories, ['Code review'])
@@ -493,7 +556,11 @@ test('PUT /api/favorites/order with a move changes the category', async () => {
 
 test('POST /api/mcp global writes ~/.claude.json and keeps other servers', async () => {
   await withServer(async ({ fx, api }) => {
-    const res = await api('POST', '/api/mcp', { scope: 'global', name: 'remote', config: { url: 'https://x.example.com' } })
+    const res = await api('POST', '/api/mcp', {
+      scope: 'global',
+      name: 'remote',
+      config: { url: 'https://x.example.com' }
+    })
     assert.equal(res.status, 200, res.text)
     const data = read(path.join(fx.home, '.claude.json'))
     assert.deepEqual(data.mcpServers.remote, { url: 'https://x.example.com' })
@@ -532,7 +599,15 @@ test('hook toggle activity names event, matcher and a truncated command for off 
     const inv = await api('GET', '/api/inventory')
     const hook = inv.json.hooks.find((h) => h.command === command)
     const short = `${command.slice(0, 60)}…`
-    const off = await api('POST', '/api/toggle', { kind: 'hook', name: command, scope: 'global', file: hook.file, event: hook.event, index: hook.index, enabled: false })
+    const off = await api('POST', '/api/toggle', {
+      kind: 'hook',
+      name: command,
+      scope: 'global',
+      file: hook.file,
+      event: hook.event,
+      index: hook.index,
+      enabled: false
+    })
     assert.equal(off.status, 200, off.text)
     assert.equal(off.json.entry.message, `Switched PreToolUse hook · Bash · ${short} off`)
     const parked = (await api('GET', '/api/inventory')).json.hooks.find((h) => h.parked && h.command === command)
@@ -546,7 +621,12 @@ test('toggle activity labels plugin by id, skill by name, mcp by server name', a
   await withServer(async ({ api }) => {
     const plugin = await api('POST', '/api/toggle', { kind: 'plugin', name: SP, scope: 'global', enabled: false })
     assert.equal(plugin.json.entry.message, `Switched plugin ${SP} off`)
-    const skill = await api('POST', '/api/toggle', { kind: 'skill', name: 'html-report', scope: 'global', enabled: false })
+    const skill = await api('POST', '/api/toggle', {
+      kind: 'skill',
+      name: 'html-report',
+      scope: 'global',
+      enabled: false
+    })
     assert.equal(skill.json.entry.message, 'Switched skill html-report off')
   })
 })
@@ -558,7 +638,10 @@ test('POST /api/create claudemdClaudeDir writes .claude/CLAUDE.md and refuses a 
     const res = await api('POST', '/api/create', { what: 'claudemdClaudeDir', template: 'default' })
     assert.equal(res.status, 200, res.text)
     assert.equal(res.json.file, file)
-    assert.equal(fs.readFileSync(file, 'utf8'), `# ${path.basename(fx.projectDir)}\n\n## What this project is\n\n## Commands\n\n## Conventions\n\n## Do not\n`)
+    assert.equal(
+      fs.readFileSync(file, 'utf8'),
+      `# ${path.basename(fx.projectDir)}\n\n## What this project is\n\n## Commands\n\n## Conventions\n\n## Do not\n`
+    )
     const again = await api('POST', '/api/create', { what: 'claudemdClaudeDir', template: 'empty' })
     assert.equal(again.status, 409)
     fs.rmSync(file)

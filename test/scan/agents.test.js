@@ -55,7 +55,10 @@ test('missing agents folders give empty list', () => {
 test('empty agent description falls back to first body line', () => {
   const fx = makeFixture()
   try {
-    fs.writeFileSync(path.join(fx.home, '.claude', 'agents', 'my-agent.md'), '---\nname: my-agent\ndescription: ""\n---\nBody text\n')
+    fs.writeFileSync(
+      path.join(fx.home, '.claude', 'agents', 'my-agent.md'),
+      '---\nname: my-agent\ndescription: ""\n---\nBody text\n'
+    )
     assert.equal(run(fx).find((i) => i.name === 'my-agent').description, 'Body text')
   } finally {
     fx.cleanup()
@@ -66,7 +69,10 @@ test('scanAgents reads model and tools from frontmatter', () => {
   const fx = makeFixture()
   try {
     const dir = path.join(fx.home, '.claude', 'agents')
-    fs.writeFileSync(path.join(dir, 'my-agent.md'), '---\nname: my-agent\ndescription: d\nmodel: sonnet\ntools: Read, Grep, Bash\n---\nBody\n')
+    fs.writeFileSync(
+      path.join(dir, 'my-agent.md'),
+      '---\nname: my-agent\ndescription: d\nmodel: sonnet\ntools: Read, Grep, Bash\n---\nBody\n'
+    )
     fs.writeFileSync(path.join(dir, 'listed.md'), '---\nname: listed\ntools:\n  - Read\n  - "Glob"\n---\nBody\n')
     const items = run(fx)
     const a = items.find((i) => i.name === 'my-agent')

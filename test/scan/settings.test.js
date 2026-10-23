@@ -10,8 +10,14 @@ test('lists three settings files with exists flags', () => {
   try {
     fs.rmSync(path.join(fx.projectDir, '.claude', 'settings.local.json'))
     const { files } = scanSettings({ home: fx.home, projectDir: fx.projectDir })
-    assert.deepEqual(files.map((f) => f.scope), ['global', 'project', 'projectLocal'])
-    assert.deepEqual(files.map((f) => f.exists), [true, true, false])
+    assert.deepEqual(
+      files.map((f) => f.scope),
+      ['global', 'project', 'projectLocal']
+    )
+    assert.deepEqual(
+      files.map((f) => f.exists),
+      [true, true, false]
+    )
     assert.equal(files[0].path, path.join(fx.home, '.claude', 'settings.json'))
     assert.equal(files[0].ok, true)
     assert.equal(files[0].data.model, 'fable')

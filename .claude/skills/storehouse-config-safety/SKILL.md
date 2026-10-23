@@ -7,17 +7,17 @@ description: Rules for any code that reads or writes Claude Code config files (s
 
 ## Where each switch writes
 
-| Item | Scope | File | Key |
-|---|---|---|---|
-| Plugin | global | `~/.claude/settings.json` | `enabledPlugins["name@marketplace"]` |
-| Plugin | project | `./.claude/settings.local.json` | same |
-| Local skill | global | `~/.claude/settings.json` | `skillOverrides["name"] = "off"`, on deletes the key |
-| Project skill | project | `./.claude/settings.local.json` | same |
-| Plugin skill, agent, hook | — | no switch | follows the plugin |
-| MCP in `./.mcp.json` | project | `./.claude/settings.local.json` | `enabledMcpjsonServers[]`, `disabledMcpjsonServers[]` |
-| MCP global or plugin | per project | `~/.claude.json` → `projects["<abs dir>"].disabledMcpServers[]` | plugin form is `plugin:<plugin>:<server>` |
-| Hook | global or project | settings file of that scope | off moves the entry to `~/.claude/storehouse.json` → `parkedHooks` |
-| Agent | global or project | agents folder | off renames `name.md` → `name.md.disabled` |
+| Item                      | Scope             | File                                                            | Key                                                                |
+| ------------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Plugin                    | global            | `~/.claude/settings.json`                                       | `enabledPlugins["name@marketplace"]`                               |
+| Plugin                    | project           | `./.claude/settings.local.json`                                 | same                                                               |
+| Local skill               | global            | `~/.claude/settings.json`                                       | `skillOverrides["name"] = "off"`, on deletes the key               |
+| Project skill             | project           | `./.claude/settings.local.json`                                 | same                                                               |
+| Plugin skill, agent, hook | —                 | no switch                                                       | follows the plugin                                                 |
+| MCP in `./.mcp.json`      | project           | `./.claude/settings.local.json`                                 | `enabledMcpjsonServers[]`, `disabledMcpjsonServers[]`              |
+| MCP global or plugin      | per project       | `~/.claude.json` → `projects["<abs dir>"].disabledMcpServers[]` | plugin form is `plugin:<plugin>:<server>`                          |
+| Hook                      | global or project | settings file of that scope                                     | off moves the entry to `~/.claude/storehouse.json` → `parkedHooks` |
+| Agent                     | global or project | agents folder                                                   | off renames `name.md` → `name.md.disabled`                         |
 
 ## Write procedure
 

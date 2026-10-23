@@ -21,7 +21,12 @@ export function hookId(file, event, matcher, command, projectDir) {
 }
 
 export function parkedHookId(file, event, matcher, command, projectDir, parkedAt) {
-  return sha1(['parked', hookId(file, event, matcher, command, projectDir), parkedAt, crypto.randomBytes(8).toString('hex')])
+  return sha1([
+    'parked',
+    hookId(file, event, matcher, command, projectDir),
+    parkedAt,
+    crypto.randomBytes(8).toString('hex')
+  ])
 }
 
 export function hookSettingsPath(file, { home, projectDir }) {

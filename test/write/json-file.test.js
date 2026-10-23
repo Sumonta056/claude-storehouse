@@ -43,7 +43,10 @@ test('writeJsonAtomic writes backup then file, keeps other keys', () => {
     assert.ok(fs.readFileSync(file, 'utf8').endsWith('}\n'))
     assert.ok(backup.startsWith(path.join(fx.home, '.claude', 'backups', 'storehouse') + path.sep))
     assert.ok(fs.existsSync(backup))
-    assert.deepEqual(JSON.parse(fs.readFileSync(backup, 'utf8')).skillOverrides, { old: 'off', 'java-clean-code': 'off' })
+    assert.deepEqual(JSON.parse(fs.readFileSync(backup, 'utf8')).skillOverrides, {
+      old: 'off',
+      'java-clean-code': 'off'
+    })
     assert.equal(fs.existsSync(file + '.tmp'), false)
   } finally {
     fx.cleanup()

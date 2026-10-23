@@ -109,7 +109,10 @@ test('missing skills folders give empty list', () => {
 
 test('empty frontmatter description falls back to first body line', () => {
   withFixture((fx) => {
-    fs.writeFileSync(path.join(fx.home, '.claude', 'skills', 'nofm', 'SKILL.md'), '---\nname: nofm\ndescription: ""\n---\nBody text here\n')
+    fs.writeFileSync(
+      path.join(fx.home, '.claude', 'skills', 'nofm', 'SKILL.md'),
+      '---\nname: nofm\ndescription: ""\n---\nBody text here\n'
+    )
     assert.equal(run(fx).find((i) => i.name === 'nofm').description, 'Body text here')
   })
 })
@@ -119,7 +122,12 @@ test('frontmatter name differs from folder and overrides use it', () => {
     const dir = path.join(fx.home, '.claude', 'skills', 'folder-x')
     fs.mkdirSync(dir)
     fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: real-name\ndescription: d\n---\n')
-    const items = scanSkills({ home: fx.home, projectDir: fx.projectDir, plugins: [], skillOverrides: { 'real-name': 'off', 'folder-x': 'on' } })
+    const items = scanSkills({
+      home: fx.home,
+      projectDir: fx.projectDir,
+      plugins: [],
+      skillOverrides: { 'real-name': 'off', 'folder-x': 'on' }
+    })
     const item = items.find((i) => i.name === 'real-name')
     assert.equal(item.enabled, false)
     assert.ok(!items.some((i) => i.name === 'folder-x'))

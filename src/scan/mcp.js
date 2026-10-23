@@ -65,13 +65,30 @@ export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabl
   const perProject = Boolean(projectDir)
   for (const [name, config] of serversOf(root)) {
     out.push(
-      build({ name, config, scope: 'global', origin: 'user', file: claudeJson, disabledKey: name, enabled: !disabled.has(name), canToggle: perProject })
+      build({
+        name,
+        config,
+        scope: 'global',
+        origin: 'user',
+        file: claudeJson,
+        disabledKey: name,
+        enabled: !disabled.has(name),
+        canToggle: perProject
+      })
     )
   }
 
   for (const [name, config] of serversOf(projectEntry)) {
     out.push(
-      build({ name, config, scope: 'project', origin: 'local', file: claudeJson, disabledKey: name, enabled: !disabled.has(name) })
+      build({
+        name,
+        config,
+        scope: 'project',
+        origin: 'local',
+        file: claudeJson,
+        disabledKey: name,
+        enabled: !disabled.has(name)
+      })
     )
   }
 

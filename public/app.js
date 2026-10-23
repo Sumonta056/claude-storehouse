@@ -13,8 +13,22 @@ const PAGES = {
 }
 
 const HOLDER = '.recent, tr[data-key], .lrow, .pnote'
-const HOOK_EVENTS = ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop', 'SubagentStop', 'SessionStart', 'SessionEnd', 'PreCompact']
-const SETTINGS_FILE = { global: '~/.claude/settings.json', project: '.claude/settings.json', projectLocal: '.claude/settings.local.json' }
+const HOOK_EVENTS = [
+  'PreToolUse',
+  'PostToolUse',
+  'UserPromptSubmit',
+  'Notification',
+  'Stop',
+  'SubagentStop',
+  'SessionStart',
+  'SessionEnd',
+  'PreCompact'
+]
+const SETTINGS_FILE = {
+  global: '~/.claude/settings.json',
+  project: '.claude/settings.json',
+  projectLocal: '.claude/settings.local.json'
+}
 const MCP_ORIGIN = { user: '~/.claude.json', local: '~/.claude.json · this folder', mcpjson: '.mcp.json' }
 
 export const state = { inventory: null, scope: 'all', query: '', page: 'dash' }
@@ -35,7 +49,10 @@ let searchTimer = null
 const $ = (id) => document.getElementById(id)
 
 export function esc(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  )
 }
 
 function keyOf(kind, source, name) {
@@ -104,7 +121,7 @@ function normalize(inv) {
       key: `hook:${h.id}:${h.file}:${h.index?.group}:${h.index?.hook}${h.parked ? ':parked' : ''}`,
       name: String(h.command ?? ''),
       description: `${h.event} · ${h.matcher}`,
-      source: h.plugin ? pluginLabel(h.plugin) : h.parked ? 'parked' : SETTINGS_FILE[h.file] ?? h.file
+      source: h.plugin ? pluginLabel(h.plugin) : h.parked ? 'parked' : (SETTINGS_FILE[h.file] ?? h.file)
     }
     items.set(item.key, item)
     out.hook.push(item)
@@ -115,7 +132,7 @@ function normalize(inv) {
       kind: 'mcp',
       key: `mcp:${m.origin}:${m.plugin ?? ''}:${m.name}`,
       description: m.command ?? m.url ?? '',
-      source: m.plugin ? pluginLabel(m.plugin) : MCP_ORIGIN[m.origin] ?? m.origin
+      source: m.plugin ? pluginLabel(m.plugin) : (MCP_ORIGIN[m.origin] ?? m.origin)
     }
     items.set(item.key, item)
     out.mcp.push(item)
@@ -134,7 +151,11 @@ function inScope(scope) {
 function matches(item) {
   const q = state.query.trim().toLowerCase()
   if (!q) return true
-  return [item.name, item.description, item.source, item.plugin, item.id, item.model, item.tools?.join(' ')].some((v) => String(v ?? '').toLowerCase().includes(q))
+  return [item.name, item.description, item.source, item.plugin, item.id, item.model, item.tools?.join(' ')].some((v) =>
+    String(v ?? '')
+      .toLowerCase()
+      .includes(q)
+  )
 }
 
 function visible(item) {
@@ -143,20 +164,35 @@ function visible(item) {
 
 function switchInfo(item) {
   if (item.kind === 'plugin') {
-    if (item.missing) return { disabled: true, text: 'not installed', title: `${item.id} is listed but its folder is missing` }
+    if (item.missing)
+      return { disabled: true, text: 'not installed', title: `${item.id} is listed but its folder is missing` }
     const file = item.scope === 'project' ? '.claude/settings.local.json' : '~/.claude/settings.json'
     return { disabled: false, title: `Writes enabledPlugins["${item.id}"] in ${file}` }
   }
   if (item.kind === 'hook' && !item.plugin) {
-    if (!item.canToggle) return { disabled: true, text: 'cannot switch', title: 'This hook has no command string, so it cannot be parked.' }
+    if (!item.canToggle)
+      return {
+        disabled: true,
+        text: 'cannot switch',
+        title: 'This hook has no command string, so it cannot be parked.'
+      }
     const file = SETTINGS_FILE[item.file] ?? item.file
-    return { disabled: false, title: item.enabled ? `Off moves this hook from ${file} to ~/.claude/storehouse.json` : `On puts this hook back in ${file}` }
-  }
-  if (item.kind === 'mcp') {
-    if (!item.canToggle) return { disabled: true, text: 'cannot switch', title: `${item.name} cannot be switched here.` }
     return {
       disabled: false,
-      title: item.origin === 'mcpjson' ? 'Writes enabledMcpjsonServers or disabledMcpjsonServers in .claude/settings.local.json' : 'Writes disabledMcpServers for this folder in ~/.claude.json'
+      title: item.enabled
+        ? `Off moves this hook from ${file} to ~/.claude/storehouse.json`
+        : `On puts this hook back in ${file}`
+    }
+  }
+  if (item.kind === 'mcp') {
+    if (!item.canToggle)
+      return { disabled: true, text: 'cannot switch', title: `${item.name} cannot be switched here.` }
+    return {
+      disabled: false,
+      title:
+        item.origin === 'mcpjson'
+          ? 'Writes enabledMcpjsonServers or disabledMcpjsonServers in .claude/settings.local.json'
+          : 'Writes disabledMcpServers for this folder in ~/.claude.json'
     }
   }
   if (!item.canToggle) {
@@ -169,7 +205,12 @@ function switchInfo(item) {
   }
   if (item.kind === 'agent') {
     const file = item.path.split(/[\\/]/).pop()
-    return { disabled: false, title: item.enabled ? `Renames ${file} to ${file}.disabled` : `Renames ${file} back to ${file.replace(/\.disabled$/, '')}` }
+    return {
+      disabled: false,
+      title: item.enabled
+        ? `Renames ${file} to ${file}.disabled`
+        : `Renames ${file} back to ${file.replace(/\.disabled$/, '')}`
+    }
   }
   const file = item.scope === 'project' ? '.claude/settings.local.json' : '~/.claude/settings.json'
   return { disabled: false, title: `Writes skillOverrides["${item.name}"] in ${file}` }
@@ -209,7 +250,9 @@ function statTile(page, label, c) {
 }
 
 function otherCounts(list) {
-  const shown = list.filter((i) => inScope(i.scope) && matches({ name: i.name ?? i.command, description: i.event, source: i.plugin }))
+  const shown = list.filter(
+    (i) => inScope(i.scope) && matches({ name: i.name ?? i.command, description: i.event, source: i.plugin })
+  )
   return { total: shown.length, on: shown.filter((i) => i.enabled).length }
 }
 
@@ -222,11 +265,22 @@ function renderDash() {
     statTile('hooks', 'Hooks', otherCounts(inv.hooks)),
     statTile('mcp', 'MCP servers', otherCounts(inv.mcp))
   ].join('')
-  const favs = favoriteEntries().filter((e) => e.item && visible(e.item)).slice(0, 6)
-  const favHtml = favs.length ? `<ul class="rows" data-rows="dfav">${favs.map((e) => rowHtml(e.item, 'dfav', { cat: e.fav.category })).join('')}</ul>` : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any row.')
-  const more = inv.favorites.length > favs.length && favs.length ? '<button type="button" class="btn-link" data-go="fav">All favorites <span aria-hidden="true">→</span></button>' : ''
-  const proj = [...catalog.skill, ...catalog.agent, ...catalog.plugin].filter((i) => i.scope === 'project' && visible(i))
-  const projHtml = proj.length ? rowsHtml(proj, 'dproj') : empty(state.query ? `No project items match "${state.query}".` : 'No skills, agents, or plugins in ./.claude.')
+  const favs = favoriteEntries()
+    .filter((e) => e.item && visible(e.item))
+    .slice(0, 6)
+  const favHtml = favs.length
+    ? `<ul class="rows" data-rows="dfav">${favs.map((e) => rowHtml(e.item, 'dfav', { cat: e.fav.category })).join('')}</ul>`
+    : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any row.')
+  const more =
+    inv.favorites.length > favs.length && favs.length
+      ? '<button type="button" class="btn-link" data-go="fav">All favorites <span aria-hidden="true">→</span></button>'
+      : ''
+  const proj = [...catalog.skill, ...catalog.agent, ...catalog.plugin].filter(
+    (i) => i.scope === 'project' && visible(i)
+  )
+  const projHtml = proj.length
+    ? rowsHtml(proj, 'dproj')
+    : empty(state.query ? `No project items match "${state.query}".` : 'No skills, agents, or plugins in ./.claude.')
   const errors = inv.errors?.length
     ? `<div class="warn"><b>${inv.errors.length} file${inv.errors.length > 1 ? 's' : ''} could not be read.</b> ${inv.errors.map((e) => `<code>${esc(tilde(e.path))}</code>: ${esc(e.error)}`).join('; ')}</div>`
     : ''
@@ -260,7 +314,8 @@ function recentHtml() {
   const body = recent.length
     ? `<ul class="clist">${recent
         .map(
-          (i) => `<li class="recent" data-key="${esc(i.key)}"><button type="button" class="btn-plain name" data-act="open">${esc(i.name)}</button><span class="ck">${esc(KIND_WORD[i.kind] ?? i.kind)} · ${esc(i.scope)}</span><span class="when" title="${esc(new Date(i.mtime).toLocaleString())}">${esc(ago(i.mtime))}</span></li>`
+          (i) =>
+            `<li class="recent" data-key="${esc(i.key)}"><button type="button" class="btn-plain name" data-act="open">${esc(i.name)}</button><span class="ck">${esc(KIND_WORD[i.kind] ?? i.kind)} · ${esc(i.scope)}</span><span class="when" title="${esc(new Date(i.mtime).toLocaleString())}">${esc(ago(i.mtime))}</span></li>`
         )
         .join('')}</ul>`
     : nothingMatches()
@@ -316,8 +371,12 @@ function favHeadHtml(cat, label, count, open, index) {
 function favSectionHtml(cat, list, index) {
   const label = cat ?? 'Uncategorized'
   const open = favOpen.get(cat ?? '') !== false
-  const rows = list.map((e) => (e.item ? rowHtml(e.item, 'fav', { draggable: true }) : missingFavRowHtml(e.fav))).join('')
-  const body = list.length ? `<ul class="rows" data-rows="fav">${rows}</ul>` : `<div class="empty fav-drop">No favorites here. Drag a row here, or pick ${esc(label)} from a star.</div>`
+  const rows = list
+    .map((e) => (e.item ? rowHtml(e.item, 'fav', { draggable: true }) : missingFavRowHtml(e.fav)))
+    .join('')
+  const body = list.length
+    ? `<ul class="rows" data-rows="fav">${rows}</ul>`
+    : `<div class="empty fav-drop">No favorites here. Drag a row here, or pick ${esc(label)} from a star.</div>`
   return `<section class="fav-sec" data-cat="${esc(cat ?? '')}" aria-label="${esc(label)}">
     <div class="fav-h">${favHeadHtml(cat, label, list.length, open, index)}</div>
     <div id="favsec-${index}"${open ? '' : ' hidden'}>${body}</div>
@@ -328,7 +387,10 @@ function renderFav() {
   const cats = favCats()
   const entries = favoriteEntries()
   const shown = entries.filter((e) => (e.item ? visible(e.item) : matches({ name: e.fav.name, source: e.fav.source })))
-  const groups = [...cats.map((c) => [c, shown.filter((e) => e.fav.category === c)]), [null, shown.filter((e) => e.fav.category === null)]]
+  const groups = [
+    ...cats.map((c) => [c, shown.filter((e) => e.fav.category === c)]),
+    [null, shown.filter((e) => e.fav.category === null)]
+  ]
   const top = `<div class="fav-top">
     <div class="warn">Favorites and categories live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a row to reorder it or to move it to another category.</div>
     <form class="fav-new" data-form="cat-new">
@@ -357,13 +419,16 @@ function favNameError(name) {
 }
 
 function favPopHtml(item, fav) {
-  const current = fav ? fav.category ?? '' : ''
+  const current = fav ? (fav.category ?? '') : ''
   const options = [['', 'Uncategorized'], ...favCats().map((c) => [c, c])]
   return `<form data-form="favpop">
     <h3 id="favpop-t">${fav ? 'Change category' : 'Add to favorites'}</h3>
     <p class="sub">${esc(item.name)}</p>
     <fieldset><legend class="sr">Category</legend>${options
-      .map(([value, label]) => `<label class="opt"><input type="radio" name="cat" value="${esc(value)}"${value === current ? ' checked' : ''}><span>${esc(label)}</span></label>`)
+      .map(
+        ([value, label]) =>
+          `<label class="opt"><input type="radio" name="cat" value="${esc(value)}"${value === current ? ' checked' : ''}><span>${esc(label)}</span></label>`
+      )
       .join('')}</fieldset>
     <input type="text" name="newcat" maxlength="40" placeholder="+ New category" aria-label="New category name">
     <p class="err" role="alert" hidden></p>
@@ -422,12 +487,19 @@ function closeFavPop(refocus = true) {
   if (!refocus) return
   if (trigger?.isConnected) return trigger.focus({ preventScroll: true })
   const scope = inDrawer && drawerOpen() ? $('dr') : document.querySelector('.page:not([hidden])')
-  const btn = inDrawer ? scope?.querySelector('[data-dact="star"]') : [...(scope?.querySelectorAll('[data-act="star"]') ?? [])].find((b) => holderKey(b.closest(HOLDER)) === item.key)
+  const btn = inDrawer
+    ? scope?.querySelector('[data-dact="star"]')
+    : [...(scope?.querySelectorAll('[data-act="star"]') ?? [])].find((b) => holderKey(b.closest(HOLDER)) === item.key)
   btn?.focus({ preventScroll: true })
 }
 
 function favBody(item, favorite, category) {
-  const body = { kind: item.kind, name: item.kind === 'plugin' ? item.id : item.name, source: item.kind === 'plugin' ? 'plugin' : item.source, favorite }
+  const body = {
+    kind: item.kind,
+    name: item.kind === 'plugin' ? item.id : item.name,
+    source: item.kind === 'plugin' ? 'plugin' : item.source,
+    favorite
+  }
   if (category !== undefined) body.category = category
   return body
 }
@@ -504,7 +576,9 @@ async function onFavCat(el) {
     const n = state.inventory.favorites.filter((f) => f.category === cat).length
     const yes = await ask({
       title: `Delete category ${cat}?`,
-      message: n ? `Its ${plural(n, 'favorite')} move to Uncategorized. They stay favorites. You can undo this from the activity log.` : 'This category is empty.',
+      message: n
+        ? `Its ${plural(n, 'favorite')} move to Uncategorized. They stay favorites. You can undo this from the activity log.`
+        : 'This category is empty.',
       ok: 'Delete',
       danger: true
     })
@@ -516,7 +590,8 @@ async function submitNewCat() {
   const name = favNewName.trim()
   const error = favNameError(name)
   if (error) return toast(error, true)
-  if (favCats().some((c) => c.toLowerCase() === name.toLowerCase())) return toast(`Category ${name} already exists.`, true)
+  if (favCats().some((c) => c.toLowerCase() === name.toLowerCase()))
+    return toast(`Category ${name} already exists.`, true)
   if (await editFavCategory({ op: 'create', name }, `Added category ${name}`)) {
     favNewName = ''
     render()
@@ -531,7 +606,8 @@ async function submitRename(form) {
   const error = favNameError(name)
   if (error) return toast(error, true)
   favEditing = null
-  if (await editFavCategory({ op: 'rename', name: old, newName: name }, `Renamed ${old} to ${name}`)) return focusFavTool(name, 'rename')
+  if (await editFavCategory({ op: 'rename', name: old, newName: name }, `Renamed ${old} to ${name}`))
+    return focusFavTool(name, 'rename')
   favEditing = old
   render()
   $('fav-rename')?.focus()
@@ -548,13 +624,31 @@ const ICON = {
 }
 
 const CHIPS = {
-  plugins: [['all', 'All'], ['on', 'On'], ['off', 'Off'], ['broken', 'Broken']],
-  skills: [['all', 'All'], ['on', 'On'], ['off', 'Off'], ['plugin', 'From plugins']],
-  agents: [['all', 'All'], ['on', 'On'], ['off', 'Off'], ['plugin', 'From plugins']]
+  plugins: [
+    ['all', 'All'],
+    ['on', 'On'],
+    ['off', 'Off'],
+    ['broken', 'Broken']
+  ],
+  skills: [
+    ['all', 'All'],
+    ['on', 'On'],
+    ['off', 'Off'],
+    ['plugin', 'From plugins']
+  ],
+  agents: [
+    ['all', 'All'],
+    ['on', 'On'],
+    ['off', 'Off'],
+    ['plugin', 'From plugins']
+  ]
 }
 
 const SECTIONS = {
-  plugins: [['global', 'Global · installed for your user', ''], ['project', 'Project · installed for this folder', '']],
+  plugins: [
+    ['global', 'Global · installed for your user', ''],
+    ['project', 'Project · installed for this folder', '']
+  ],
   skills: [
     ['global', 'Global · ~/.claude/skills', 'The switch writes skillOverrides in ~/.claude/settings.json'],
     ['project', 'Project · ./.claude/skills', 'The switch writes .claude/settings.local.json']
@@ -588,7 +682,13 @@ function shortVersion(v) {
 function pluginParts(id) {
   const p = pluginById(id)
   if (!p) return []
-  const parts = [[p.skills.length, 'skill'], [p.agents.length, 'agent'], [p.hooks.length, 'hook']].filter(([n]) => n).map(([n, w]) => plural(n, w))
+  const parts = [
+    [p.skills.length, 'skill'],
+    [p.agents.length, 'agent'],
+    [p.hooks.length, 'hook']
+  ]
+    .filter(([n]) => n)
+    .map(([n, w]) => plural(n, w))
   if (p.mcp.length) parts.push(`${p.mcp.length} MCP`)
   return parts
 }
@@ -617,7 +717,11 @@ function leadHtml(item) {
 }
 
 function menuEntries(item) {
-  if (item.kind === 'plugin' && item.missing) return [['m-open', 'Open details'], ['m-uninstall', 'Remove entry', true]]
+  if (item.kind === 'plugin' && item.missing)
+    return [
+      ['m-open', 'Open details'],
+      ['m-uninstall', 'Remove entry', true]
+    ]
   const list = [['m-open', 'Open details']]
   if (item.canToggle) list.push(['m-toggle', item.enabled ? 'Switch off' : 'Switch on'])
   if (item.path) list.push(['m-finder', 'Reveal in Finder'])
@@ -628,7 +732,10 @@ function menuEntries(item) {
 function menuHtml(item) {
   const entries = menuEntries(item)
   const html = entries
-    .map(([act, text, danger]) => `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-act="${act}">${esc(text)}</button>`)
+    .map(
+      ([act, text, danger]) =>
+        `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-act="${act}">${esc(text)}</button>`
+    )
     .join('')
   return `<div class="menu" role="menu" id="menu-${slug(item.key)}" aria-label="${esc(`More actions for ${item.name}`)}">${html}</div>`
 }
@@ -652,9 +759,13 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null } = {}) {
   const open = menuKey === item.key && menuCtx === ctx
   const src = rowSource(item)
   const off = item.canToggle && !item.enabled
-  const desc = item.missing ? 'Listed in installed_plugins.json, but the plugin folder is gone.' : item.description || 'No description'
+  const desc = item.missing
+    ? 'Listed in installed_plugins.json, but the plugin folder is gone.'
+    : item.description || 'No description'
   const ver = item.kind === 'plugin' ? shortVersion(pluginById(item.id)?.version) : ''
-  const cls = ['lrow', off ? 'off' : '', item.missing ? 'missing' : '', item.canToggle ? '' : 'locked'].filter(Boolean).join(' ')
+  const cls = ['lrow', off ? 'off' : '', item.missing ? 'missing' : '', item.canToggle ? '' : 'locked']
+    .filter(Boolean)
+    .join(' ')
   return `<li class="${cls}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
     <div class="lead">${leadHtml(item)}</div>
     <div class="body">
@@ -679,7 +790,8 @@ function rowsHtml(list, ctx = '') {
 function keepChip(page, item) {
   const f = chipFilter[page]
   if (f === 'all') return true
-  if (page === 'plugins') return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
+  if (page === 'plugins')
+    return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
   if (f === 'plugin') return item.scope === 'plugin'
   return item.scope !== 'plugin' && (f === 'on') === Boolean(item.enabled)
 }
@@ -688,10 +800,20 @@ function chipCounts(page, list) {
   const shown = list.filter(visible)
   if (page === 'plugins') {
     const ok = shown.filter((p) => !p.missing)
-    return { all: shown.length, on: ok.filter((p) => p.enabled).length, off: ok.filter((p) => !p.enabled).length, broken: shown.length - ok.length }
+    return {
+      all: shown.length,
+      on: ok.filter((p) => p.enabled).length,
+      off: ok.filter((p) => !p.enabled).length,
+      broken: shown.length - ok.length
+    }
   }
   const own = shown.filter((i) => i.scope !== 'plugin')
-  return { all: shown.length, on: own.filter((i) => i.enabled).length, off: own.filter((i) => !i.enabled).length, plugin: shown.length - own.length }
+  return {
+    all: shown.length,
+    on: own.filter((i) => i.enabled).length,
+    off: own.filter((i) => !i.enabled).length,
+    plugin: shown.length - own.length
+  }
 }
 
 function chipsHtml(page, list, note) {
@@ -757,7 +879,11 @@ function renderCatalog(page, list, note) {
 
 function menuButtonFor(key) {
   const page = document.querySelector('.page:not([hidden])')
-  return page ? [...page.querySelectorAll('[data-act="menu"]')].find((b) => holderKey(b.closest(HOLDER)) === key && (b.closest('[data-rows]')?.dataset.rows ?? '') === menuCtx) ?? null : null
+  return page
+    ? ([...page.querySelectorAll('[data-act="menu"]')].find(
+        (b) => holderKey(b.closest(HOLDER)) === key && (b.closest('[data-rows]')?.dataset.rows ?? '') === menuCtx
+      ) ?? null)
+    : null
 }
 
 function closeMenu(refocus = true) {
@@ -843,13 +969,14 @@ function renderNav() {
     if (b.dataset.p === state.page) b.setAttribute('aria-current', 'page')
     else b.removeAttribute('aria-current')
   }
-  for (const b of document.querySelectorAll('#scope button')) b.setAttribute('aria-pressed', String(b.dataset.s === state.scope))
+  for (const b of document.querySelectorAll('#scope button'))
+    b.setAttribute('aria-pressed', String(b.dataset.s === state.scope))
   const project = inv.project.dir ? `<code>${esc(tilde(inv.project.dir))}</code>` : 'off'
   $('ctx').innerHTML = `Project: ${project} · Global: <code>${esc(tilde(inv.global.dir))}</code>`
 }
 
 function holderKey(h) {
-  return h ? h.dataset.key ?? h.dataset.fav ?? null : null
+  return h ? (h.dataset.key ?? h.dataset.fav ?? null) : null
 }
 
 function focusMark() {
@@ -859,8 +986,15 @@ function focusMark() {
   const holder = el.dataset?.act ? el.closest(HOLDER) : null
   if (holder) {
     const key = holderKey(holder)
-    const same = [...page.querySelectorAll(`[data-act="${el.dataset.act}"]`)].filter((b) => holderKey(b.closest(HOLDER)) === key)
-    return { key, act: el.dataset.act, index: Math.max(0, same.indexOf(el)), pos: [...page.querySelectorAll(HOLDER)].indexOf(holder) }
+    const same = [...page.querySelectorAll(`[data-act="${el.dataset.act}"]`)].filter(
+      (b) => holderKey(b.closest(HOLDER)) === key
+    )
+    return {
+      key,
+      act: el.dataset.act,
+      index: Math.max(0, same.indexOf(el)),
+      pos: [...page.querySelectorAll(HOLDER)].indexOf(holder)
+    }
   }
   if (el.id) return { id: el.id, start: el.selectionStart ?? null, end: el.selectionEnd ?? null, scroll: el.scrollTop }
   return null
@@ -882,12 +1016,15 @@ function focusRestore(mark) {
     if (mark.scroll) el.scrollTop = mark.scroll
     return
   }
-  const same = [...page.querySelectorAll(`[data-act="${mark.act}"]`)].filter((b) => holderKey(b.closest(HOLDER)) === mark.key)
+  const same = [...page.querySelectorAll(`[data-act="${mark.act}"]`)].filter(
+    (b) => holderKey(b.closest(HOLDER)) === mark.key
+  )
   let target = same[mark.index] ?? same[0]
   if (!target && mark.pos >= 0) {
     const holders = [...page.querySelectorAll(HOLDER)]
     const h = holders[Math.min(mark.pos, holders.length - 1)]
-    target = h?.querySelector(`[data-act="${mark.act}"]:not([disabled])`) ?? h?.querySelector('[data-act="open"]') ?? null
+    target =
+      h?.querySelector(`[data-act="${mark.act}"]:not([disabled])`) ?? h?.querySelector('[data-act="open"]') ?? null
   }
   if (target) target.focus({ preventScroll: true })
 }
@@ -908,11 +1045,23 @@ function renderPage() {
   if (page === 'dash') renderDash()
   else if (page === 'fav') renderFav()
   else if (page === 'skills')
-    renderCatalog('skills', catalog.skill, 'Off writes <code>"skillOverrides": {"name": "off"}</code> to <code>~/.claude/settings.json</code> (global) or <code>.claude/settings.local.json</code> (project). Plugin skills follow their plugin.')
+    renderCatalog(
+      'skills',
+      catalog.skill,
+      'Off writes <code>"skillOverrides": {"name": "off"}</code> to <code>~/.claude/settings.json</code> (global) or <code>.claude/settings.local.json</code> (project). Plugin skills follow their plugin.'
+    )
   else if (page === 'agents')
-    renderCatalog('agents', catalog.agent, 'Claude Code has no off switch for agents. Off renames <code>name.md</code> to <code>name.md.disabled</code>. Plugin agents follow their plugin.')
+    renderCatalog(
+      'agents',
+      catalog.agent,
+      'Claude Code has no off switch for agents. Off renames <code>name.md</code> to <code>name.md.disabled</code>. Plugin agents follow their plugin.'
+    )
   else if (page === 'plugins')
-    renderCatalog('plugins', catalog.plugin, 'The switch writes <code>enabledPlugins["name@marketplace"]</code>, the same as the <code>/plugin</code> menu.')
+    renderCatalog(
+      'plugins',
+      catalog.plugin,
+      'The switch writes <code>enabledPlugins["name@marketplace"]</code>, the same as the <code>/plugin</code> menu.'
+    )
   else if (page === 'hooks') renderHooks()
   else if (page === 'mcp') renderMcp()
   else if (page === 'settings') renderSettings()
@@ -1000,7 +1149,15 @@ function toggleBody(item, enabled) {
   if (item.kind === 'plugin') return { kind: 'plugin', name: item.id, scope: item.scope, enabled }
   if (item.kind === 'hook') {
     if (enabled) return { kind: 'hook', name: item.id, scope: item.scope, enabled }
-    return { kind: 'hook', name: item.command, scope: item.scope, file: item.file, event: item.event, index: item.index, enabled }
+    return {
+      kind: 'hook',
+      name: item.command,
+      scope: item.scope,
+      file: item.file,
+      event: item.event,
+      index: item.index,
+      enabled
+    }
   }
   if (item.kind === 'mcp') {
     const body = { kind: 'mcp', name: item.name, scope: item.scope, origin: item.origin, enabled }
@@ -1024,8 +1181,12 @@ async function toggle(item) {
     showBanner()
     await refresh()
     if (item.kind === 'hook' && !drawerOpen()) {
-      const moved = catalog.hook.find((h) => h.event === item.event && h.command === item.command && h.file === item.file && h.enabled === enabled)
-      const row = moved ? [...document.querySelectorAll('#p-hooks tr[data-key]')].find((r) => r.dataset.key === moved.key) : null
+      const moved = catalog.hook.find(
+        (h) => h.event === item.event && h.command === item.command && h.file === item.file && h.enabled === enabled
+      )
+      const row = moved
+        ? [...document.querySelectorAll('#p-hooks tr[data-key]')].find((r) => r.dataset.key === moved.key)
+        : null
       row?.querySelector('[data-act="toggle"]')?.focus()
     }
   } catch (err) {
@@ -1098,7 +1259,7 @@ function drawerOpen() {
 }
 
 function drawerItem() {
-  return dr.key ? items.get(dr.key) ?? null : null
+  return dr.key ? (items.get(dr.key) ?? null) : null
 }
 
 function isDirty() {
@@ -1143,9 +1304,9 @@ function ask({ title, message, ok = 'OK', danger = false, command = '' }) {
 }
 
 function trapTab(e, container) {
-  const nodes = [...container.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])')].filter(
-    (el) => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0
-  )
+  const nodes = [
+    ...container.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])')
+  ].filter((el) => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0)
   if (!nodes.length) return
   const first = nodes[0]
   const last = nodes[nodes.length - 1]
@@ -1173,7 +1334,7 @@ function ownerId(item) {
 }
 
 function ownerPlugin(item) {
-  return isPluginOwned(item) ? catalog.plugin.find((p) => p.id === ownerId(item)) ?? null : null
+  return isPluginOwned(item) ? (catalog.plugin.find((p) => p.id === ownerId(item)) ?? null) : null
 }
 
 function kindLabel(item) {
@@ -1200,7 +1361,10 @@ function headTools(item) {
   if (!entries.length) return starBtn
   const menu = dr.menu
     ? `<div class="menu" role="menu" id="dr-menu" aria-label="${esc(`More actions for ${item.name}`)}">${entries
-        .map(([act, text, danger]) => `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-dact="${act}">${esc(text)}</button>`)
+        .map(
+          ([act, text, danger]) =>
+            `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-dact="${act}">${esc(text)}</button>`
+        )
         .join('')}</div>`
     : ''
   return `${starBtn}<div class="dr-more"><button type="button" class="icon-btn" data-dact="menu" id="dr-menu-btn" aria-haspopup="menu" aria-expanded="${dr.menu ? 'true' : 'false'}"${dr.menu ? ' aria-controls="dr-menu"' : ''} aria-label="More actions">${ICON.dots}</button>${menu}</div>`
@@ -1299,7 +1463,8 @@ function syncDrawerHead() {
   $('dr-status').innerHTML = statusHtml(item)
   $('dr-facts').innerHTML = factsHtml(item)
   $('dr-bar').innerHTML = barHtml(item)
-  if (focused) document.querySelector(`#dr .dr-top [data-dact="${focused}"], #dr .dr-bar [data-dact="${focused}"]`)?.focus()
+  if (focused)
+    document.querySelector(`#dr .dr-top [data-dact="${focused}"], #dr .dr-bar [data-dact="${focused}"]`)?.focus()
   if (item.kind !== 'plugin' && item.path !== dr.mainFile) {
     const wasMain = dr.file === dr.mainFile
     dr.mainFile = item.path
@@ -1322,13 +1487,19 @@ function showPath() {
 
 function tabsHtml(tabs) {
   return `<div class="tabs" role="tablist" aria-label="Drawer views">${tabs
-    .map(([id, label]) => `<button type="button" role="tab" id="tab-${id}" data-tab="${id}" aria-controls="pane-${id}" aria-selected="${dr.tab === id ? 'true' : 'false'}">${esc(label)}</button>`)
+    .map(
+      ([id, label]) =>
+        `<button type="button" role="tab" id="tab-${id}" data-tab="${id}" aria-controls="pane-${id}" aria-selected="${dr.tab === id ? 'true' : 'false'}">${esc(label)}</button>`
+    )
     .join('')}</div>`
 }
 
 function fileBodyHtml(item, withFiles) {
   const own = !item.readOnly && !isPluginOwned(item)
-  const tabs = [['preview', 'Preview'], ['file', own ? 'Edit' : 'Source (read-only)']]
+  const tabs = [
+    ['preview', 'Preview'],
+    ['file', own ? 'Edit' : 'Source (read-only)']
+  ]
   if (withFiles) tabs.push(['files', 'Files'])
   if (own) tabs.push(['backups', 'Backups'])
   return `${tabsHtml(tabs)}
@@ -1350,7 +1521,8 @@ function listLinks(list, kind) {
   if (!list.length) return `<p class="note">No ${kind}.</p>`
   return `<ul class="mini">${list
     .map(
-      (s) => `<li><button type="button" class="btn-plain name" data-dact="sub" data-key="${esc(s.key)}">${esc(s.name)}</button><span class="note">${esc(s.description || '')}</span><button type="button" class="sw" role="switch" aria-checked="${s.enabled ? 'true' : 'false'}" aria-label="${esc(`${s.name} follows the plugin`)}" disabled></button></li>`
+      (s) =>
+        `<li><button type="button" class="btn-plain name" data-dact="sub" data-key="${esc(s.key)}">${esc(s.name)}</button><span class="note">${esc(s.description || '')}</span><button type="button" class="sw" role="switch" aria-checked="${s.enabled ? 'true' : 'false'}" aria-label="${esc(`${s.name} follows the plugin`)}" disabled></button></li>`
     )
     .join('')}</ul>`
 }
@@ -1362,7 +1534,13 @@ function pluginBodyHtml(item) {
   const hooks = p?.hooks ?? []
   const mcp = p?.mcp ?? []
   const events = [...new Set(hooks.map((h) => h.event).filter(Boolean))]
-  const tabs = item.missing ? [['overview', 'Overview']] : [['overview', 'Overview'], ['files', 'Files'], ['file', 'File']]
+  const tabs = item.missing
+    ? [['overview', 'Overview']]
+    : [
+        ['overview', 'Overview'],
+        ['files', 'Files'],
+        ['file', 'File']
+      ]
   return `${tabsHtml(tabs)}
     <div class="pane" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
       <h3>Skills <span class="pill">${skills.length}</span></h3>${listLinks(skills, 'skills')}
@@ -1382,7 +1560,8 @@ function pluginBodyHtml(item) {
 
 function setTab(tab) {
   dr.tab = tab
-  for (const b of $('dr-body').querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab))
+  for (const b of $('dr-body').querySelectorAll('[data-tab]'))
+    b.setAttribute('aria-selected', String(b.dataset.tab === tab))
   for (const pane of $('dr-body').querySelectorAll('.pane')) pane.hidden = pane.id !== `pane-${tab}`
   if (tab === 'preview') $('pane-preview').innerHTML = previewHtml($('dr-txt').value, dr.file)
   if (tab === 'files') loadDir(dr.dir ?? dr.root)
@@ -1400,7 +1579,9 @@ function updateDirty() {
 function noteText(item) {
   if (item.kind === 'plugin') return ''
   if (item.readOnly) {
-    return item.kind === 'skill' ? 'Plugin files are read-only. Use Copy to my skills to edit a copy in ~/.claude/skills.' : 'Plugin files are read-only.'
+    return item.kind === 'skill'
+      ? 'Plugin files are read-only. Use Copy to my skills to edit a copy in ~/.claude/skills.'
+      : 'Plugin files are read-only.'
   }
   if (!dr.editable) return 'This file is shown read-only. Only .md, .json, and .txt files can be edited here.'
   return 'Save writes the file and a backup to ~/.claude/backups/storehouse/.'
@@ -1450,7 +1631,10 @@ async function loadDir(dir) {
   try {
     const res = await get(`/api/file?path=${encodeURIComponent(dir)}`)
     if (seq !== dr.seq || dr.dir !== dir) return
-    const up = dir !== dr.root ? `<li><button type="button" class="btn-plain name" data-dact="dir" data-path="${esc(parentDir(dir))}">../</button><span class="note">up one folder</span></li>` : ''
+    const up =
+      dir !== dr.root
+        ? `<li><button type="button" class="btn-plain name" data-dact="dir" data-path="${esc(parentDir(dir))}">../</button><span class="note">up one folder</span></li>`
+        : ''
     const rows = (res.entries ?? [])
       .map((e) => {
         const full = `${dir}/${e.name}`
@@ -1482,7 +1666,10 @@ async function loadBackups() {
 function backupsListHtml(list, attrs, canRestore, prefix) {
   if (!list.length) return '<p class="note">No backups for this file yet. Each save writes one.</p>'
   return `<ul class="mini">${list
-    .map((b, i) => `<li><span class="when">${esc(b.time ? new Date(b.time).toLocaleString() : baseName(b.path))}</span><button type="button" class="btn" id="${prefix}-rs-${i}" ${attrs} data-path="${esc(b.path)}"${canRestore ? '' : ' disabled'}>Restore</button></li>`)
+    .map(
+      (b, i) =>
+        `<li><span class="when">${esc(b.time ? new Date(b.time).toLocaleString() : baseName(b.path))}</span><button type="button" class="btn" id="${prefix}-rs-${i}" ${attrs} data-path="${esc(b.path)}"${canRestore ? '' : ' disabled'}>Restore</button></li>`
+    )
     .join('')}</ul><p class="note">Newest first.</p>`
 }
 
@@ -1635,7 +1822,12 @@ function forceClose() {
 export async function closeDrawer() {
   if (!drawerOpen()) return
   if (isDirty()) {
-    const discard = await ask({ title: 'Discard changes?', message: `You have unsaved edits in ${baseName(dr.file)}. Close and lose them?`, ok: 'Discard', danger: true })
+    const discard = await ask({
+      title: 'Discard changes?',
+      message: `You have unsaved edits in ${baseName(dr.file)}. Close and lose them?`,
+      ok: 'Discard',
+      danger: true
+    })
     if (!discard) return
   }
   forceClose()
@@ -1643,7 +1835,12 @@ export async function closeDrawer() {
 
 async function confirmLeaveFile() {
   if (!isDirty()) return true
-  return ask({ title: 'Discard changes?', message: `You have unsaved edits in ${baseName(dr.file)}. Open another file and lose them?`, ok: 'Discard', danger: true })
+  return ask({
+    title: 'Discard changes?',
+    message: `You have unsaved edits in ${baseName(dr.file)}. Open another file and lose them?`,
+    ok: 'Discard',
+    danger: true
+  })
 }
 
 async function guarded(name, fn) {
@@ -1849,7 +2046,18 @@ function freshHookForm() {
 }
 
 function freshMcpForm() {
-  return { open: false, scope: 'global', name: '', transport: 'stdio', command: '', args: '', url: '', env: '', error: '', invalid: '' }
+  return {
+    open: false,
+    scope: 'global',
+    name: '',
+    transport: 'stdio',
+    command: '',
+    args: '',
+    url: '',
+    env: '',
+    error: '',
+    invalid: ''
+  }
 }
 
 const cfg = { hook: freshHookForm(), mcp: freshMcpForm(), stab: 'form', sform: null, sformMsg: '' }
@@ -1927,8 +2135,12 @@ function renderHooks() {
   const rows = list
     .map((h) => {
       const label = `${h.event} hook ${h.name}`
-      const del = h.plugin ? '' : `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
-      const source = h.plugin ? viaPlugin(h) : `<span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}<span class="src">${esc(h.parked ? '~/.claude/storehouse.json' : SETTINGS_FILE[h.file] ?? h.file)}</span></span>`
+      const del = h.plugin
+        ? ''
+        : `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
+      const source = h.plugin
+        ? viaPlugin(h)
+        : `<span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}<span class="src">${esc(h.parked ? '~/.claude/storehouse.json' : (SETTINGS_FILE[h.file] ?? h.file))}</span></span>`
       return `<tr data-key="${esc(h.key)}" class="${[h.enabled ? '' : 'off', h.plugin ? 'locked' : ''].filter(Boolean).join(' ')}">
         <td data-label="On" class="sw-cell">${cellSwitch(h, label)}</td>
         <td data-label="Event" class="ev">${esc(h.event)}</td>
@@ -1984,7 +2196,12 @@ function submitHook() {
     const command = f.command.trim()
     if (!command) return formFail('hook', 'command', 'Enter the command the hook runs.', 'hf-command')
     try {
-      const res = await send('POST', '/api/hook', { scope: f.scope, event: f.event, matcher: f.matcher.trim(), command })
+      const res = await send('POST', '/api/hook', {
+        scope: f.scope,
+        event: f.event,
+        matcher: f.matcher.trim(),
+        command
+      })
       cfg.hook = freshHookForm()
       toast(`Added ${f.event} hook · wrote ${tilde(res.file)}`)
       showBanner()
@@ -2001,10 +2218,17 @@ function renderMcp() {
   const rows = list
     .map((m) => {
       const label = `MCP server ${m.name}`
-      const keys = [...Object.keys(isPlain(m.config?.env) ? m.config.env : {}), ...Object.keys(isPlain(m.config?.headers) ? m.config.headers : {})]
+      const keys = [
+        ...Object.keys(isPlain(m.config?.env) ? m.config.env : {}),
+        ...Object.keys(isPlain(m.config?.headers) ? m.config.headers : {})
+      ]
       const canDelete = !m.plugin && ['user', 'local', 'mcpjson'].includes(m.origin)
-      const del = canDelete ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>` : ''
-      const source = m.plugin ? viaPlugin(m) : `<span class="tags">${scopeTag(m.scope)}<span class="src">${esc(m.source)}</span></span>`
+      const del = canDelete
+        ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
+        : ''
+      const source = m.plugin
+        ? viaPlugin(m)
+        : `<span class="tags">${scopeTag(m.scope)}<span class="src">${esc(m.source)}</span></span>`
       return `<tr data-key="${esc(m.key)}" class="${[m.enabled ? '' : 'off', m.plugin ? 'locked' : ''].filter(Boolean).join(' ')}">
         <td data-label="On" class="sw-cell">${cellSwitch(m, label)}</td>
         <td data-label="Name"><button type="button" class="btn-plain cmd" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button></td>
@@ -2018,7 +2242,11 @@ function renderMcp() {
   const table = !catalog.mcp.length
     ? empty('No MCP servers in ~/.claude.json, .mcp.json, or plugins.')
     : list.length
-      ? tableHtml('MCP servers', [['', 'On'], ['Name'], ['Transport'], ['Command / URL'], ['Source'], ['', 'Actions']], rows)
+      ? tableHtml(
+          'MCP servers',
+          [['', 'On'], ['Name'], ['Transport'], ['Command / URL'], ['Source'], ['', 'Actions']],
+          rows
+        )
       : nothingMatches()
   const bar = pageBar(
     'Global servers live in <code>~/.claude.json</code>. Project servers live in <code>./.mcp.json</code>. Plugin servers follow their plugin and cannot be deleted here. Changes apply at the next Claude Code session.',
@@ -2073,7 +2301,8 @@ function submitMcp() {
     f.invalid = ''
     const name = f.name.trim()
     if (!name) return formFail('mcp', 'name', 'Enter a server name.', 'mf-name')
-    if (!/^[A-Za-z0-9_.@-]+$/.test(name)) return formFail('mcp', 'name', 'Use only letters, digits, dot, dash, at, or underscore in the name.', 'mf-name')
+    if (!/^[A-Za-z0-9_.@-]+$/.test(name))
+      return formFail('mcp', 'name', 'Use only letters, digits, dot, dash, at, or underscore in the name.', 'mf-name')
     let config
     if (f.transport === 'stdio') {
       const command = f.command.trim()
@@ -2086,7 +2315,8 @@ function submitMcp() {
       if (Object.keys(parsed.env).length) config.env = parsed.env
     } else {
       const url = f.url.trim()
-      if (!/^https?:\/\/\S+$/.test(url)) return formFail('mcp', 'url', 'Enter a URL that starts with http:// or https://.', 'mf-url')
+      if (!/^https?:\/\/\S+$/.test(url))
+        return formFail('mcp', 'url', 'Enter a URL that starts with http:// or https://.', 'mf-url')
       config = { type: f.transport, url }
     }
     try {
@@ -2097,7 +2327,12 @@ function submitMcp() {
       await afterWrite()
       $('mf-open')?.focus()
     } catch (err) {
-      formFail('mcp', err.status === 409 ? 'name' : '', `Could not add the server: ${err.message}`, err.status === 409 ? 'mf-name' : 'mf-save')
+      formFail(
+        'mcp',
+        err.status === 409 ? 'name' : '',
+        `Could not add the server: ${err.message}`,
+        err.status === 409 ? 'mf-name' : 'mf-save'
+      )
     }
   })
 }
@@ -2156,11 +2391,33 @@ function cfgPanels() {
   return {
     sg: { info: s.global, label: 'Global', file: '~/.claude/settings.json' },
     sp: { info: s.project, label: 'Project', file: '.claude/settings.json', create: 'projectSettings', del: true },
-    sl: { info: s.projectLocal, label: 'Project local', file: '.claude/settings.local.json', create: 'projectSettingsLocal', del: true, pill: 'git-ignored' },
+    sl: {
+      info: s.projectLocal,
+      label: 'Project local',
+      file: '.claude/settings.local.json',
+      create: 'projectSettingsLocal',
+      del: true,
+      pill: 'git-ignored'
+    },
     mg: { info: m.global, label: 'Global', file: '~/.claude/CLAUDE.md', create: 'globalClaudemd', md: true, del: true },
     mp: { info: m.project, label: 'Project', file: './CLAUDE.md', create: 'claudemd', md: true, del: true },
-    ml: { info: m.projectLocal, label: 'Project local', file: './CLAUDE.local.md', create: 'claudemdLocal', md: true, del: true, pill: 'git-ignored' },
-    mc: { info: m.projectClaudeDir, label: 'Project .claude folder', file: './.claude/CLAUDE.md', create: 'claudemdClaudeDir', md: true, del: true }
+    ml: {
+      info: m.projectLocal,
+      label: 'Project local',
+      file: './CLAUDE.local.md',
+      create: 'claudemdLocal',
+      md: true,
+      del: true,
+      pill: 'git-ignored'
+    },
+    mc: {
+      info: m.projectClaudeDir,
+      label: 'Project .claude folder',
+      file: './.claude/CLAUDE.md',
+      create: 'claudemdClaudeDir',
+      md: true,
+      del: true
+    }
   }
 }
 
@@ -2232,7 +2489,16 @@ function ensureEd(k, file) {
   }
   if (ed && (!ed.stale || ed.fetching)) return
   if (!ed) {
-    ed = { path: file, status: 'loading', text: '', loaded: '', editing: false, preview: false, stale: false, fetching: false }
+    ed = {
+      path: file,
+      status: 'loading',
+      text: '',
+      loaded: '',
+      editing: false,
+      preview: false,
+      stale: false,
+      fetching: false
+    }
     eds[k] = ed
   }
   ed.fetching = true
@@ -2305,7 +2571,10 @@ function editorHtml(k, p) {
     `<span class="dirty" id="${k}-dirty" aria-live="polite">${dirty ? '● unsaved' : ''}</span>`,
     backupsBtn(k)
   ]
-  if (p.del) btns.push(`<button type="button" class="btn danger x" id="${k}-del" data-c="delete" data-k="${k}">Delete file</button>`)
+  if (p.del)
+    btns.push(
+      `<button type="button" class="btn danger x" id="${k}-del" data-c="delete" data-k="${k}">Delete file</button>`
+    )
   const area = `<textarea id="${k}-txt" class="ed code" data-ed="${k}" spellcheck="false" aria-label="${esc(`${p.file} contents`)}">\n${esc(ed.text)}</textarea>`
   return `${area}<div class="row">${btns.join('')}</div>${panelBackupsHtml(k)}${msgHtml(k)}`
 }
@@ -2315,7 +2584,14 @@ function edChrome(k) {
   const dirty = edDirty(ed)
   const md = MD_ORDER.includes(k)
   const mark = $(`${k}-dirty`)
-  if (mark) mark.textContent = md ? (dirty ? '● Unsaved changes' : `${plural(lineCount(ed?.text ?? ''), 'line')} · Saved`) : dirty ? '● unsaved' : ''
+  if (mark)
+    mark.textContent = md
+      ? dirty
+        ? '● Unsaved changes'
+        : `${plural(lineCount(ed?.text ?? ''), 'line')} · Saved`
+      : dirty
+        ? '● unsaved'
+        : ''
   if (mark && md) mark.classList.toggle('is-dirty', dirty)
   const save = $(`${k}-save`)
   if (save) save.disabled = !dirty
@@ -2344,7 +2620,8 @@ function managedHtml(data) {
       if (perms[key] !== undefined) rows.push([`permissions.${key}`, `${size(perms[key])} rules`])
     }
   }
-  if (data.enabledPlugins !== undefined) rows.push(['enabledPlugins', `${size(data.enabledPlugins)} entries — managed on Plugins page`])
+  if (data.enabledPlugins !== undefined)
+    rows.push(['enabledPlugins', `${size(data.enabledPlugins)} entries — managed on Plugins page`])
   if (data.skillOverrides !== undefined) {
     const off = isPlain(data.skillOverrides) ? Object.values(data.skillOverrides).filter((v) => v === 'off').length : 0
     rows.push(['skillOverrides', `${off} off — managed on Skills page`])
@@ -2352,7 +2629,13 @@ function managedHtml(data) {
   if (data.hooks !== undefined) rows.push(['hooks', `${size(data.hooks)} events — managed on Hooks page`])
   const known = new Set([...FORM_KEYS, 'permissions', 'enabledPlugins', 'skillOverrides', 'hooks'])
   for (const key of Object.keys(data)) {
-    if (!known.has(key)) rows.push([key, isPlain(data[key]) || Array.isArray(data[key]) ? `${size(data[key])} entries — edit in Raw JSON` : 'set — edit in Raw JSON'])
+    if (!known.has(key))
+      rows.push([
+        key,
+        isPlain(data[key]) || Array.isArray(data[key])
+          ? `${size(data[key])} entries — edit in Raw JSON`
+          : 'set — edit in Raw JSON'
+      ])
   }
   if (!rows.length) return '<p class="note">No other keys.</p>'
   return `<ul class="files">${rows.map(([k, v]) => `<li><code>${esc(k)}</code><span class="no">${esc(v)}</span></li>`).join('')}</ul>`
@@ -2367,7 +2650,8 @@ function settingsFormHtml(info) {
     if (extra && !effort.some(([value]) => value === extra)) effort.push([extra, `${extra} (current)`])
   }
   const locked = lockedKeys()
-  const lockedRow = (key) => `<span class="label">${key}</span><span class="note">${esc(`${lockedText(data[key])} — edit in Raw JSON`)}</span>`
+  const lockedRow = (key) =>
+    `<span class="label">${key}</span><span class="note">${esc(`${lockedText(data[key])} — edit in Raw JSON`)}</span>`
   const text = (key, ph) =>
     locked.includes(key)
       ? lockedRow(key)
@@ -2403,10 +2687,18 @@ function settingsGlobalHtml(p) {
   const tab = broken ? 'raw' : cfg.stab
   const tabs = broken
     ? ''
-    : `<div class="row"><div class="tabs" role="tablist" aria-label="Global settings view">${[['form', 'Form'], ['raw', 'Raw JSON']]
-        .map(([value, label]) => `<button type="button" role="tab" id="sg-tab-${value}" data-c="stab" data-v="${value}" aria-selected="${tab === value}" aria-controls="sg-pane">${label}</button>`)
+    : `<div class="row"><div class="tabs" role="tablist" aria-label="Global settings view">${[
+        ['form', 'Form'],
+        ['raw', 'Raw JSON']
+      ]
+        .map(
+          ([value, label]) =>
+            `<button type="button" role="tab" id="sg-tab-${value}" data-c="stab" data-v="${value}" aria-selected="${tab === value}" aria-controls="sg-pane">${label}</button>`
+        )
         .join('')}</div></div>`
-  const warn = broken ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix it below. The form comes back once the file parses.`)}</div>` : ''
+  const warn = broken
+    ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix it below. The form comes back once the file parses.`)}</div>`
+    : ''
   let body
   if (tab === 'form') body = settingsFormHtml(info)
   else if (!info.exists) body = '<p class="note">The file does not exist yet. Save the form to create it.</p>'
@@ -2433,7 +2725,10 @@ function panelHtml(k, p) {
   else if (!info.exists) body = missingHtml(k, p)
   else {
     ensureEd(k, info.path)
-    const warn = !p.md && info.ok === false ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix the JSON and save.`)}</div>` : ''
+    const warn =
+      !p.md && info.ok === false
+        ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix the JSON and save.`)}</div>`
+        : ''
     body = warn + editorHtml(k, p)
   }
   return `<section class="panel" aria-labelledby="${k}-h">${panelHead(k, p)}${body}</section>`
@@ -2449,7 +2744,12 @@ function renderSettings() {
 }
 
 const MD_ORDER = ['mg', 'mp', 'mc', 'ml']
-const MD_WHERE = { mg: 'every project', mp: 'this folder · in git', mc: 'this folder · in git', ml: 'this folder · only you' }
+const MD_WHERE = {
+  mg: 'every project',
+  mp: 'this folder · in git',
+  mc: 'this folder · in git',
+  ml: 'this folder · only you'
+}
 const cmd = { sel: null }
 
 function mdKeys() {
@@ -2485,7 +2785,10 @@ function mdListHtml(panels, sel) {
       const num = exists ? ++n : 0
       const cur = k === sel
       const dirty = edDirty(eds[k])
-      const create = p.info && !exists ? `<button type="button" class="btn" id="cm-create-${k}" data-c="create" data-k="${k}" data-v="default" aria-label="${esc(`Create ${p.file}`)}">Create</button>` : ''
+      const create =
+        p.info && !exists
+          ? `<button type="button" class="btn" id="cm-create-${k}" data-c="create" data-k="${k}" data-v="default" aria-label="${esc(`Create ${p.file}`)}">Create</button>`
+          : ''
       return `<li class="cm-file${cur ? ' cur' : ''}${exists ? '' : ' missing'}">
         <span class="cm-num" aria-hidden="true">${num || '–'}</span>
         <button type="button" class="cm-pick" id="cm-pick-${k}" data-c="pick" data-k="${k}"${cur ? ' aria-current="true"' : ''}>
@@ -2518,7 +2821,8 @@ function mdPanelHtml(k, p) {
   if (!info) body = '<div class="warn">This file could not be scanned.</div>'
   else if (!info.exists) body = missingHtml(k, p)
   else if (!ed || ed.status === 'loading') body = '<p class="note">Loading…</p>'
-  else if (ed.status === 'error') body = `<p class="note">${esc(`Could not read ${p.file}: ${ed.error}`)}</p>${msgHtml(k)}`
+  else if (ed.status === 'error')
+    body = `<p class="note">${esc(`Could not read ${p.file}: ${ed.error}`)}</p>${msgHtml(k)}`
   else {
     const dirty = edDirty(ed)
     const pane = editing
@@ -2540,7 +2844,8 @@ function mdPanelHtml(k, p) {
 function renderClaudeMd() {
   const panels = cfgPanels()
   const sel = mdSelected(panels)
-  $('p-claudemd').innerHTML = `<p class="note cm-intro">Claude Code reads every file that exists here at the start of a session in this folder. Each save writes a backup to <code>~/.claude/backups/storehouse/</code> first.</p>
+  $('p-claudemd').innerHTML =
+    `<p class="note cm-intro">Claude Code reads every file that exists here at the start of a session in this folder. Each save writes a backup to <code>~/.claude/backups/storehouse/</code> first.</p>
     <div class="cm">
       <nav class="cm-nav" aria-label="CLAUDE.md files">
         <ul class="cm-list">${mdListHtml(panels, sel)}</ul>
@@ -2558,7 +2863,12 @@ function mdDirtyKey() {
 async function discardMd(k) {
   const ed = eds[k]
   if (!edDirty(ed)) return true
-  const yes = await ask({ title: 'Discard changes?', message: `Your unsaved edits in ${cfgPanels()[k].file} are lost.`, ok: 'Discard', danger: true })
+  const yes = await ask({
+    title: 'Discard changes?',
+    message: `Your unsaved edits in ${cfgPanels()[k].file} are lost.`,
+    ok: 'Discard',
+    danger: true
+  })
   if (!yes) return false
   ed.text = ed.loaded
   ed.editing = false
@@ -2615,12 +2925,22 @@ function onCfgInput(e) {
 async function setSettingsTab(tab) {
   if (tab === cfg.stab) return
   if (tab === 'raw' && sformDirtyKeys().length) {
-    const yes = await ask({ title: 'Discard form changes?', message: 'Raw JSON shows the file on disk. Your unsaved form changes are lost.', ok: 'Discard', danger: true })
+    const yes = await ask({
+      title: 'Discard form changes?',
+      message: 'Raw JSON shows the file on disk. Your unsaved form changes are lost.',
+      ok: 'Discard',
+      danger: true
+    })
     if (!yes) return
     cfg.sform = null
   }
   if (tab === 'form' && edDirty(eds.sg)) {
-    const yes = await ask({ title: 'Discard JSON changes?', message: 'The form shows the file on disk. Your unsaved Raw JSON edits are lost.', ok: 'Discard', danger: true })
+    const yes = await ask({
+      title: 'Discard JSON changes?',
+      message: 'The form shows the file on disk. Your unsaved Raw JSON edits are lost.',
+      ok: 'Discard',
+      danger: true
+    })
     if (!yes) return
     eds.sg.text = eds.sg.loaded
   }
@@ -2720,7 +3040,12 @@ async function cancelEd(k) {
   const ed = eds[k]
   if (!ed) return
   if (edDirty(ed)) {
-    const yes = await ask({ title: 'Discard changes?', message: `Your unsaved edits in ${cfgPanels()[k].file} are lost.`, ok: 'Discard', danger: true })
+    const yes = await ask({
+      title: 'Discard changes?',
+      message: `Your unsaved edits in ${cfgPanels()[k].file} are lost.`,
+      ok: 'Discard',
+      danger: true
+    })
     if (!yes) return
   }
   ed.text = ed.loaded
@@ -2917,11 +3242,17 @@ function placeFav(fromKey, cat, toKey, after) {
 
 async function saveOrder({ ids, move }) {
   const byId = new Map(state.inventory.favorites.map((f) => [f.id, f]))
-  state.inventory.favorites = ids.map((id) => byId.get(id)).map((f) => (move && f.id === move.id ? { ...f, category: move.category } : f))
+  state.inventory.favorites = ids
+    .map((id) => byId.get(id))
+    .map((f) => (move && f.id === move.id ? { ...f, category: move.category } : f))
   render()
   try {
     await send('PUT', '/api/favorites/order', move ? { ids, move } : { ids })
-    toast(move ? `Moved ${byId.get(move.id).name} to ${move.category ?? 'Uncategorized'} · ~/.claude/storehouse.json` : 'Saved order · ~/.claude/storehouse.json')
+    toast(
+      move
+        ? `Moved ${byId.get(move.id).name} to ${move.category ?? 'Uncategorized'} · ~/.claude/storehouse.json`
+        : 'Saved order · ~/.claude/storehouse.json'
+    )
   } catch (err) {
     toast(`Could not save order: ${err.message}`, true)
   }
@@ -2938,7 +3269,8 @@ function renderActivity(entries) {
   }
   list.innerHTML = entries
     .map(
-      (e) => `<li data-entry="${esc(e.id)}"><b>${esc(e.message)}</b><code>${esc(tilde(e.file ?? '')).replace(/\//g, '/<wbr>')}</code>${e.canUndo ? `<button type="button" class="btn undo" data-undo="${esc(e.id)}" aria-label="Undo: ${esc(e.message)}">Undo</button>` : ''}</li>`
+      (e) =>
+        `<li data-entry="${esc(e.id)}"><b>${esc(e.message)}</b><code>${esc(tilde(e.file ?? '')).replace(/\//g, '/<wbr>')}</code>${e.canUndo ? `<button type="button" class="btn undo" data-undo="${esc(e.id)}" aria-label="Undo: ${esc(e.message)}">Undo</button>` : ''}</li>`
     )
     .join('')
 }
@@ -3075,7 +3407,8 @@ function wire() {
   document.addEventListener(
     'mousedown',
     (e) => {
-      if (favPop && !favPop.el.contains(e.target) && !e.target.closest('[data-act="star"], [data-dact="star"]')) closeFavPop(false)
+      if (favPop && !favPop.el.contains(e.target) && !e.target.closest('[data-act="star"], [data-dact="star"]'))
+        closeFavPop(false)
     },
     true
   )
@@ -3157,7 +3490,8 @@ function wire() {
   })
 
   const clearDrop = () => {
-    for (const n of document.querySelectorAll('.drop-over, .drop-before, .drop-after')) n.classList.remove('drop-over', 'drop-before', 'drop-after')
+    for (const n of document.querySelectorAll('.drop-over, .drop-before, .drop-after'))
+      n.classList.remove('drop-over', 'drop-before', 'drop-after')
   }
   const isAfter = (e, row) => {
     const r = row.getBoundingClientRect()

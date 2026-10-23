@@ -113,7 +113,8 @@ function settingsPathFor(scope, ctx) {
 }
 
 function refusePluginRequest(req, label) {
-  if (req.plugin || req.scope === 'plugin') refuse(`${label} ${req.name} comes from a plugin; switch the plugin instead`)
+  if (req.plugin || req.scope === 'plugin')
+    refuse(`${label} ${req.name} comes from a plugin; switch the plugin instead`)
 }
 
 function findLocal(items, req, label) {
@@ -220,7 +221,8 @@ function locateHook(data, item, groupIndex, hookIndex, file) {
   const groups = isObject(data.hooks) ? data.hooks[item.event] : undefined
   const group = Array.isArray(groups) ? groups[groupIndex] : undefined
   const hook = isObject(group) && Array.isArray(group.hooks) ? group.hooks[hookIndex] : undefined
-  if (!isObject(hook) || hook.command !== item.command) refuse(`hook ${item.command} changed in ${file}; reload and try again`)
+  if (!isObject(hook) || hook.command !== item.command)
+    refuse(`hook ${item.command} changed in ${file}; reload and try again`)
   return { groups, group, hook }
 }
 
@@ -260,7 +262,14 @@ function hookOff(req, ctx, inv) {
     file: item.file
   }
   if (isProjectFile(item.file)) entry.projectDir = ctx.projectDir
-  Object.assign(entry, { event: item.event, matcher: group.matcher, hook, group: groupIndex, position: hookIndex, parkedAt })
+  Object.assign(entry, {
+    event: item.event,
+    matcher: group.matcher,
+    hook,
+    group: groupIndex,
+    position: hookIndex,
+    parkedAt
+  })
 
   const storeFile = storehousePath(ctx.home)
   const store = mutateJson(storeFile, ctx, (data, { existed }) => {
@@ -322,7 +331,15 @@ function hookOn(req, ctx, inv) {
   return {
     file,
     backup: settings.backup,
-    undo: { kind: 'hook', name: entry.hook.command, scope: entry.scope, file: entry.file, event: entry.event, index, enabled: false }
+    undo: {
+      kind: 'hook',
+      name: entry.hook.command,
+      scope: entry.scope,
+      file: entry.file,
+      event: entry.event,
+      index,
+      enabled: false
+    }
   }
 }
 

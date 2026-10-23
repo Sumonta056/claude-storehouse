@@ -47,7 +47,9 @@ export class Activity {
     const latest = this.#latestSaves()
     if (!this.#canUndo(entry, latest)) {
       const changed = entry.kind === 'save' && latest.get(entry.file) === entry.id && entry.backup
-      const error = changed ? `${entry.file} changed since this save; undo refused` : 'this change can no longer be undone'
+      const error = changed
+        ? `${entry.file} changed since this save; undo refused`
+        : 'this change can no longer be undone'
       return { ok: false, error }
     }
     let result
@@ -92,7 +94,8 @@ export class Activity {
 
   #canUndo(entry, latest) {
     if (entry.isUndo || entry.undone) return false
-    if (entry.kind === 'save') return Boolean(entry.backup) && latest.get(entry.file) === entry.id && stampOf(entry.file) === entry.stamp
+    if (entry.kind === 'save')
+      return Boolean(entry.backup) && latest.get(entry.file) === entry.id && stampOf(entry.file) === entry.stamp
     return entry.undo !== null && entry.undo !== undefined
   }
 

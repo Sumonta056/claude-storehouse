@@ -22,7 +22,8 @@ function writeStore(home, apply) {
     }
     if (data.favorites === undefined) data.favorites = []
     if (!Array.isArray(data.favorites)) refuse(`favorites in ${file} is not an array`)
-    if (data.favoriteCategories !== undefined && !Array.isArray(data.favoriteCategories)) refuse(`favoriteCategories in ${file} is not an array`)
+    if (data.favoriteCategories !== undefined && !Array.isArray(data.favoriteCategories))
+      refuse(`favoriteCategories in ${file} is not an array`)
     const had = Object.hasOwn(data, 'favoriteCategories')
     data.favoriteCategories = categoriesOf(data)
     apply(data)
@@ -40,7 +41,9 @@ function normalize(list) {
   return list
     .filter((f) => isObject(f))
     .map((f, index) => ({ f, index }))
-    .sort((a, b) => (Number.isFinite(a.f.order) ? a.f.order : a.index) - (Number.isFinite(b.f.order) ? b.f.order : b.index))
+    .sort(
+      (a, b) => (Number.isFinite(a.f.order) ? a.f.order : a.index) - (Number.isFinite(b.f.order) ? b.f.order : b.index)
+    )
     .map(({ f }, order) => ({ ...f, order }))
 }
 
@@ -57,7 +60,8 @@ function validName(value, categories, except = null) {
   if (name === '') refuse('category name is required')
   if (name.length > MAX_NAME) refuse(`category name must be ${MAX_NAME} characters or fewer`)
   if (name.toLowerCase() === 'uncategorized') refuse('Uncategorized is a reserved name')
-  if (categories.some((c) => c !== except && c.toLowerCase() === name.toLowerCase())) refuse(`category ${name} already exists`)
+  if (categories.some((c) => c !== except && c.toLowerCase() === name.toLowerCase()))
+    refuse(`category ${name} already exists`)
   return name
 }
 
@@ -123,16 +127,23 @@ export function editCategory({ op, name, newName }, home) {
     if (old === undefined) refuse(`category ${name} does not exist`)
     const next = op === 'rename' ? validName(newName, list, old) : null
     data.favoriteCategories = next === null ? list.filter((c) => c !== old) : list.map((c) => (c === old ? next : c))
-    data.favorites = data.favorites.map((f) => (isObject(f) && typeof f.category === 'string' && f.category.trim() === old ? withCategory(f, next) : f))
+    data.favorites = data.favorites.map((f) =>
+      isObject(f) && typeof f.category === 'string' && f.category.trim() === old ? withCategory(f, next) : f
+    )
   })
   return { favorites: readFavorites(home), categories: readCategories(home), backup }
 }
 
 export function reorderFavorites(ids, home, move) {
   if (!Array.isArray(ids)) refuse('ids must be an array')
-  if (move !== undefined && (!isObject(move) || typeof move.id !== 'string' || !Object.hasOwn(move, 'category'))) refuse('move must be { id, category }')
+  if (move !== undefined && (!isObject(move) || typeof move.id !== 'string' || !Object.hasOwn(move, 'category')))
+    refuse('move must be { id, category }')
   return mutateStore(home, (data) => {
-    if (move !== undefined && !data.favorites.some((f) => isObject(f) && favoriteId(f.kind, f.source, f.name) === move.id)) refuse(`favorite ${move.id} does not exist`)
+    if (
+      move !== undefined &&
+      !data.favorites.some((f) => isObject(f) && favoriteId(f.kind, f.source, f.name) === move.id)
+    )
+      refuse(`favorite ${move.id} does not exist`)
     const target = move === undefined ? undefined : resolveCategory(data, move.category, false)
     const current = normalize(data.favorites).map((f) =>
       target !== undefined && favoriteId(f.kind, f.source, f.name) === move.id ? withCategory(f, target) : f
@@ -140,7 +151,9 @@ export function reorderFavorites(ids, home, move) {
     const rank = new Map(ids.map((id, index) => [id, index]))
     const listed = current.filter((f) => rank.has(favoriteId(f.kind, f.source, f.name)))
     const rest = current.filter((f) => !rank.has(favoriteId(f.kind, f.source, f.name)))
-    listed.sort((a, b) => rank.get(favoriteId(a.kind, a.source, a.name)) - rank.get(favoriteId(b.kind, b.source, b.name)))
+    listed.sort(
+      (a, b) => rank.get(favoriteId(a.kind, a.source, a.name)) - rank.get(favoriteId(b.kind, b.source, b.name))
+    )
     data.favorites = [...listed, ...rest].map((f, order) => ({ ...f, order }))
   })
 }

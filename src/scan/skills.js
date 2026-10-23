@@ -90,7 +90,9 @@ export function scanSkills({ home, projectDir, plugins = [], skillOverrides = {}
   const enabledByOverride = (name) => overrides[name] !== 'off'
   const items = [
     ...scanFolder(path.join(home, '.claude', 'skills'), 'global', 'local', enabledByOverride),
-    ...(projectDir ? scanFolder(path.join(projectDir, '.claude', 'skills'), 'project', 'project', enabledByOverride) : [])
+    ...(projectDir
+      ? scanFolder(path.join(projectDir, '.claude', 'skills'), 'project', 'project', enabledByOverride)
+      : [])
   ]
   for (const plugin of plugins) {
     if (plugin.missing) continue
