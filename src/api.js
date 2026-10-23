@@ -237,7 +237,8 @@ export function deleteFile({ body }, deps) {
   if (settingsFile && exists(settingsFile)) {
     const parsed = readJson(settingsFile)
     if (!parsed.ok) throw new HttpError(400, `cannot read ${settingsFile}: ${parsed.error}; nothing was deleted`)
-    if (!isObject(parsed.data)) throw new HttpError(400, `${settingsFile} does not hold a JSON object; nothing was deleted`)
+    if (!isObject(parsed.data))
+      throw new HttpError(400, `${settingsFile} does not hold a JSON object; nothing was deleted`)
   }
   const result = checked(deleteToTrash(file, ctx))
   recordSave(deps, file, `Deleted ${path.basename(file)}`, null)
@@ -299,7 +300,7 @@ export async function postPluginUninstall({ body }, deps) {
   const scope = CLI_SCOPES.has(plugin.installScope) ? plugin.installScope : 'user'
   const args = ['plugin', 'uninstall', id, '--scope', scope]
   const env = { ...process.env, HOME: ctx.home, CLAUDE_CONFIG_DIR: path.join(ctx.home, '.claude') }
-  const cwd = scope === 'user' ? ctx.home : ctx.projectDir ?? ctx.home
+  const cwd = scope === 'user' ? ctx.home : (ctx.projectDir ?? ctx.home)
   try {
     await (deps.runClaude ?? runClaude)(args, { env, cwd })
   } catch (err) {
@@ -314,7 +315,7 @@ export async function postPluginUninstall({ body }, deps) {
   return ok({ ok: true, entry })
 }
 
-function backupTime(backup, file) {
+function backupTime(backup) {
   const name = path.basename(backup)
   const stamp = name.slice(name.lastIndexOf('.') + 1)
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/.exec(stamp)
@@ -323,7 +324,7 @@ function backupTime(backup, file) {
 
 export function getBackups({ query }, { ctx }) {
   const { file } = requirePath(query.path, ctx)
-  const backups = listBackups(file, ctx.home).map((backup) => ({ path: backup, time: backupTime(backup, file) }))
+  const backups = listBackups(file, ctx.home).map((backup) => ({ path: backup, time: backupTime(backup) }))
   return ok({ backups })
 }
 
@@ -332,7 +333,13 @@ export function postRestore({ body }, deps) {
   const backup = requireString(body.backup, 'backup')
   const result = checked(restoreBackup(backup, file, deps.ctx.home, deps.ctx))
   const entry = recordSave(deps, file, `Restored ${path.basename(file)} from backup`, result.backup)
-  return ok({ ok: true, backup: result.backup ?? null, content: fs.readFileSync(file, 'utf8'), stamp: stampOf(file), entry })
+  return ok({
+    ok: true,
+    backup: result.backup ?? null,
+    content: fs.readFileSync(file, 'utf8'),
+    stamp: stampOf(file),
+    entry
+  })
 }
 
 export function getActivity(_req, { activity }) {

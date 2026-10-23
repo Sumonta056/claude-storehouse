@@ -1,3 +1,4 @@
 .superpowers/
 node_modules/
 !test/fixtures/**/.claude/settings.local.json
+.claude/worktrees/

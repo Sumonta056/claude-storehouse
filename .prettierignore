@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+test/fixtures/
+.superpowers/
+.impeccable/
+CHANGELOG.md
+.claude/worktrees/

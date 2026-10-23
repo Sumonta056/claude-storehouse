@@ -5,32 +5,40 @@ in any folder. It lists skills, agents, plugins, hooks, MCP servers, settings, a
 CLAUDE.md for the global scope (`~/.claude`) and the project scope (`./.claude`), and lets
 the developer read, edit, switch on/off, and favorite them.
 
-Design: `docs/superpowers/specs/2026-10-23-claude-storehouse-design.md` (approved).
-Plan: `docs/superpowers/plans/` (one task per section).
-Setup index: `plot.md`.
-
-## Stack
-
-- Node 20, CommonJS or ESM as the plan says. No TypeScript, no build step.
-- Runtime dependency allowed: `open` only. Everything else is Node built-ins.
-- Tests: `node --test`. Fixtures under `test/fixtures/`. Tests never touch the real `~/.claude`.
-- UI: one `public/index.html`, one `public/app.js`, one `public/app.css`. Vanilla JS.
-- Font: Figtree from Google Fonts with a system fallback. All functional text 14 px or larger.
-
 ## Rules
 
+Claude Code loads every file in `.claude/rules/`. Files with `paths:` load only for matching files.
+
+| File                              | Holds                                                                        | Loads                   |
+| --------------------------------- | ---------------------------------------------------------------------------- | ----------------------- |
+| `.claude/rules/code-rules.md`     | Stack, style, tests, workflow, plan cleanup                                  | always                  |
+| `.claude/rules/business-logic.md` | Goals, what Claude Code reads, on/off per type, favorites, undo, limitations | always                  |
+| `.claude/rules/config-safety.md`  | Write procedure, backups, path allow-list, server security                   | `src/`, `test/`, `bin/` |
+| `.claude/rules/ui.md`             | Font, 14 px, pages, UI behavior, mockup                                      | `public/`               |
+| `.claude/rules/git-workflow.md`   | Conventional Commits, Husky hooks, CI, release pipeline                      | always                  |
+
+Key rules:
+
 - No comments in code.
-- Never write to the real `~/.claude`, `~/.claude.json`, or a real project `.claude` during development or tests. Use a temp HOME. See skill `storehouse-config-safety`.
-- Every config write: backup first, write temp file, rename. Parse failure means refuse.
-- Project switches write `.claude/settings.local.json`, never `.claude/settings.json`.
-- Plugin cache files are read-only. Plugin skills, agents, and hooks have no own switch.
-- Before you claim a task is done, run `npm test` and show the output. For UI tasks also verify in Chrome against a temp HOME. See skill `storehouse-verify`.
+- Never write to the real `~/.claude` or `~/.claude.json` during development or tests.
+- Run `npm run check` and show the output before you claim a task is done.
 - Ask before `git commit` or `git push`.
+- Delete a plan and its spec when the work is complete. Keep lasting decisions in `.claude/rules/`.
+
+## Project Claude Code setup
+
+- Skill `storehouse-config-safety`: switch table, write procedure, path allow-list, test rule. Load for any `src/write` or `src/scan` task.
+- Skill `storehouse-verify`: test command, fake home recipe, 10-point Chrome check. Load before you claim a task is done.
+- Agent `toggle-reviewer`: read-only reviewer for toggle and scanner code. Run after each `src/write` task.
+- `.claude/settings.json`: allows `npm test`, `node --test`, and the CLI. Denies edits to the real `~/.claude/settings.json` and `~/.claude.json`.
 
 ## Commands
 
 ```
 npm test              run all tests
+npm run lint          ESLint
+npm run format        Prettier write
+npm run check         lint + tests, run before you claim a task is done
 npm start             start the server on this folder
 node bin/storehouse.js --dir <path> --home <fakeHome> --no-open
 ```
@@ -39,10 +47,14 @@ node bin/storehouse.js --dir <path> --home <fakeHome> --no-open
 
 ```
 bin/storehouse.js   CLI
-src/server.js       http + API
+src/server.js       http server, route table
+src/api*.js         API handlers
 src/scan/*.js       read-only scanners, one per item type
-src/write/*.js      json-file (atomic + backup), toggles, files, favorites
+src/write/*.js      json-file (atomic + backup), toggles, files, favorites, activity, paths
 public/             UI
 test/               node:test + fixtures
-.claude/            project skills, agents, settings for this development
+.claude/            project rules, skills, agents, settings
+.github/            CI and release workflows, PR and issue templates, dependabot
+.husky/             git hooks
+CHANGELOG.md        written by /release-tag
 ```

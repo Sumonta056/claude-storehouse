@@ -35,7 +35,7 @@ test('starts, serves inventory with token, exits 0 on SIGINT', async () => {
   try {
     const { url, out } = await waitForRunning(child)
     assert.match(out, /Project: /)
-    assert.match(out, /Global:  .*\.claude/)
+    assert.match(out, /Global: {2}.*\.claude/)
     assert.match(out, /Press Ctrl\+C to stop\./)
     const token = url.searchParams.get('token')
     assert.match(token, /^[0-9a-f]{32}$/)
@@ -65,7 +65,11 @@ test('--version prints package version', () => {
 
 test('missing --dir exits 1', () => {
   const fx = makeFixture()
-  const res = spawnSync(process.execPath, [bin, '--dir', path.join(fx.projectDir, 'nope'), '--home', fx.home, '--no-open'], { encoding: 'utf8' })
+  const res = spawnSync(
+    process.execPath,
+    [bin, '--dir', path.join(fx.projectDir, 'nope'), '--home', fx.home, '--no-open'],
+    { encoding: 'utf8' }
+  )
   assert.equal(res.status, 1)
   assert.match(res.stderr, /nope/)
 })
@@ -73,7 +77,10 @@ test('missing --dir exits 1', () => {
 test('missing home/.claude exits 1', () => {
   const fx = makeFixture()
   const emptyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'storehouse-empty-'))
-  const res = spawnSync(process.execPath, [bin, '--dir', fx.projectDir, '--home', emptyHome, '--no-open'], { encoding: 'utf8', timeout: 10000 })
+  const res = spawnSync(process.execPath, [bin, '--dir', fx.projectDir, '--home', emptyHome, '--no-open'], {
+    encoding: 'utf8',
+    timeout: 10000
+  })
   assert.equal(res.status, 1)
   assert.match(res.stderr, /No Claude Code config found at .*\.claude/)
 })
@@ -81,7 +88,11 @@ test('missing home/.claude exits 1', () => {
 test('invalid --port exits 1', () => {
   const fx = makeFixture()
   for (const port of ['abc', '70000', '-1', '80x']) {
-    const res = spawnSync(process.execPath, [bin, '--dir', fx.projectDir, '--home', fx.home, '--no-open', `--port=${port}`], { encoding: 'utf8', timeout: 10000 })
+    const res = spawnSync(
+      process.execPath,
+      [bin, '--dir', fx.projectDir, '--home', fx.home, '--no-open', `--port=${port}`],
+      { encoding: 'utf8', timeout: 10000 }
+    )
     assert.equal(res.status, 1, port)
     assert.match(res.stderr, /Invalid port/)
   }
@@ -91,7 +102,10 @@ test('--dir that is a file exits 1', () => {
   const fx = makeFixture()
   const file = path.join(fx.projectDir, 'file.txt')
   fs.writeFileSync(file, 'x')
-  const res = spawnSync(process.execPath, [bin, '--dir', file, '--home', fx.home, '--no-open'], { encoding: 'utf8', timeout: 10000 })
+  const res = spawnSync(process.execPath, [bin, '--dir', file, '--home', fx.home, '--no-open'], {
+    encoding: 'utf8',
+    timeout: 10000
+  })
   assert.equal(res.status, 1)
   assert.match(res.stderr, /not a directory/)
 })
@@ -102,7 +116,16 @@ test('busy port exits 1 with message', async () => {
   await new Promise((resolve) => blocker.listen(0, '127.0.0.1', resolve))
   const port = blocker.address().port
   try {
-    const child = spawn(process.execPath, [bin, '--dir', fx.projectDir, '--home', fx.home, '--no-open', '--port', String(port)])
+    const child = spawn(process.execPath, [
+      bin,
+      '--dir',
+      fx.projectDir,
+      '--home',
+      fx.home,
+      '--no-open',
+      '--port',
+      String(port)
+    ])
     let err = ''
     child.stderr.on('data', (c) => (err += c))
     const code = await new Promise((resolve) => child.on('exit', resolve))

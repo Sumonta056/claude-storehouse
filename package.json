@@ -2,9 +2,54 @@
   "name": "claude-storehouse",
   "version": "0.1.0",
   "type": "module",
-  "bin": { "claude-storehouse": "bin/storehouse.js" },
-  "files": ["bin", "src", "public"],
-  "scripts": { "test": "node --test test/", "start": "node bin/storehouse.js" },
-  "engines": { "node": ">=20" },
-  "dependencies": { "open": "^10.1.0" }
+  "bin": {
+    "claude-storehouse": "bin/storehouse.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public"
+  ],
+  "scripts": {
+    "test": "node --test test/",
+    "start": "node bin/storehouse.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm test",
+    "prepare": "husky"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.9.10"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css,html}": "prettier --write"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sumonta056/claude-storehouse.git"
+  },
+  "homepage": "https://github.com/Sumonta056/claude-storehouse#readme",
+  "bugs": {
+    "url": "https://github.com/Sumonta056/claude-storehouse/issues"
+  }
 }

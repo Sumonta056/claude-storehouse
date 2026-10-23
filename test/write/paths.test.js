@@ -118,7 +118,7 @@ test('rejects symlink under project that points outside', () => {
 })
 
 test('works when home itself is reached through a symlink', () => {
-  withFixture((fx, ctx) => {
+  withFixture((fx) => {
     const alias = path.join(path.dirname(fx.home), 'home-alias')
     fs.symlinkSync(fx.home, alias)
     const result = isAllowed(path.join(alias, '.claude', 'settings.json'), { home: alias, projectDir: fx.projectDir })
