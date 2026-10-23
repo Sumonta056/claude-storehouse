@@ -95,6 +95,30 @@ Target file per scope:
 - A favorite whose item is gone shows "missing" with a remove button.
 - Drag to reorder.
 
+## Context cost
+
+The Context page estimates the tokens that each item adds to every session. The browser builds it from `GET /api/inventory`. There is no server code for it beyond `size` on skills and agents and `claudeMd.rules`.
+
+| Item                                                    | Loads at session start   | Loads on use                               |
+| ------------------------------------------------------- | ------------------------ | ------------------------------------------ |
+| CLAUDE.md (global, project, local, `.claude/CLAUDE.md`) | full file                | —                                          |
+| `.claude/rules/**/*.md` without `paths:`                | full file                | —                                          |
+| `.claude/rules/**/*.md` with `paths:`                   | —                        | full file, when a matching file is touched |
+| Skill (on)                                              | `name` + `description`   | full `SKILL.md`                            |
+| Agent (on)                                              | `name` + `description`   | full body, in the subagent context         |
+| Plugin skill and agent (plugin on)                      | same as above            | same as above                              |
+| MCP server (on)                                         | tool names, not measured | full tool schema                           |
+| Skill or agent (off)                                    | nothing                  | nothing                                    |
+
+- Estimate: `tokens = Math.ceil(bytes / 4)`. One constant, `TOKEN_BYTES`, in `public/app.js`.
+- A skill or agent costs its `name: description` bytes. The description is cut at 1,536 characters, the Claude Code cap.
+- Skill listing budget: 1% of the context window, about 2,000 tokens for 200K. Over budget, Claude Code drops the descriptions of the least-used skills. Source: code.claude.com/docs/en/skills.
+- The scanner reads rules recursively from `~/.claude/rules` and `./.claude/rules`. It skips names that start with `.`, non-`.md` files, symlinked folders, and symlinked files whose real path is outside the home folder and the project folder. A rule is conditional when its frontmatter `paths` has at least one entry.
+- An item that is off counts 0. Its row shows "Saves NN tok while off".
+- A skill with a duplicate name counts once for each copy. The row links to Duplicates.
+- Not counted: MCP tool schemas, `@path` imports in CLAUDE.md, `SessionStart` hook output, and `disable-model-invocation: true` (counted as if it lists).
+- The total uses the scope filter and search. With the chip "All", the total equals the sum of the rows.
+
 ## Duplicates
 
 - The Duplicates page groups skills, agents, and MCP servers of one kind that have the same name. A skill and an agent with one name do not make a group.
@@ -116,4 +140,5 @@ Target file per scope:
 2. Agent off is a rename to `.md.disabled`.
 3. Hook off parks the entry in `~/.claude/storehouse.json`.
 4. Changes apply at the next Claude Code session.
-5. `commands`, `rules`, `output-styles` are out of scope for version 1.
+5. `commands` and `output-styles` are out of scope for version 1. Rules are read-only. They show only on the Context page.
+6. Context cost is an estimate from file sizes.
