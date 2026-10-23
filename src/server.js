@@ -18,6 +18,7 @@ const ROUTES = {
   'POST /api/toggle': api.postToggle,
   'POST /api/favorite': api.postFavorite,
   'PUT /api/favorites/order': api.putFavoritesOrder,
+  'POST /api/favorites/category': api.postFavoriteCategory,
   'POST /api/hook': config.postHook,
   'DELETE /api/hook': config.deleteHook,
   'POST /api/mcp': config.postMcp,

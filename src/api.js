@@ -4,7 +4,8 @@ import { execFile } from 'node:child_process'
 import { scanAll } from './scan/index.js'
 import { storehousePath } from './scan/hooks.js'
 import { toggle, mutateJson, Refusal } from './write/toggles.js'
-import { setFavorite, reorderFavorites } from './write/favorites.js'
+import { setFavorite, reorderFavorites, editCategory } from './write/favorites.js'
+import { favoriteId, readCategories, readFavorites } from './scan/favorites.js'
 import { readText, writeText, deleteToTrash } from './write/files.js'
 import { isAllowed } from './write/paths.js'
 import { listBackups, restoreBackup, readJson } from './write/json-file.js'
@@ -133,22 +134,40 @@ export function postToggle({ body }, deps) {
 }
 
 export function postFavorite({ body }, deps) {
-  const req = pick(body, ['kind', 'name', 'source', 'favorite'])
-  const favorites = refused(() => setFavorite(req, deps.ctx.home))
-  const entry = deps.activity.record({
-    kind: 'favorite',
-    file: storehousePath(deps.ctx.home),
-    message: `${req.favorite ? 'Starred' : 'Unstarred'} ${req.kind} ${req.name}`,
-    undo: req
-  })
-  return ok({ ok: true, favorites, entry })
+  const req = pick(body, ['kind', 'name', 'source', 'favorite', 'category'])
+  const home = deps.ctx.home
+  const before = readFavorites(home).find((f) => f.id === favoriteId(req.kind, req.source, req.name))
+  const favorites = refused(() => setFavorite(req, home))
+  const file = storehousePath(home)
+  const label = `${req.kind} ${req.name}`
+  const now = favorites.find((f) => f.id === favoriteId(req.kind, req.source, req.name))
+  const entry =
+    req.favorite && before
+      ? recordSave(deps, file, req.category === undefined ? `Kept ${label} as a favorite` : `Moved ${label} to ${now?.category ?? 'Uncategorized'}`, null)
+      : deps.activity.record({
+          kind: 'favorite',
+          file,
+          message: `${req.favorite ? 'Starred' : 'Unstarred'} ${label}`,
+          undo: req.favorite ? req : { ...req, category: before?.category ?? null }
+        })
+  return ok({ ok: true, favorites, favoriteCategories: readCategories(home), entry })
+}
+
+export function postFavoriteCategory({ body }, deps) {
+  const req = pick(body, ['op', 'name', 'newName'])
+  const result = refused(() => editCategory(req, deps.ctx.home))
+  const message =
+    req.op === 'rename' ? `Renamed category ${req.name} to ${String(req.newName).trim()}` : `${req.op === 'create' ? 'Added' : 'Deleted'} category ${String(req.name).trim()}`
+  const entry = recordSave(deps, storehousePath(deps.ctx.home), message, result.backup)
+  return ok({ ok: true, favorites: result.favorites, favoriteCategories: result.categories, entry })
 }
 
 export function putFavoritesOrder({ body }, deps) {
   const ids = Array.isArray(body) ? body : body?.ids
-  const favorites = refused(() => reorderFavorites(ids, deps.ctx.home))
-  const entry = recordSave(deps, storehousePath(deps.ctx.home), 'Reordered favorites', null)
-  return ok({ ok: true, favorites, entry })
+  const move = Array.isArray(body) ? undefined : body?.move
+  const favorites = refused(() => reorderFavorites(ids, deps.ctx.home, move))
+  const entry = recordSave(deps, storehousePath(deps.ctx.home), move ? 'Moved and reordered favorites' : 'Reordered favorites', null)
+  return ok({ ok: true, favorites, favoriteCategories: readCategories(deps.ctx.home), entry })
 }
 
 function listDir(dir) {

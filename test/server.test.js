@@ -436,6 +436,61 @@ test('POST /api/favorite stars a skill and logs it', async () => {
   })
 })
 
+test('POST /api/favorites/category creates, renames, and deletes a category', async () => {
+  await withServer(async ({ api }) => {
+    const made = await api('POST', '/api/favorites/category', { op: 'create', name: 'Review' })
+    assert.equal(made.status, 200, made.text)
+    assert.deepEqual(made.json.favoriteCategories, ['Review'])
+    const dup = await api('POST', '/api/favorites/category', { op: 'create', name: 'review' })
+    assert.equal(dup.status, 400)
+    await api('POST', '/api/favorite', { kind: 'skill', name: 'html-report', source: 'local', favorite: true, category: 'Review' })
+    const renamed = await api('POST', '/api/favorites/category', { op: 'rename', name: 'Review', newName: 'Code review' })
+    assert.equal(renamed.json.favorites[0].category, 'Code review')
+    const inv = await api('GET', '/api/inventory')
+    assert.deepEqual(inv.json.favoriteCategories, ['Code review'])
+    const gone = await api('POST', '/api/favorites/category', { op: 'delete', name: 'Code review' })
+    assert.deepEqual(gone.json.favoriteCategories, [])
+    assert.equal(gone.json.favorites[0].category, null)
+    const activity = await api('GET', '/api/activity')
+    assert.equal(activity.json.entries[0].kind, 'save')
+    assert.equal(activity.json.entries[0].canUndo, true)
+    const undo = await api('POST', '/api/undo', { entryId: gone.json.entry.id })
+    assert.equal(undo.status, 200, undo.text)
+    const back = await api('GET', '/api/inventory')
+    assert.deepEqual(back.json.favoriteCategories, ['Code review'])
+    assert.equal(back.json.favorites[0].category, 'Code review')
+  })
+})
+
+test('POST /api/favorite move is not undoable, and undo of unstar restores the category', async () => {
+  await withServer(async ({ api }) => {
+    const fav = { kind: 'skill', name: 'html-report', source: 'local' }
+    await api('POST', '/api/favorite', { ...fav, favorite: true, category: 'QA' })
+    const move = await api('POST', '/api/favorite', { ...fav, favorite: true, category: 'Review' })
+    assert.equal(move.json.favorites[0].category, 'Review')
+    let activity = await api('GET', '/api/activity')
+    assert.equal(activity.json.entries[0].kind, 'save')
+    const off = await api('POST', '/api/favorite', { ...fav, favorite: false })
+    assert.deepEqual(off.json.favorites, [])
+    const undo = await api('POST', '/api/undo', { entryId: off.json.entry.id })
+    assert.equal(undo.status, 200, undo.text)
+    const inv = await api('GET', '/api/inventory')
+    assert.equal(inv.json.favorites[0].category, 'Review')
+  })
+})
+
+test('PUT /api/favorites/order with a move changes the category', async () => {
+  await withServer(async ({ api }) => {
+    const fav = { kind: 'skill', name: 'html-report', source: 'local' }
+    await api('POST', '/api/favorite', { ...fav, favorite: true, category: 'QA' })
+    await api('POST', '/api/favorites/category', { op: 'create', name: 'Review' })
+    const id = 'skill:local:html-report'
+    const res = await api('PUT', '/api/favorites/order', { ids: [id], move: { id, category: 'Review' } })
+    assert.equal(res.status, 200, res.text)
+    assert.equal(res.json.favorites[0].category, 'Review')
+  })
+})
+
 test('POST /api/mcp global writes ~/.claude.json and keeps other servers', async () => {
   await withServer(async ({ fx, api }) => {
     const res = await api('POST', '/api/mcp', { scope: 'global', name: 'remote', config: { url: 'https://x.example.com' } })
