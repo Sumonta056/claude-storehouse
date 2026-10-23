@@ -4,6 +4,7 @@ const PAGES = {
   dash: 'Dashboard',
   fav: 'Favorites',
   dups: 'Duplicates',
+  context: 'Context',
   skills: 'Skills',
   agents: 'Agents',
   plugins: 'Plugins',
@@ -827,6 +828,7 @@ const ICON = {
 }
 
 const KIND_PATH = {
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
   skill: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
   agent: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/>',
   plugin: '<path d="M9 3v4M15 3v4M6 7h12v5a6 6 0 0 1-12 0zM12 18v3"/>',
@@ -839,6 +841,14 @@ function kindIcon(kind, size = 24) {
 }
 
 const CHIPS = {
+  context: [
+    ['all', 'All'],
+    ['claudemd', 'CLAUDE.md'],
+    ['rules', 'Rules'],
+    ['skills', 'Skills'],
+    ['agents', 'Agents'],
+    ['mcp', 'MCP']
+  ],
   dups: [
     ['all', 'All'],
     ['needs', 'Needs action']
@@ -901,7 +911,16 @@ const SECTIONS = {
   ]
 }
 
-const chipFilter = { dups: 'all', plugins: 'all', mods: 'all', skills: 'all', agents: 'all', hooks: 'all', mcp: 'all' }
+const chipFilter = {
+  context: 'all',
+  dups: 'all',
+  plugins: 'all',
+  mods: 'all',
+  skills: 'all',
+  agents: 'all',
+  hooks: 'all',
+  mcp: 'all'
+}
 const groupOpen = new Map()
 let menuKey = null
 let menuCtx = ''
@@ -1008,7 +1027,7 @@ function dupSource(item) {
   return item.scope === 'project' ? 'Project' : 'Global'
 }
 
-function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false } = {}) {
+function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, right = '', note = '' } = {}) {
   const open = menuKey === item.key && menuCtx === ctx
   const src =
     ctx === 'dups'
@@ -1030,9 +1049,9 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false }
     <div class="body">
       <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
       <p class="desc">${esc(desc)}</p>
-      ${metaHtml(item)}
+      ${metaHtml(item)}${note}
     </div>
-    ${ver ? `<span class="ver" title="${esc(fullVer)}">${esc(ver)}</span>` : ''}
+    ${right}${ver ? `<span class="ver" title="${esc(fullVer)}">${esc(ver)}</span>` : ''}
     <div class="tail">
       ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
       ${keep ? '<button type="button" class="btn" data-act="keep">Keep only this</button>' : ''}
@@ -1063,6 +1082,8 @@ function keepChip(page, item) {
 
 function chipCounts(page, list) {
   if (page === 'dups') return { all: list.length, needs: list.filter(needsAction).length }
+  if (page === 'context')
+    return Object.fromEntries(CHIPS.context.map(([k]) => [k, list.filter((e) => k === 'all' || e.type === k).length]))
   const shown = list.filter(visible)
   if (page === 'mods') {
     const own = shown.filter((m) => !m.dev)
@@ -1213,6 +1234,222 @@ async function keepOnly(item) {
   }
 }
 
+const TOKEN_BYTES = 4
+const WINDOW_TOKENS = 200000
+const LISTING_BUDGET = WINDOW_TOKENS / 100
+const DESC_CAP = 1536
+const CTX_TYPES = [
+  ['claudemd', 'CLAUDE.md', 'm0'],
+  ['skills', 'Skills', 'm1'],
+  ['rules', 'Rules', 'm2'],
+  ['agents', 'Agents', 'm3']
+]
+const CTX_FILES = [
+  ['global', '~/.claude/CLAUDE.md'],
+  ['project', 'CLAUDE.md'],
+  ['projectLocal', 'CLAUDE.local.md'],
+  ['projectClaudeDir', '.claude/CLAUDE.md']
+]
+const utf8 = new TextEncoder()
+
+function tokensOf(bytes) {
+  return Math.ceil(bytes / TOKEN_BYTES)
+}
+
+function listingTokens(item) {
+  return tokensOf(utf8.encode(`${item.name}: ${String(item.description ?? '').slice(0, DESC_CAP)}`).length)
+}
+
+function sumTokens(list) {
+  return list.reduce((sum, e) => sum + e.always, 0)
+}
+
+function tok(n) {
+  return `${n.toLocaleString('en-US')} tok`
+}
+
+function contextItems() {
+  const m = state.inventory.claudeMd ?? {}
+  const out = []
+  for (const [k, name] of CTX_FILES) {
+    const f = m[k]
+    if (!f?.exists) continue
+    const scope = k === 'global' ? 'global' : 'project'
+    out.push({
+      type: 'claudemd',
+      kind: 'claudemd',
+      key: `ctx:md:${k}`,
+      name,
+      scope,
+      path: f.path,
+      description: 'Loads in full at session start.',
+      always: tokensOf(f.size),
+      onUse: 0,
+      enabled: true
+    })
+  }
+  for (const r of m.rules ?? []) {
+    const size = tokensOf(r.size)
+    out.push({
+      type: 'rules',
+      kind: 'rule',
+      key: `ctx:rule:${r.path}`,
+      name: `rules/${r.path.split(/[\\/]rules[\\/]/).pop()}`,
+      scope: r.scope,
+      path: r.path,
+      conditional: r.conditional,
+      description: r.conditional
+        ? 'Has paths: in its frontmatter. Loads when Claude reads a matching file.'
+        : 'Loads in full at session start.',
+      always: r.conditional ? 0 : size,
+      onUse: r.conditional ? size : 0,
+      enabled: true
+    })
+  }
+  for (const [type, list] of [
+    ['skills', catalog.skill],
+    ['agents', catalog.agent]
+  ])
+    for (const item of list) {
+      const cost = listingTokens(item)
+      out.push({
+        type,
+        kind: item.kind,
+        key: item.key,
+        item,
+        name: item.name,
+        scope: item.scope,
+        description: item.description,
+        source: item.source,
+        plugin: item.plugin,
+        cost,
+        always: item.enabled ? cost : 0,
+        onUse: tokensOf(item.size ?? 0),
+        enabled: item.enabled
+      })
+    }
+  for (const item of catalog.mcp)
+    out.push({
+      type: 'mcp',
+      kind: 'mcp',
+      key: item.key,
+      item,
+      name: item.name,
+      scope: item.scope,
+      description: item.description,
+      source: item.source,
+      always: 0,
+      onUse: 0,
+      enabled: item.enabled
+    })
+  return out.sort((a, b) => b.always - a.always || b.onUse - a.onUse || a.name.localeCompare(b.name))
+}
+
+function tokHtml(n, max, label = tok(n)) {
+  const width = max && n ? Math.max(4, (n / max) * 100) : 0
+  return `<div class="tok"><span>${esc(label)}</span><span class="mini" aria-hidden="true"><span style="width:${width}%"></span></span></div>`
+}
+
+function ctxNote(e, dups) {
+  const bits = []
+  if (e.type === 'mcp') bits.push('<span class="mchip">Tool names load at start. Not measured.</span>')
+  else if (e.item && !e.enabled) bits.push(`<span class="mchip okc">Saves ${tok(e.cost)} while off</span>`)
+  else if (e.type === 'rules' && e.conditional) bits.push(`<span class="mchip">On use: ${tok(e.onUse)}</span>`)
+  else if (e.item) bits.push(`<span class="mchip">Body on use: ${tok(e.onUse)}</span>`)
+  if (dups.has(e.key))
+    bits.push(
+      `<button type="button" class="mchip btn-plain dupc" data-go="dups">Same name as another ${esc(e.kind === 'mcp' ? 'MCP server' : e.kind)}</button>`
+    )
+  return `<p class="meta chips-s">${bits.join('')}</p>`
+}
+
+function ctxFileRow(e, max, dups) {
+  const where = e.scope === 'global' ? 'Global' : 'Project'
+  const name =
+    e.type === 'claudemd'
+      ? `<button type="button" class="name btn-plain" data-go="claudemd">${esc(e.name)}</button>`
+      : `<span class="name">${esc(e.name)}</span>`
+  return `<li class="lrow ctx-file">
+    <div class="lead"><span class="lead-ic" role="img" aria-label="${esc(e.type === 'claudemd' ? 'CLAUDE.md file' : 'Rule file')}" title="${esc(tilde(e.path))}">${kindIcon('file', 18)}</span></div>
+    <div class="body">
+      <div class="l1">${name}<span class="src">${esc(`${where} · ${tilde(e.path)}`)}</span></div>
+      <p class="desc">${esc(e.description)}</p>
+      ${e.conditional ? ctxNote(e, dups) : ''}
+    </div>
+    ${tokHtml(e.always, max)}
+  </li>`
+}
+
+function ctxRow(e, max, dups) {
+  if (!e.item) return ctxFileRow(e, max, dups)
+  const right = e.type === 'mcp' ? tokHtml(0, max, 'not measured') : tokHtml(e.always, max)
+  return rowHtml(e.item, 'context', { right, note: ctxNote(e, dups) })
+}
+
+function contextBandHtml(list) {
+  const total = sumTokens(list)
+  const types = CTX_TYPES.map(([type, label, cls]) => ({
+    label,
+    cls,
+    n: sumTokens(list.filter((e) => e.type === type))
+  })).filter((t) => t.n)
+  const pct = (n) => `${total ? ((n / total) * 100).toFixed(0) : 0}%`
+  const top = [...types].sort((a, b) => b.n - a.n)[0]
+  const on = (type) => list.filter((e) => e.type === type && e.always).length
+  const parts = [
+    plural(on('claudemd'), 'CLAUDE.md file'),
+    plural(on('rules'), 'rule'),
+    plural(on('skills'), 'skill'),
+    plural(on('agents'), 'agent')
+  ]
+  const share = ((total / WINDOW_TOKENS) * 100).toFixed(1)
+  return `<section class="usage" aria-label="Context cost">
+      <div>
+        <div class="k">Loaded in every session</div>
+        <div class="big" id="ctx-total">${total.toLocaleString('en-US')}<small> tokens</small></div>
+        <p>Estimate: file bytes ÷ ${TOKEN_BYTES}. ${share}% of a 200K context window.<br>${esc(parts.join(' · '))} · MCP servers not measured · <code>@path</code> imports not followed</p>
+      </div>
+      <div class="right">
+        <div class="k">By type</div>
+        <div class="mon">${top ? esc(top.label) : 'Nothing'}<span>${top ? `${pct(top.n)} of the total` : 'loads at start'}</span></div>
+        <div class="bar" role="img" aria-label="${esc(`Context by type: ${types.map((t) => `${t.label} ${pct(t.n)}`).join(', ')}`)}">${types
+          .map((t) => `<span class="${t.cls}" style="width:${pct(t.n)}"></span>`)
+          .join('')}</div>
+        <div class="legend">${types.map((t) => `<span><i class="${t.cls}"></i>${esc(t.label)} ${pct(t.n)}</span>`).join('')}</div>
+      </div>
+    </section>`
+}
+
+function budgetHtml(list) {
+  const skills = list.filter((e) => e.type === 'skills')
+  const own = sumTokens(skills.filter((e) => e.scope !== 'plugin'))
+  const fromPlugins = sumTokens(skills.filter((e) => e.scope === 'plugin'))
+  const used = own + fromPlugins
+  const pct = (used / LISTING_BUDGET) * 100
+  const scale = Math.max(used, LISTING_BUDGET)
+  const over = used > LISTING_BUDGET
+  return `<div class="budget${over ? ' over' : ''}">
+      <div class="bt"><b>Skill listing budget</b><span>${used.toLocaleString('en-US')} of about ${LISTING_BUDGET.toLocaleString('en-US')} tokens · ${pct.toFixed(0)}%</span></div>
+      <div class="meter" role="img" aria-label="${esc(`${pct.toFixed(0)} percent of the skill listing budget used`)}"><span style="width:${(own / scale) * 100}%;background:var(--accent)"></span><span style="width:${(fromPlugins / scale) * 100}%;background:var(--purple)"></span></div>
+      <small>Claude Code lists skill names and descriptions in 1% of the context window: about ${LISTING_BUDGET.toLocaleString('en-US')} tokens for 200K. ${over ? '<b>Over budget:</b> Claude Code drops the descriptions of the skills you use least, and Claude can miss a skill.' : 'Over budget, Claude Code drops the descriptions of the skills you use least.'} Orange: your skills. Purple: plugin skills.</small>
+    </div>`
+}
+
+function renderContext() {
+  const all = contextItems().filter(visible)
+  const shown = all.filter((e) => chipFilter.context === 'all' || e.type === chipFilter.context)
+  const max = Math.max(1, ...all.map((e) => e.always))
+  const dups = new Set(duplicateGroups().flatMap((g) => g.items.map((i) => i.key)))
+  const note =
+    'Sorted by tokens. Switch off a large item to give the context window back. Changes apply at the next session.'
+  const body = shown.length
+    ? `<h2>Biggest items <span class="pill">${shown.length}</span><span class="hint">${esc(`${tok(sumTokens(shown))} at session start`)}</span></h2><ul class="rows" data-rows="context">${shown.map((e) => ctxRow(e, max, dups)).join('')}</ul>`
+    : all.length
+      ? empty('No items match this filter.')
+      : nothingMatches()
+  $('p-context').innerHTML = contextBandHtml(all) + budgetHtml(all) + chipsHtml('context', all, note) + body
+}
+
 function catalogBody(page, list) {
   if (!list.length) return empty(`No ${page} found in ~/.claude or ./.claude.`)
   const own = SECTIONS[page]
@@ -1321,6 +1558,7 @@ function renderNav() {
   $('n-hooks').textContent = otherCounts(inv.hooks).total
   $('n-mcp').textContent = otherCounts(inv.mcp).total
   $('n-dups').textContent = duplicateGroups().filter(needsAction).length
+  $('n-context').textContent = compact(sumTokens(contextItems().filter(visible)))
   $('n-fav').textContent = favoriteEntries().filter((e) => !e.item || visible(e.item)).length
   for (const b of document.querySelectorAll('#nav button')) {
     if (b.dataset.p === state.page) b.setAttribute('aria-current', 'page')
@@ -1402,6 +1640,7 @@ function renderPage() {
   if (page === 'dash') renderDash()
   else if (page === 'fav') renderFav()
   else if (page === 'dups') renderDups()
+  else if (page === 'context') renderContext()
   else if (page === 'skills')
     renderCatalog(
       'skills',
