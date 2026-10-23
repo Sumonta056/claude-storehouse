@@ -25,9 +25,11 @@ Runs on each push to `main` and each PR: lint, commitlint, tests on Node 20 and 
 ## Format
 
 - Prettier config: `.prettierrc.json`. `lint-staged` formats only the files in a commit.
-- A full reformat waits until branch `feat/favorite-categories` is merged. Then run `npm run format` in 1 `style:` commit, add `npm run format:check` to the `check` script, and add a format step to the `lint` job in `ci.yml`. Then delete this item.
+- CI and `npm run check` fail on unformatted files. Run `npm run format` before you commit, or let `lint-staged` do it.
 
 ## Release
+
+Full steps, the npm page, screenshots, and failure fixes: skill `storehouse-release`.
 
 1. Run `/release-tag` on `main`. It bumps `package.json`, writes `CHANGELOG.md`, pushes tag `vX.Y.Z`, and creates the GitHub Release.
 2. The tag starts `.github/workflows/release.yml`. It runs lint and tests, checks that the tag equals the `package.json` version and that `CHANGELOG.md` has the version, then publishes to npm with provenance and attaches the tarball to the GitHub Release.
