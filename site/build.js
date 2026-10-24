@@ -52,6 +52,7 @@ async function record() {
       home,
       inventory: await get('/api/inventory'),
       usage: await get('/api/usage'),
+      doctor: await get('/api/doctor'),
       store: JSON.parse(fs.readFileSync(path.join(home, '.claude', 'storehouse.json'), 'utf8')),
       files
     }

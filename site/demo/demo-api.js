@@ -302,6 +302,8 @@
         return inventory()
       case 'GET /api/usage':
         return clone(db.usage)
+      case 'GET /api/doctor':
+        return clone(db.doctor)
       case 'GET /api/file':
         return getFile(query.get('path'))
       case 'GET /api/backups':

@@ -93,13 +93,20 @@ for (const [id, def] of Object.entries(plugins)) {
 write(path.join(claude, 'plugins', 'installed_plugins.json'), installed)
 
 write(path.join(claude, 'settings.json'), {
-  enabledPlugins: { 'toolkit@demo-market': true, 'docs-kit@demo-market': true, 'frontend@design-market': false },
+  enabledPlugins: {
+    'toolkit@demo-market': true,
+    'docs-kit@demo-market': true,
+    'frontend@design-market': false,
+    'old-theme@demo-market': true
+  },
   skillOverrides: { 'sql-explain': 'off' },
   hooks: {
     PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/.claude/hooks/guard-bash.sh' }] }],
     Stop: [{ hooks: [{ type: 'command', command: '~/.claude/hooks/notify.sh' }] }]
   }
 })
+write(path.join(claude, 'hooks', 'guard-bash.sh'), '#!/bin/sh\nexit 0\n')
+write(path.join(claude, 'hooks', 'notify.sh'), '#!/bin/sh\nexit 0\n')
 write(path.join(claude, 'storehouse.json'), {
   favoriteCategories: ['Plan', 'Build', 'Review'],
   favorites: [
