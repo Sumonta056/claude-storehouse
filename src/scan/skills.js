@@ -18,6 +18,14 @@ function safeRealPath(file) {
   }
 }
 
+function hasText(value) {
+  return typeof value === 'string' && value.trim() !== ''
+}
+
+function isBrokenLink(entry, full) {
+  return entry.isSymbolicLink() && !fs.existsSync(full)
+}
+
 function describe(file, fallbackName) {
   let text
   try {
@@ -29,6 +37,7 @@ function describe(file, fallbackName) {
   return {
     name: meta.name || fallbackName,
     description: meta.description || firstBodyLine(meta.body),
+    hasDescription: hasText(meta.description),
     size: Buffer.byteLength(text)
   }
 }
@@ -57,6 +66,7 @@ function buildItem(file, fallback, scope, source, pluginId, enabledFor) {
     kind: 'skill',
     name: info.name,
     description: info.description,
+    hasDescription: info.hasDescription,
     size: info.size,
     scope,
     source,
@@ -72,10 +82,14 @@ function buildItem(file, fallback, scope, source, pluginId, enabledFor) {
   return item
 }
 
-function scanFolder(root, scope, source, enabledFor) {
+function scanFolder(root, scope, source, enabledFor, skipped) {
   const out = []
   for (const entry of entriesOf(root)) {
     const full = path.join(root, entry.name)
+    if (isBrokenLink(entry, full)) {
+      skipped.push({ kind: 'skill', path: full, reason: 'broken-link' })
+      continue
+    }
     let item = null
     if (entry.isDirectory() || (entry.isSymbolicLink() && isDir(full))) {
       item = buildItem(path.join(full, 'SKILL.md'), entry.name, scope, source, null, enabledFor)
@@ -87,13 +101,13 @@ function scanFolder(root, scope, source, enabledFor) {
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export function scanSkills({ home, projectDir, plugins = [], skillOverrides = {} }) {
+export function scanSkills({ home, projectDir, plugins = [], skillOverrides = {}, skipped = [] }) {
   const overrides = skillOverrides ?? {}
   const enabledByOverride = (name) => overrides[name] !== 'off'
   const items = [
-    ...scanFolder(path.join(home, '.claude', 'skills'), 'global', 'local', enabledByOverride),
+    ...scanFolder(path.join(home, '.claude', 'skills'), 'global', 'local', enabledByOverride, skipped),
     ...(projectDir
-      ? scanFolder(path.join(projectDir, '.claude', 'skills'), 'project', 'project', enabledByOverride)
+      ? scanFolder(path.join(projectDir, '.claude', 'skills'), 'project', 'project', enabledByOverride, skipped)
       : [])
   ]
   for (const plugin of plugins) {

@@ -50,6 +50,7 @@ function readItem(file, fileName, scope, source, pluginId, enabled, readOnly) {
     kind: 'agent',
     name,
     description: meta.description || firstBodyLine(meta.body),
+    hasDescription: typeof meta.description === 'string' && meta.description.trim() !== '',
     model: typeof meta.model === 'string' ? meta.model : '',
     tools: toolList(meta.tools),
     size: Buffer.byteLength(text),
@@ -67,7 +68,7 @@ function readItem(file, fileName, scope, source, pluginId, enabled, readOnly) {
   return item
 }
 
-function scanFolder(root, scope, source) {
+function scanFolder(root, scope, source, skipped) {
   let entries
   try {
     entries = fs.readdirSync(root, { withFileTypes: true })
@@ -79,6 +80,10 @@ function scanFolder(root, scope, source) {
     if (entry.name.startsWith('.')) continue
     if (!(entry.isFile() || entry.isSymbolicLink())) continue
     if (stripSuffix(entry.name) === null) continue
+    if (entry.isSymbolicLink() && !fs.existsSync(path.join(root, entry.name))) {
+      skipped.push({ kind: 'agent', path: path.join(root, entry.name), reason: 'broken-link' })
+      continue
+    }
     const item = readItem(
       path.join(root, entry.name),
       entry.name,
@@ -93,10 +98,10 @@ function scanFolder(root, scope, source) {
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export function scanAgents({ home, projectDir, plugins = [] }) {
+export function scanAgents({ home, projectDir, plugins = [], skipped = [] }) {
   const items = [
-    ...scanFolder(path.join(home, '.claude', 'agents'), 'global', 'local'),
-    ...(projectDir ? scanFolder(path.join(projectDir, '.claude', 'agents'), 'project', 'project') : [])
+    ...scanFolder(path.join(home, '.claude', 'agents'), 'global', 'local', skipped),
+    ...(projectDir ? scanFolder(path.join(projectDir, '.claude', 'agents'), 'project', 'project', skipped) : [])
   ]
   for (const plugin of plugins) {
     if (plugin.missing) continue

@@ -143,3 +143,27 @@ test('each skill has size in bytes of its file', () => {
     assert.equal(loose.size, fs.statSync(path.join(fx.home, '.claude', 'skills', 'loose.md')).size)
   })
 })
+
+test('hasDescription is true only when frontmatter has a description', () => {
+  withFixture((fx) => {
+    const items = run(fx)
+    assert.equal(items.find((i) => i.name === 'html-report').hasDescription, true)
+    assert.equal(items.find((i) => i.name === 'nofm').hasDescription, false)
+    assert.equal(items.find((i) => i.name === 'nofm').description, 'First real line of the body.')
+  })
+})
+
+test('broken skill symlinks go to the skipped list', () => {
+  withFixture((fx) => {
+    const root = path.join(fx.home, '.claude', 'skills')
+    fs.symlinkSync(path.join(fx.home, 'gone-dir'), path.join(root, 'ghost'))
+    fs.symlinkSync(path.join(fx.home, 'gone.md'), path.join(root, 'ghost-file.md'))
+    const skipped = []
+    const items = scanSkills({ home: fx.home, projectDir: fx.projectDir, plugins: [], skillOverrides: {}, skipped })
+    assert.ok(!items.some((i) => i.name === 'ghost' || i.name === 'ghost-file'))
+    assert.deepEqual(skipped.map((s) => [s.kind, s.path, s.reason]).sort(), [
+      ['skill', path.join(root, 'ghost'), 'broken-link'],
+      ['skill', path.join(root, 'ghost-file.md'), 'broken-link']
+    ])
+  })
+})

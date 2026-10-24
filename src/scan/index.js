@@ -66,13 +66,14 @@ export function scanAll({ home, projectDir }) {
     () => scanPlugins({ home, projectDir, enabledPlugins: settings.enabledPlugins }),
     []
   )
+  const skipped = []
   const skills = attempt(
     errors,
     'skills',
-    () => scanSkills({ home, projectDir, plugins, skillOverrides: settings.skillOverrides }),
+    () => scanSkills({ home, projectDir, plugins, skillOverrides: settings.skillOverrides, skipped }),
     []
   )
-  const agents = attempt(errors, 'agents', () => scanAgents({ home, projectDir, plugins }), [])
+  const agents = attempt(errors, 'agents', () => scanAgents({ home, projectDir, plugins, skipped }), [])
   const mcp = attempt(
     errors,
     'mcp',
@@ -108,6 +109,7 @@ export function scanAll({ home, projectDir }) {
     settings: { global: byScope.global, project: byScope.project, projectLocal: byScope.projectLocal },
     claudeMd,
     favorites: [],
+    skipped,
     errors
   }
   inventory.favorites = attempt(errors, 'favorites', () => applyFavorites(inventory, home), [])

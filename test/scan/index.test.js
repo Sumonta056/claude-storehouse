@@ -31,6 +31,24 @@ test('scanAll returns every section and errors array', () => {
   }
 })
 
+test('scanAll collects broken skill and agent links in skipped', () => {
+  const fx = makeFixture()
+  try {
+    assert.deepEqual(scanAll({ home: fx.home, projectDir: fx.projectDir }).skipped, [])
+    const skillLink = path.join(fx.home, '.claude', 'skills', 'ghost')
+    const agentLink = path.join(fx.projectDir, '.claude', 'agents', 'ghost.md')
+    fs.symlinkSync(path.join(fx.home, 'gone'), skillLink)
+    fs.symlinkSync(path.join(fx.home, 'gone.md'), agentLink)
+    const inv = scanAll({ home: fx.home, projectDir: fx.projectDir })
+    assert.deepEqual(inv.skipped, [
+      { kind: 'skill', path: skillLink, reason: 'broken-link' },
+      { kind: 'agent', path: agentLink, reason: 'broken-link' }
+    ])
+  } finally {
+    fx.cleanup()
+  }
+})
+
 test('scanAll records a parse error and still returns other sections', () => {
   const fx = makeFixture()
   try {

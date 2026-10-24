@@ -98,3 +98,30 @@ test('each agent has size in bytes of its file', () => {
     fx.cleanup()
   }
 })
+
+test('agent hasDescription follows the frontmatter description', () => {
+  const fx = makeFixture()
+  try {
+    fs.writeFileSync(path.join(fx.home, '.claude', 'agents', 'bare.md'), 'Just a body line.\n')
+    const items = run(fx)
+    assert.equal(items.find((i) => i.name === 'bare').hasDescription, false)
+    assert.equal(items.find((i) => i.name === 'bare').description, 'Just a body line.')
+    assert.equal(items.find((i) => i.name === 'my-agent').hasDescription, true)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('broken agent symlinks go to the skipped list', () => {
+  const fx = makeFixture()
+  try {
+    const link = path.join(fx.home, '.claude', 'agents', 'ghost.md')
+    fs.symlinkSync(path.join(fx.home, 'gone.md'), link)
+    const skipped = []
+    const items = scanAgents({ home: fx.home, projectDir: fx.projectDir, plugins: [], skipped })
+    assert.ok(!items.some((i) => i.name === 'ghost'))
+    assert.deepEqual(skipped, [{ kind: 'agent', path: link, reason: 'broken-link' }])
+  } finally {
+    fx.cleanup()
+  }
+})
