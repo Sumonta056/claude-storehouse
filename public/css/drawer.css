@@ -1,0 +1,333 @@
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  --k: var(--accent-text);
+  width: min(720px, 100vw);
+  height: 100vh;
+  height: 100dvh;
+  background: var(--side);
+  border-left: 1px solid var(--line);
+  box-shadow: -20px 0 60px #00000080;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 0.2s,
+    visibility 0.2s;
+  overflow: auto;
+  overscroll-behavior: contain;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+}
+.drawer[data-kind='agent'] {
+  --k: var(--purple);
+}
+.drawer[data-kind='plugin'] {
+  --k: var(--blue);
+}
+.drawer[data-kind='hook'] {
+  --k: var(--green);
+}
+.drawer[data-kind='mcp'] {
+  --k: var(--teal);
+}
+.drawer {
+  --k-soft: color-mix(in srgb, var(--k) 14%, transparent);
+  --k-line: color-mix(in srgb, var(--k) 40%, transparent);
+}
+.drawer.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.2s;
+}
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: #0006;
+  z-index: 8;
+}
+.dr-top {
+  position: relative;
+  padding: 18px 24px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--k-soft), transparent 85%);
+}
+.dr-top::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--k);
+}
+.dh {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kicon {
+  flex: none;
+  align-self: stretch;
+  min-width: 48px;
+  min-height: 48px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--k);
+  background: var(--k-soft);
+  border: 1px solid var(--k-line);
+}
+.dh-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dr-meta {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text2);
+  overflow-wrap: anywhere;
+}
+.dr-meta .k {
+  color: var(--k);
+  font-weight: 600;
+}
+.dr-meta span {
+  white-space: nowrap;
+}
+.dr-meta i {
+  font-style: normal;
+  color: var(--muted);
+}
+.sw-pill,
+.st-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sw-pill {
+  padding-left: 8px;
+  cursor: pointer;
+}
+.sw-pill:hover {
+  border-color: var(--k-line);
+}
+.sw-pill[aria-checked='true'] .sw {
+  background: var(--accent);
+}
+.sw-pill[aria-checked='true'] .sw::after {
+  left: 19px;
+}
+.sw-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.st-chip {
+  color: var(--text2);
+}
+.st-chip.on::before,
+.st-chip.off::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.st-chip.off::before {
+  background: var(--switch-off);
+}
+.st-chip.bad {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-bg);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.badge.kind {
+  color: var(--k);
+  background: var(--k-soft);
+  border-color: var(--k-line);
+}
+.badge.on::before,
+.badge.off::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.badge.off::before {
+  background: var(--switch-off);
+}
+.badge.bad {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-bg);
+}
+.dr-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.dh-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.dh .icon-btn {
+  background: var(--panel);
+}
+.dh .icon-btn.star {
+  margin: 0;
+  font-size: 18px;
+  color: var(--star-off);
+}
+.dh .icon-btn.star[aria-pressed='true'] {
+  color: var(--accent-text);
+}
+.dr-more {
+  position: relative;
+}
+.dr-more .menu {
+  right: 0;
+  top: calc(100% + 6px);
+}
+.drawer .dr-desc {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.dr-notes {
+  margin-bottom: 14px;
+}
+.dr-notes:empty {
+  display: none;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.dr-note {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
+}
+.dr-note.bad {
+  background: var(--red-bg);
+  border-color: var(--red);
+}
+.lock-t {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.lock-t > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-text);
+}
+.dr-note.bad .lock-t > svg {
+  color: var(--red);
+}
+.lock-t p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.lock-a {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 32px;
+}
+.lock-a .btn {
+  min-height: 40px;
+}
+.lock-a .btn.soft {
+  background: var(--accent-soft);
+  border-color: var(--note-line);
+}
+.lock-a .btn.danger {
+  background: transparent;
+  border-color: var(--red);
+}
+.btn-link {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.btn-link:hover {
+  text-decoration: underline;
+}
+.facts {
+  font-size: 14px;
+  min-width: 0;
+}
+.facts .f-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.facts .f-path .path {
+  flex: 1;
+  min-width: 0;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.icon-btn.sm {
+  width: 40px;
+  height: 32px;
+  flex: none;
+}

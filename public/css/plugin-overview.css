@@ -1,0 +1,181 @@
+.ov {
+  gap: 16px;
+}
+.ov-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.ov-tile {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.ov-tile:hover {
+  border-color: var(--k);
+}
+.ov-tile b {
+  display: block;
+  font-size: 26px;
+  line-height: 1.15;
+}
+.ov-tile span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ov-tile.zero b {
+  color: var(--muted);
+}
+.ov-lock {
+  margin: 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
+  font-size: 14px;
+}
+.ov-lock svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-text);
+}
+.ov-sec {
+  scroll-margin-top: 72px;
+}
+.pane .ov-sec h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+.ov-sec h3 svg {
+  color: var(--k);
+}
+.ov-sec h3 .n {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ov-cards,
+.ov-ev ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ov-cards {
+  display: grid;
+  gap: 8px;
+}
+.ov-card {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.ov-card:hover {
+  border-color: var(--k);
+}
+.ov-card .cb {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ov-card .cn {
+  font:
+    600 14px ui-monospace,
+    Menlo,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.ov-card .cd {
+  color: var(--muted);
+  font-size: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ov-card .badge,
+.ov-ev-r .badge {
+  flex: none;
+  align-self: center;
+}
+.ov-ev-r .badge {
+  margin-left: auto;
+}
+.ov-card.off .cn,
+.ov-ev-r:has(.badge.off) .what {
+  color: var(--muted);
+}
+.ov-card .chev {
+  flex: none;
+  align-self: center;
+  color: var(--muted);
+}
+.ov-ev {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.ov-ev + .ov-ev {
+  margin-top: 8px;
+}
+.ov-ev-h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.ov-ev-h b {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--green);
+}
+.ov-ev-h span {
+  color: var(--muted);
+}
+.ov-ev li + li {
+  border-top: 1px dashed var(--line);
+}
+.ov-ev .ov-ev-r {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 14px;
+  text-align: left;
+}
+.ov-ev .ov-ev-r:hover .what {
+  color: var(--k);
+}
+.ov-ev-r .what {
+  font-weight: 600;
+}
+.ov-empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
