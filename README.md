@@ -68,7 +68,7 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 - Counts for skills, agents, plugins, hooks, and MCP servers, with how many are on and off.
 - API-equal cost of your Claude Code use, by model, from the session files in `~/.claude/projects`.
 - Tokens, sessions, projects, and how much the prompt cache saved.
-- Only token counts are read from session files, never message text.
+- Session files give only token counts, tool names, and the skill, agent, or MCP server name of each call. Never prompts or message text.
 - Your favorites, recent changes, and which Claude Code files this project has.
 
 ### Skills and agents
@@ -77,8 +77,9 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 - Each switch shows the file it writes before you click. A toast names the file after.
 - Filter by scope (All, Global, Project) and press `/` to search.
 - Plugin skills show "via plugin X" and follow their plugin. Fork one to `~/.claude/skills` to make your own version.
+- Use in the last 30 days for each skill, agent, and MCP server, with an Unused 30 d filter, a sort by use, and "Switch off N" for the unused ones.
 
-![Skills page with on/off switches, favorites, and the file each switch writes](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/skills.png)
+![Skills page with on/off switches, 30-day use chips, an Unused 30 d filter, a sort by use, and a banner to switch off unused skills](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/skills.png)
 
 ### Find duplicates
 
@@ -144,7 +145,7 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 - MCP servers from `~/.claude.json`, `.mcp.json`, and plugins, with secrets masked.
 - Add a hook or an MCP server from a form, or remove one.
 
-![MCP servers page with transport, command, and source for each server](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/mcp.png)
+![MCP servers page with transport, command, source, and 30-day use for each server](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/mcp.png)
 
 ### Edit in place, undo anything
 
@@ -216,18 +217,18 @@ Global switches write `~/.claude/settings.json`. Project switches write `./.clau
 
 ## Safety and privacy
 
-| Topic          | Rule                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------- |
-| Backups        | Before any write, the old file is copied to `~/.claude/backups/storehouse/`. The last 20 per file are kept.    |
-| Atomic writes  | Each write goes to a temp file, then a rename. A file that does not parse is never touched.                    |
-| Delete         | Moves the item to `~/.claude/backups/storehouse/trash/`. Restore it from the Backups panel.                    |
-| Local only     | The server listens on `127.0.0.1` and rejects a foreign `Host` header.                                         |
-| Token          | Every API call needs the random token from the start URL. Without it the server returns 401.                   |
-| Allow-list     | Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only. |
-| Session files  | The usage band reads only token counts. It never keeps or returns message text.                                |
-| Doctor         | Reads only. It never writes a file or runs a command, and it returns env key names, never values.              |
-| Effective view | Reads only. Env values that look like secrets are masked before they leave the server.                         |
-| Dependencies   | The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.            |
+| Topic          | Rule                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Backups        | Before any write, the old file is copied to `~/.claude/backups/storehouse/`. The last 20 per file are kept.                 |
+| Atomic writes  | Each write goes to a temp file, then a rename. A file that does not parse is never touched.                                 |
+| Delete         | Moves the item to `~/.claude/backups/storehouse/trash/`. Restore it from the Backups panel.                                 |
+| Local only     | The server listens on `127.0.0.1` and rejects a foreign `Host` header.                                                      |
+| Token          | Every API call needs the random token from the start URL. Without it the server returns 401.                                |
+| Allow-list     | Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only.              |
+| Session files  | Usage reads token counts, tool names, and the skill, agent, or MCP server name of each call. Never prompts or message text. |
+| Doctor         | Reads only. It never writes a file or runs a command, and it returns env key names, never values.                           |
+| Effective view | Reads only. Env values that look like secrets are masked before they leave the server.                                      |
+| Dependencies   | The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.                         |
 
 ## How it works
 

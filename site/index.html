@@ -208,7 +208,7 @@
             <ul>
               <li>API-equal cost of your Claude Code use, by model</li>
               <li>Tokens, sessions, projects, and prompt-cache savings</li>
-              <li>Read from token counts only, never from message text</li>
+              <li>Reads token counts and tool names, never prompts or message text</li>
               <li>Counts for skills, agents, plugins, hooks, and MCP servers</li>
             </ul>
             <a class="more" href="#demo" data-demo="dash">Open the Dashboard in the demo →</a>
@@ -233,8 +233,8 @@
               click, and a toast names the file after.
             </p>
             <ul>
-              <li>Filter by scope: All, Global, or Project</li>
-              <li>Press <kbd>/</kbd> to search names and descriptions</li>
+              <li>Filter by scope and press <kbd>/</kbd> to search</li>
+              <li>Use in the last 30 days, an Unused filter, and a sort by use</li>
               <li>Plugin skills show "via plugin X" and follow their plugin</li>
               <li>Fork a plugin skill to <code>~/.claude/skills</code></li>
             </ul>
@@ -243,7 +243,7 @@
           <figure class="frame">
             <img
               src="screenshots/skills.png"
-              alt="Skills page: global, project, and plugin skills, each with a switch, a star, and a menu"
+              alt="Skills page with switches, 30-day use chips, an Unused 30 d filter, a sort by use, and a banner to switch off unused skills"
               loading="lazy"
               width="2880"
               height="1800"
@@ -322,7 +322,7 @@
           <figure class="frame">
             <img
               src="screenshots/mcp.png"
-              alt="MCP servers page with transport, command, and source for each server, and masked environment values"
+              alt="MCP servers page with transport, command, source, masked environment values, and 30-day use for each server"
               loading="lazy"
               width="2880"
               height="1800"
@@ -627,8 +627,8 @@ claude-storehouse</code></pre>
             <div class="panel">
               <h3>Safety and privacy</h3>
               <p>
-                No server outside your machine, no account, no analytics. Only token counts are read from session files,
-                never message text.
+                No server outside your machine, no account, no analytics. Session files give only token counts, tool
+                names, and the skill, agent, or MCP server name of each call. Never prompts or message text.
               </p>
               <table>
                 <tr>
