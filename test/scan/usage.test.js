@@ -399,3 +399,37 @@ test('ignores tool calls of unknown shape without an error', async () => {
     fx.cleanup()
   }
 })
+
+test('skips a symlinked subagents folder', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [toolLine({ id: 'a', tools: [['t1', 'Skill', { skill: 'kept' }]] })])
+    const outside = path.join(path.dirname(fx.home), 'outside-subagents')
+    fs.mkdirSync(outside, { recursive: true })
+    fs.writeFileSync(
+      path.join(outside, 'a.jsonl'),
+      toolLine({ id: 'b', tools: [['t2', 'Skill', { skill: 'leak' }]] }) + '\n'
+    )
+    fs.mkdirSync(path.join(fx.home, '.claude', 'projects', '-proj-a', 's1'))
+    fs.symlinkSync(outside, path.join(fx.home, '.claude', 'projects', '-proj-a', 's1', 'subagents'))
+    const result = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(Object.keys(result.items), ['skill:kept'])
+    assert.equal(result.all.responses, 1)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('does not count a call stamped after now', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      toolLine({ id: 'a', at: '2026-10-20T10:00:00Z', tools: [['t1', 'Skill', { skill: 'x' }]] }),
+      toolLine({ id: 'b', at: '2027-01-01T10:00:00Z', tools: [['t2', 'Skill', { skill: 'x' }]] })
+    ])
+    const { items } = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(items['skill:x'], { count30: 1, last: Date.parse('2026-10-20T10:00:00Z') })
+  } finally {
+    fx.cleanup()
+  }
+})

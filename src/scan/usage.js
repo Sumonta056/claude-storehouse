@@ -96,6 +96,14 @@ function entries(dir) {
   }
 }
 
+function isFolder(dir) {
+  try {
+    return fs.lstatSync(dir).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 function jsonl(dir) {
   return entries(dir)
     .filter((e) => e.isFile() && e.name.endsWith('.jsonl'))
@@ -110,7 +118,8 @@ function transcripts(root) {
     for (const file of jsonl(dir)) files.push({ project: project.name, file })
     for (const session of entries(dir)) {
       if (!session.isDirectory() || session.name.startsWith('.')) continue
-      for (const file of jsonl(path.join(dir, session.name, 'subagents'))) files.push({ project: project.name, file })
+      const sub = path.join(dir, session.name, 'subagents')
+      if (isFolder(sub)) for (const file of jsonl(sub)) files.push({ project: project.name, file })
     }
   }
   return files
@@ -159,6 +168,7 @@ function summarizeUses(uses, now) {
   const items = {}
   const since = now - WINDOW
   for (const { key, time } of uses) {
+    if (time > now) continue
     const item = (items[key] ??= { count30: 0, last: 0 })
     if (time >= since) item.count30++
     item.last = Math.max(item.last, time)
