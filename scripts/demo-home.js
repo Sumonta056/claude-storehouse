@@ -163,6 +163,20 @@ const sessions = [
   ['-home-infra', 'claude-sonnet-5', 22]
 ]
 const today = new Date()
+const tools = [
+  ['Skill', { skill: 'debugging' }],
+  ['Skill', { skill: 'git-message' }],
+  ['Agent', { subagent_type: 'code-reviewer' }],
+  ['Skill', { skill: 'debugging' }],
+  ['mcp__github__create_pull_request', {}],
+  ['Skill', { skill: 'test-first' }],
+  ['Skill', { skill: 'toolkit:brainstorm' }],
+  ['Agent', {}],
+  ['Skill', { skill: 'git-message' }],
+  ['Skill', { skill: 'api-design' }],
+  ['Agent', { subagent_type: 'toolkit:planner' }],
+  ['Skill', { skill: 'debugging' }]
+]
 sessions.forEach(([dir, model, turns], s) => {
   const lines = []
   for (let t = 0; t < turns; t++) {
@@ -182,6 +196,14 @@ sessions.forEach(([dir, model, turns], s) => {
         message: {
           id: `msg_${s}_${t}`,
           model,
+          content: [
+            {
+              type: 'tool_use',
+              id: `toolu_${s}_${t}`,
+              name: tools[(s + t) % tools.length][0],
+              input: tools[(s + t) % tools.length][1]
+            }
+          ],
           usage: {
             input_tokens: 1200 + t * 40,
             output_tokens: 900 + ((t * 137) % 1600),
@@ -194,5 +216,25 @@ sessions.forEach(([dir, model, turns], s) => {
   }
   write(path.join(claude, 'projects', dir, `session-${s + 1}.jsonl`), lines.join('\n') + '\n')
 })
+
+const longAgo = new Date(today.getTime() - 47 * 86400000)
+write(
+  path.join(claude, 'projects', '-home-acme-api', 'session-old.jsonl'),
+  JSON.stringify({
+    type: 'assistant',
+    sessionId: 'demo-session-old',
+    timestamp: longAgo.toISOString(),
+    requestId: 'req_old',
+    message: {
+      id: 'msg_old',
+      model: 'claude-sonnet-5',
+      content: [{ type: 'tool_use', id: 'toolu_old', name: 'Skill', input: { skill: 'release-notes' } }],
+      usage: { input_tokens: 800, output_tokens: 400 }
+    }
+  }) + '\n'
+)
+const stale = new Date(today.getTime() - 60 * 86400000)
+for (const name of ['release-notes', 'sql-explain', 'security-review'])
+  fs.utimesSync(path.join(claude, 'skills', name, 'SKILL.md'), stale, stale)
 
 console.log(JSON.stringify({ home, project }))

@@ -42,6 +42,12 @@ test('site build makes the landing page and a live demo from the current public/
   assert.deepEqual(model.overridden, [{ file: 'global', value: 'sonnet' }])
   assert.ok(data.inventory.skills.length > 0)
   assert.ok(data.usage.all.cost > 0)
+  assert.ok(data.usage.items['skill:debugging'].count30 > 0)
+  assert.ok(data.usage.items['agent:code-reviewer'].count30 > 0)
+  assert.ok(data.usage.items['mcp:github'].count30 > 0)
+  assert.equal(data.usage.items['skill:release-notes'].count30, 0)
+  const old = data.inventory.skills.find((s) => s.name === 'sql-explain' && s.scope === 'global')
+  assert.ok(old.mtime < Date.now() - 30 * 86400000)
   assert.deepEqual(data.doctor.issues.map((i) => `${i.check}:${i.name}`).sort(), [
     '5:old-theme@demo-market',
     '7:code-reviewer'
