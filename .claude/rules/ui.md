@@ -22,6 +22,8 @@ paths:
 
 - Mutable values shared by modules are fields of `state`, never a module-level `let`: an ES module cannot reassign an imported binding.
 - A new stylesheet needs a `<link>` in `index.html`. `test/public/index-html.test.js` fails otherwise. Add it where its rules must win in the cascade.
+- Each JS file in `public/` has 500 lines or fewer, and each CSS file in `public/css/` has 600 lines or fewer. Split a file by topic in the same task when it passes the budget. `public/app.js` holds only `start` and `wire`.
+- Before you write UI code, pick the layer with the decision table in skill `storehouse-ui-structure`.
 - Font: Figtree from Google Fonts with a system fallback for offline use.
 - All functional text is 14 px or larger.
 - Approved layout: `.superpowers/brainstorm/*/content/dashboard-demo-v2.html`.

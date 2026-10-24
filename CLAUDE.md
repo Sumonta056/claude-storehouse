@@ -14,7 +14,7 @@ Claude Code loads every file in `.claude/rules/`. Files with `paths:` load only 
 | `.claude/rules/code-rules.md`     | Stack, style, tests, workflow, plan cleanup                                  | always                  |
 | `.claude/rules/business-logic.md` | Goals, what Claude Code reads, on/off per type, favorites, undo, limitations | always                  |
 | `.claude/rules/config-safety.md`  | Write procedure, backups, path allow-list, server security                   | `src/`, `test/`, `bin/` |
-| `.claude/rules/ui.md`             | Font, 14 px, pages, UI behavior, mockup                                      | `public/`               |
+| `.claude/rules/ui.md`             | `public/` module layout, 500-line budget, font, 14 px, pages, UI behavior    | `public/`               |
 | `.claude/rules/git-workflow.md`   | Conventional Commits, Husky hooks, CI, release pipeline                      | always                  |
 
 Key rules:
@@ -28,10 +28,12 @@ Key rules:
 ## Project Claude Code setup
 
 - Skill `storehouse-config-safety`: switch table, write procedure, path allow-list, test rule. Load for any `src/write` or `src/scan` task.
-- Skill `storehouse-verify`: test command, fake home recipe, 10-point Chrome check. Load before you claim a task is done.
+- Skill `storehouse-ui-structure`: where new code in `public/` goes (layer table), recipes for a page, stylesheet, or shared state, and the test recipe per layer. Load for any `public/` task.
+- Skill `storehouse-verify`: test command, demo home recipe, 10-point Chrome check, the 59-feature checklist, the comparison with `main` for refactors, and the report. Load before you claim a task is done.
 - Skill `storehouse-release`: release to GitHub and npm, and the npm page. Load for any release task.
 - Skill `storehouse-website`: website, live demo, screenshots, and README. Load after any user-visible change and for any README or site task.
 - Agent `toggle-reviewer`: read-only reviewer for toggle and scanner code. Run after each `src/write` task.
+- Agent `ui-structure-reviewer`: read-only reviewer for `public/` changes: layer, shared state, file size, stylesheet links, tests, escaping. Run after each `public/` task.
 - `.claude/settings.json`: allows `npm test`, `node --test`, and the CLI. Denies edits to the real `~/.claude/settings.json` and `~/.claude.json`.
 
 ## Commands
@@ -63,4 +65,5 @@ CHANGELOG.md        written by /release-tag
 site/               website and live demo for GitHub Pages; build.js, demo/demo-api.js
 scripts/demo-home.js  builds a fake home with sample data for the demo and screenshots
 docs/images/        README and website screenshots, icon.png
+docs/reports/       verification reports for refactors and large changes (HTML, opens offline)
 ```
