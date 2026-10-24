@@ -135,6 +135,29 @@ test('GET /api/usage returns totals and requires the token', async () => {
   })
 })
 
+test('GET /api/usage returns tool use per item without prompt text', async () => {
+  await withServer(async ({ fx, api }) => {
+    const file = path.join(fx.home, '.claude', 'projects', '-proj-a', 's1.jsonl')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    const at = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const content = [
+      { type: 'tool_use', id: 't1', name: 'Skill', input: { skill: 'release-tag', args: 'SECRET-ARGS' } },
+      { type: 'tool_use', id: 't2', name: 'Agent', input: { prompt: 'SECRET-PROMPT' } }
+    ]
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ timestamp: at, message: { id: 'm1', model: 'claude-opus-5-5', usage: {}, content } }) + '\n'
+    )
+    const res = await api('GET', '/api/usage')
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.json.items, {
+      'skill:release-tag': { count30: 1, last: Date.parse(at) },
+      'agent:general-purpose': { count30: 1, last: Date.parse(at) }
+    })
+    assert.ok(!res.text.includes('SECRET'))
+  })
+})
+
 test('GET /api/doctor returns issues without secrets and requires the token', async () => {
   await withServer(async ({ api }) => {
     const res = await api('GET', '/api/doctor')
