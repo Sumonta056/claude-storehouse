@@ -3849,3 +3849,40 @@ table.eff .lost code {
 .mergedl {
   color: var(--muted);
 }
+
+.mchip.warnc {
+  background: var(--note-bg);
+  color: var(--accent-text);
+}
+.usort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.ubanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--note-line);
+  background: var(--note-bg);
+  font-size: 14px;
+}
+.ubanner p {
+  margin: 0;
+  color: var(--text2);
+}
+.ubanner b {
+  color: var(--text);
+}
+.ubanner .acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

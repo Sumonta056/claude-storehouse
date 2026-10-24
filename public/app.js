@@ -75,6 +75,17 @@ let usageError = ''
 let doctor = null
 const PERIOD_KEY = 'storehouse.usagePeriod'
 let usagePeriod = readPeriod()
+const USAGE_PAGES = new Set(['dash', 'skills', 'agents', 'mcp'])
+const USE_WORD = { skills: 'skill', agents: 'agent', mcp: 'MCP server' }
+const SORT_KEY = 'storehouse.usageSort'
+const SORTS = [
+  ['most', 'Most used'],
+  ['least', 'Least used'],
+  ['name', 'Name']
+]
+const DAY = 86400000
+let usageSort = readSort()
+let usageLoad = null
 let bannerDismissed = false
 let bannerShown = false
 let dragKey = null
@@ -362,6 +373,23 @@ function readPeriod() {
   }
 }
 
+function readSort() {
+  try {
+    const value = localStorage.getItem(SORT_KEY)
+    return SORTS.some(([k]) => k === value) ? value : 'name'
+  } catch {
+    return 'name'
+  }
+}
+
+function setSort(value) {
+  usageSort = value
+  try {
+    localStorage.setItem(SORT_KEY, value)
+  } catch {}
+  render()
+}
+
 function setPeriod(period) {
   usagePeriod = period
   try {
@@ -438,7 +466,11 @@ async function loadUsage() {
   } catch (err) {
     usageError = err.message
   }
-  if (state.page === 'dash' && state.inventory) renderDash()
+  if (state.inventory && USAGE_PAGES.has(state.page)) render()
+}
+
+function needUsage() {
+  usageLoad ??= loadUsage()
 }
 
 function renderDash() {
@@ -910,13 +942,15 @@ const CHIPS = {
     ['all', 'All'],
     ['on', 'On'],
     ['off', 'Off'],
-    ['plugin', 'From plugins']
+    ['plugin', 'From plugins'],
+    ['unused', 'Unused 30 d']
   ],
   agents: [
     ['all', 'All'],
     ['on', 'On'],
     ['off', 'Off'],
-    ['plugin', 'From plugins']
+    ['plugin', 'From plugins'],
+    ['unused', 'Unused 30 d']
   ],
   hooks: [
     ['all', 'All'],
@@ -928,7 +962,8 @@ const CHIPS = {
     ['all', 'All'],
     ['on', 'On'],
     ['off', 'Off'],
-    ['plugin', 'From plugins']
+    ['plugin', 'From plugins'],
+    ['unused', 'Unused 30 d']
   ],
   mods: [
     ['all', 'All'],
@@ -979,6 +1014,119 @@ function slug(value) {
 
 function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
+function useReady() {
+  return Boolean(usage?.items && usage.all?.responses)
+}
+
+function useKeys(item) {
+  const p = item.plugin ? String(pluginLabel(item.plugin)).replace(/@.*/, '') : ''
+  if (item.kind === 'mcp') return [p ? `mcp:plugin:${p}:${item.name}` : `mcp:${item.name}`]
+  return p ? [`${item.kind}:${p}:${item.name}`, `${item.kind}:${item.name}`] : [`${item.kind}:${item.name}`]
+}
+
+function useOf(item) {
+  if (!useReady() || !['skill', 'agent', 'mcp'].includes(item.kind)) return null
+  let count30 = 0
+  let last = 0
+  for (const key of useKeys(item)) {
+    const u = usage.items[key]
+    if (!u) continue
+    count30 += u.count30
+    last = Math.max(last, u.last)
+  }
+  return { count30, last }
+}
+
+function isUnused(item) {
+  const u = useOf(item)
+  if (!u || u.count30 || !item.enabled) return false
+  return typeof item.mtime !== 'number' || item.mtime < Date.now() - 30 * DAY
+}
+
+function sharedWith(item) {
+  const mine = useKeys(item)
+  return catalog[item.kind].filter((o) => o !== item && useKeys(o).some((k) => mine.includes(k))).length
+}
+
+function lastText(ms) {
+  const days = Math.floor((Date.now() - ms) / DAY)
+  return days >= 1 ? `${days} d ago` : ago(ms)
+}
+
+function useChips(item) {
+  if (!USAGE_PAGES.has(state.page)) return ''
+  const u = useOf(item)
+  if (!u) return ''
+  const unused = isUnused(item)
+  const bits = []
+  if (u.count30) bits.push(`<span class="mchip">Used ${u.count30}× in 30 d</span>`)
+  if (u.last)
+    bits.push(
+      `<span class="mchip${unused ? ' warnc' : ''}" title="${esc(new Date(u.last).toLocaleString())}">last: ${esc(lastText(u.last))}</span>`
+    )
+  else if (unused) bits.push('<span class="mchip warnc">Never used</span>')
+  const shared = u.last ? sharedWith(item) : 0
+  if (shared) bits.push(`<span class="mchip">${esc(`Shared with ${plural(shared, 'item')} of this name`)}</span>`)
+  return bits.join('')
+}
+
+function useFlag(item) {
+  return USAGE_PAGES.has(state.page) && isUnused(item) ? '<span class="flag bad">Unused 30 d</span>' : ''
+}
+
+function sortRows(list) {
+  if (!useReady() || !USAGE_PAGES.has(state.page)) return list
+  const out = [...list]
+  if (usageSort === 'name') return out.sort((a, b) => a.name.localeCompare(b.name))
+  const dir = usageSort === 'most' ? -1 : 1
+  const val = (i) => useOf(i) ?? { count30: 0, last: 0 }
+  return out.sort((a, b) => {
+    const ua = val(a)
+    const ub = val(b)
+    return dir * (ua.count30 - ub.count30) || dir * (ua.last - ub.last) || a.name.localeCompare(b.name)
+  })
+}
+
+function sortHtml() {
+  if (!useReady()) return ''
+  const buttons = SORTS.map(
+    ([k, text]) =>
+      `<button type="button" data-usort="${k}" aria-pressed="${k === usageSort ? 'true' : 'false'}">${text}</button>`
+  ).join('')
+  return `<div class="usort"><span>Sort</span><div class="scope" role="group" aria-label="Sort by use">${buttons}</div></div>`
+}
+
+function unusedBanner(page, list) {
+  const unused = list.filter((i) => visible(i) && isUnused(i))
+  if (!unused.length) return ''
+  const can = unused.filter((i) => i.canToggle && switchable(page, i))
+  const cost = page === 'mcp' ? 0 : unused.reduce((sum, i) => sum + listingTokens(i), 0)
+  const show =
+    chipFilter[page] === 'unused' ? '' : '<button type="button" class="btn" data-unused="show">Show them</button>'
+  const off = can.length
+    ? `<button type="button" class="btn p" data-unused="off">Switch off ${can.length}</button>`
+    : ''
+  return `<div class="ubanner" role="note"><p><b>${esc(`${plural(unused.length, USE_WORD[page])} had no use in 30 days.`)}</b>${cost ? ` Together they add ${esc(tok(cost))} to every session.` : ''}</p><div class="acts">${show}${off}</div></div>`
+}
+
+async function switchOffUnused() {
+  const page = state.page
+  const list = { skills: catalog.skill, agents: catalog.agent, mcp: catalog.mcp }[page]
+  if (!list) return
+  const targets = list.filter((i) => visible(i) && isUnused(i) && i.canToggle && switchable(page, i))
+  if (!targets.length) return
+  const yes = await ask({
+    title: `Switch off ${plural(targets.length, USE_WORD[page])}?`,
+    message: `${targets.map((i) => i.name).join(', ')}. Each switch gets its own Activity entry that you can undo.`,
+    ok: `Switch off ${targets.length}`
+  })
+  if (!yes) return
+  for (const t of targets) {
+    const item = items.get(t.key)
+    if (item?.enabled) await toggle(item)
+  }
 }
 
 function shortVersion(v) {
@@ -1060,13 +1208,14 @@ function metaHtml(item) {
     const parts = pluginParts(item.id)
     return `<p class="meta${parts.length ? '' : ' muted'}">${esc(parts.length ? parts.join(' · ') : 'No skills, agents, hooks, or MCP servers found')}</p>`
   }
+  const bits = []
   if (item.kind === 'agent') {
-    const bits = []
     if (item.model) bits.push(`<span class="mchip">model: ${esc(item.model)}</span>`)
     if (item.tools?.length) bits.push(`<span class="mchip">${esc(item.tools.join(' · '))}</span>`)
-    return bits.length ? `<p class="meta chips-s">${bits.join('')}</p>` : ''
   }
-  return ''
+  const use = useChips(item)
+  if (use) bits.push(use)
+  return bits.length ? `<p class="meta chips-s">${bits.join('')}</p>` : ''
 }
 
 function dupSource(item) {
@@ -1104,7 +1253,7 @@ function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, 
   return `<li class="${cls}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
     <div class="lead">${leadHtml(item)}</div>
     <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}${tokChip(item)}</div>
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}${useFlag(item)}${tokChip(item)}</div>
       <p class="desc">${esc(desc)}</p>
       ${metaHtml(item)}${note}
     </div>
@@ -1134,6 +1283,7 @@ function keepChip(page, item) {
   if (page === 'plugins')
     return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
   if (f === 'plugin') return item.scope === 'plugin'
+  if (f === 'unused') return isUnused(item)
   return switchable(page, item) && (f === 'on') === Boolean(item.enabled)
 }
 
@@ -1169,20 +1319,24 @@ function chipCounts(page, list) {
     all: shown.length,
     on: own.filter((i) => i.enabled).length,
     off: own.filter((i) => !i.enabled).length,
-    plugin: shown.filter((i) => i.scope === 'plugin').length
+    plugin: shown.filter((i) => i.scope === 'plugin').length,
+    unused: shown.filter(isUnused).length
   }
 }
 
 function chipsHtml(page, list, note) {
   const n = chipCounts(page, list)
   const buttons = CHIPS[page]
+    .filter(([k]) => k !== 'unused' || useReady())
     .map(([k, label]) => {
       const on = chipFilter[page] === k
-      const bad = (k === 'broken' || k === 'error') && n[k] ? ' bad' : ''
+      const bad = (k === 'broken' || k === 'error' || k === 'unused') && n[k] ? ' bad' : ''
       return `<button type="button" class="chip${bad}" id="chip-${page}-${k}" data-chip="${k}" aria-pressed="${on ? 'true' : 'false'}">${esc(label)} <span class="n">${n[k]}</span></button>`
     })
     .join('')
-  return `<div class="chipbar"><div class="chips" role="group" aria-label="${esc(`Filter ${PAGES[page].toLowerCase()}`)}">${buttons}</div><p class="note">${note}</p></div>`
+  const extra = USE_WORD[page] ? sortHtml() : ''
+  const banner = USE_WORD[page] ? unusedBanner(page, list) : ''
+  return `<div class="chipbar"><div class="chips" role="group" aria-label="${esc(`Filter ${PAGES[page].toLowerCase()}`)}">${buttons}</div>${extra}<p class="note">${note}</p></div>${banner}`
 }
 
 function pluginGroupsHtml(page, list) {
@@ -1208,7 +1362,7 @@ function pluginGroupsHtml(page, list) {
         : ''
       return `<div class="pgroup${plugin?.enabled ? '' : ' off'}">
         <h3 class="ghead"><button type="button" class="gbtn" id="gb-${kind}-${slug(id)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(name)}</span><span class="gcount">${esc(plural(rows.length, kind))}</span><span class="gstate${plugin?.enabled ? ' on' : ''}">${stateText}</span></button></h3>
-        <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? notice + rowsHtml(rows) : ''}</div>
+        <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? notice + rowsHtml(sortRows(rows)) : ''}</div>
       </div>`
     })
     .join('')
@@ -1626,7 +1780,7 @@ function catalogBody(page, list) {
     .map(([scope, title, hint]) => {
       const shown = list.filter((i) => i.scope === scope && visible(i) && keepChip(page, i))
       if (!shown.length) return ''
-      return `<h2>${esc(title)} <span class="pill">${shown.length}</span>${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</h2>${rowsHtml(shown)}`
+      return `<h2>${esc(title)} <span class="pill">${shown.length}</span>${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</h2>${rowsHtml(sortRows(shown))}`
     })
     .join('')
   const html = own + (page === 'plugins' || page === 'mods' ? '' : pluginGroupsHtml(page, list))
@@ -1813,6 +1967,7 @@ function renderPage() {
   $('title').textContent = PAGES[state.page]
   for (const s of document.querySelectorAll('.page')) s.hidden = s.id !== `p-${state.page}`
   const page = state.page
+  if (USAGE_PAGES.has(page)) needUsage()
   if (page === 'dash') renderDash()
   else if (page === 'fav') renderFav()
   else if (page === 'dups') renderDups()
@@ -3430,9 +3585,9 @@ function mcpRowHtml(m, counts) {
   return `<li class="${cls}" data-key="${esc(m.key)}">
     <div class="lead">${cellSwitch(m, label)}</div>
     <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button><span class="mchip">${esc(mcpTransport(m))}</span>${off ? '<span class="flag">Off</span>' : ''}${dup}</div>
+      <div class="l1"><button type="button" class="name btn-plain" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button><span class="mchip">${esc(mcpTransport(m))}</span>${off ? '<span class="flag">Off</span>' : ''}${useFlag(m)}${dup}</div>
       ${target ? `<code class="one-line" title="${esc(target)}">${esc(target)}</code>` : ''}
-      <div class="meta-row">${source}${keys.map((k) => `<span class="mchip key">${esc(k)}</span>`).join('')}</div>
+      <div class="meta-row">${source}${keys.map((k) => `<span class="mchip key">${esc(k)}</span>`).join('')}${useChips(m)}</div>
     </div>
     <div class="tail">${del}</div>
   </li>`
@@ -3451,7 +3606,11 @@ function renderMcp() {
     .map(([scope, title, hint]) => {
       const shown = list.filter((m) => (scope === 'plugin' ? m.scope === 'plugin' : m.scope === scope))
       if (!shown.length) return ''
-      return `<h2>${esc(title)} <span class="pill">${shown.length}</span><span class="hint">${esc(hint)}</span></h2><ul class="rows">${shown.map((m) => mcpRowHtml(m, counts)).join('')}</ul>`
+      return `<h2>${esc(title)} <span class="pill">${shown.length}</span><span class="hint">${esc(hint)}</span></h2><ul class="rows">${sortRows(
+        shown
+      )
+        .map((m) => mcpRowHtml(m, counts))
+        .join('')}</ul>`
     })
     .join('')
   const body = !catalog.mcp.length
@@ -4945,6 +5104,15 @@ function wire() {
     if (goEl) return go(goEl.dataset.go)
     const periodEl = e.target.closest('[data-period]')
     if (periodEl) return setPeriod(periodEl.dataset.period)
+    const sortEl = e.target.closest('[data-usort]')
+    if (sortEl) return setSort(sortEl.dataset.usort)
+    const unusedEl = e.target.closest('[data-unused]')
+    if (unusedEl) {
+      if (unusedEl.dataset.unused === 'off') return void switchOffUnused()
+      chipFilter[state.page] = 'unused'
+      menuKey = null
+      return render()
+    }
     const cfgEl = e.target.closest('[data-c]')
     if (cfgEl) {
       if (!cfgEl.disabled) onCfg(cfgEl)
@@ -5072,7 +5240,6 @@ async function start() {
   try {
     await refresh()
     loadActivity()
-    loadUsage()
     await loadProjectFiles()
     render()
   } catch (err) {
