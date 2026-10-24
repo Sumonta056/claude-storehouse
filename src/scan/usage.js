@@ -4,6 +4,7 @@ import readline from 'node:readline'
 import { priceOf } from './prices.js'
 
 const FIELDS = ['input', 'output', 'cacheWrite5m', 'cacheWrite1h', 'cacheRead']
+const WINDOW = 30 * 24 * 60 * 60 * 1000
 const cache = new Map()
 const running = new Map()
 
@@ -12,6 +13,31 @@ function monthOf(timestamp) {
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return ''
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function keyOf(name, input) {
+  if (name === 'Skill') return typeof input?.skill === 'string' && input.skill ? `skill:${input.skill}` : null
+  if (name === 'Agent' || name === 'Task') {
+    const type = input?.subagent_type
+    return `agent:${typeof type === 'string' && type ? type : 'general-purpose'}`
+  }
+  const mcp = /^mcp__(.+?)__/.exec(name)
+  if (!mcp) return null
+  const plugin = /^plugin_([^_]+)_(.+)$/.exec(mcp[1])
+  return plugin ? `mcp:plugin:${plugin[1]}:${plugin[2]}` : `mcp:${mcp[1]}`
+}
+
+function usesOf(entry, fallbackId) {
+  const content = entry?.message?.content
+  const time = Date.parse(entry?.timestamp)
+  if (!Array.isArray(content) || Number.isNaN(time)) return []
+  const uses = []
+  content.forEach((block, index) => {
+    if (block?.type !== 'tool_use' || typeof block.name !== 'string') return
+    const key = keyOf(block.name, block.input)
+    if (key) uses.push({ id: typeof block.id === 'string' ? block.id : `${fallbackId}#${index}`, key, time })
+  })
+  return uses
 }
 
 function recordOf(line, fallbackId) {
@@ -25,6 +51,7 @@ function recordOf(line, fallbackId) {
   const message = entry?.message
   const usage = message?.usage
   if (!usage || typeof message.model !== 'string' || message.model.startsWith('<')) return null
+  const uses = usesOf(entry, fallbackId)
   const cacheWrite = usage.cache_creation_input_tokens || 0
   const cacheWrite1h = Math.min(usage.cache_creation?.ephemeral_1h_input_tokens || 0, cacheWrite)
   return {
@@ -36,7 +63,8 @@ function recordOf(line, fallbackId) {
     output: usage.output_tokens || 0,
     cacheWrite5m: cacheWrite - cacheWrite1h,
     cacheWrite1h,
-    cacheRead: usage.cache_read_input_tokens || 0
+    cacheRead: usage.cache_read_input_tokens || 0,
+    uses
   }
 }
 
@@ -105,6 +133,7 @@ function costOf(record, price) {
 
 async function collect(root) {
   const responses = new Map()
+  const uses = new Map()
   const files = transcripts(root)
   const live = new Set()
   for (const { project, file } of files) {
@@ -116,13 +145,25 @@ async function collect(root) {
       continue
     }
     for (const record of records) {
+      for (const use of record.uses) if (!uses.has(use.id)) uses.set(use.id, use)
       const seen = responses.get(record.id)
       if (seen) merge(seen, record)
       else responses.set(record.id, { ...record, project })
     }
   }
   for (const file of cache.keys()) if (file.startsWith(root + path.sep) && !live.has(file)) cache.delete(file)
-  return [...responses.values()]
+  return { records: [...responses.values()], uses: [...uses.values()] }
+}
+
+function summarizeUses(uses, now) {
+  const items = {}
+  const since = now - WINDOW
+  for (const { key, time } of uses) {
+    const item = (items[key] ??= { count30: 0, last: 0 })
+    if (time >= since) item.count30++
+    item.last = Math.max(item.last, time)
+  }
+  return items
 }
 
 function summarize(records) {
@@ -168,11 +209,12 @@ export async function scanUsage({ home, now = new Date() }) {
       root,
       collect(root).finally(() => running.delete(root))
     )
-  const records = await running.get(root)
+  const { records, uses } = await running.get(root)
   const monthKey = monthOf(now)
   return {
     monthKey,
     all: summarize(records),
-    month: summarize(records.filter((r) => r.month === monthKey))
+    month: summarize(records.filter((r) => r.month === monthKey)),
+    items: summarizeUses(uses, new Date(now).getTime())
   }
 }

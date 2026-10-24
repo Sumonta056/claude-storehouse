@@ -258,3 +258,144 @@ test('never matches a shorter price id before a longer one', () => {
   assert.equal(priceOf('claude-sonnet-5-5').input, 2)
   assert.equal(priceOf('claude-mythos-5-1-20261001').cacheRead, 0.25)
 })
+
+function toolLine({ id, at = '2026-10-10T10:00:00Z', tools }) {
+  return JSON.stringify({
+    sessionId: 's1',
+    requestId: `req-${id}`,
+    timestamp: at,
+    message: {
+      id: `msg-${id}`,
+      model: 'claude-opus-5-5',
+      role: 'assistant',
+      usage: { output_tokens: 1 },
+      content: [
+        { type: 'text', text: 'working' },
+        ...tools.map(([toolId, name, input]) => ({ type: 'tool_use', id: toolId, name, input }))
+      ]
+    }
+  })
+}
+
+test('maps Skill, Agent, MCP, and plugin MCP calls to item keys', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      toolLine({
+        id: 'a',
+        tools: [
+          ['t1', 'Skill', { skill: 'release-tag', args: 'x' }],
+          ['t2', 'Skill', { skill: 'superpowers:brainstorming' }],
+          ['t3', 'Agent', { prompt: 'p', description: 'd' }],
+          ['t4', 'Task', { subagent_type: 'toggle-reviewer', prompt: 'p' }],
+          ['t5', 'mcp__github__create_issue', { title: 'x' }],
+          ['t6', 'mcp__plugin_chrome-devtools-mcp_chrome-devtools__click', {}],
+          ['t7', 'Bash', { command: 'ls' }],
+          ['t8', 'Skill', {}]
+        ]
+      })
+    ])
+    const { items } = await scanUsage({ home: fx.home, now: NOW })
+    const last = Date.parse('2026-10-10T10:00:00Z')
+    assert.deepEqual(items, {
+      'skill:release-tag': { count30: 1, last },
+      'skill:superpowers:brainstorming': { count30: 1, last },
+      'agent:general-purpose': { count30: 1, last },
+      'agent:toggle-reviewer': { count30: 1, last },
+      'mcp:github': { count30: 1, last },
+      'mcp:plugin:chrome-devtools-mcp:chrome-devtools': { count30: 1, last }
+    })
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('counts one tool call once when it shows in two lines and two files', async () => {
+  const fx = makeFixture()
+  try {
+    const repeat = toolLine({ id: 'a', tools: [['t1', 'Skill', { skill: 'release-tag' }]] })
+    writeTranscript(fx.home, '-proj-a', 's1', [repeat, repeat])
+    writeTranscript(fx.home, '-proj-a', 's1/subagents/agent-x', [repeat])
+    writeTranscript(fx.home, '-proj-a', 's2', [
+      toolLine({ id: 'b', at: '2026-10-12T10:00:00Z', tools: [['t2', 'Skill', { skill: 'release-tag' }]] })
+    ])
+    const { items } = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(items['skill:release-tag'], { count30: 2, last: Date.parse('2026-10-12T10:00:00Z') })
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('keeps a call older than 30 days in last but not in count30', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      toolLine({ id: 'a', at: '2026-08-01T10:00:00Z', tools: [['t1', 'Skill', { skill: 'old' }]] }),
+      toolLine({ id: 'b', at: '2026-08-02T10:00:00Z', tools: [['t2', 'Skill', { skill: 'mixed' }]] }),
+      toolLine({ id: 'c', at: '2026-10-20T10:00:00Z', tools: [['t3', 'Skill', { skill: 'mixed' }]] })
+    ])
+    const { items } = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(items['skill:old'], { count30: 0, last: Date.parse('2026-08-01T10:00:00Z') })
+    assert.deepEqual(items['skill:mixed'], { count30: 1, last: Date.parse('2026-10-20T10:00:00Z') })
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('never returns prompt, args, or message text', async () => {
+  const fx = makeFixture()
+  try {
+    const secret = 'SECRET-sk-ant-1234'
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      toolLine({
+        id: 'a',
+        tools: [
+          ['t1', 'Skill', { skill: 'release-tag', args: secret }],
+          ['t2', 'Agent', { subagent_type: 'toggle-reviewer', prompt: secret, description: secret }],
+          ['t3', 'mcp__github__create_issue', { body: secret }]
+        ]
+      }),
+      JSON.stringify({ type: 'user', message: { role: 'user', content: secret } })
+    ])
+    const result = await scanUsage({ home: fx.home, now: NOW })
+    assert.equal(Object.keys(result.items).length, 3)
+    assert.ok(!JSON.stringify(result).includes(secret))
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('skips tool calls in a symlinked transcript', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [toolLine({ id: 'a', tools: [['t1', 'Skill', { skill: 'kept' }]] })])
+    const outside = path.join(path.dirname(fx.home), 'outside-tools.jsonl')
+    fs.writeFileSync(outside, toolLine({ id: 'b', tools: [['t2', 'Skill', { skill: 'linked' }]] }) + '\n')
+    fs.symlinkSync(outside, path.join(fx.home, '.claude', 'projects', '-proj-a', 'linked.jsonl'))
+    const { items } = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(Object.keys(items), ['skill:kept'])
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('ignores tool calls of unknown shape without an error', async () => {
+  const fx = makeFixture()
+  try {
+    const odd = JSON.stringify({
+      sessionId: 's1',
+      timestamp: 'not a date',
+      message: {
+        model: 'claude-opus-5-5',
+        usage: { output_tokens: 1 },
+        content: [{ type: 'tool_use', name: 42 }, { type: 'tool_use', id: 'x', name: 'mcp__' }, null, 'text']
+      }
+    })
+    writeTranscript(fx.home, '-proj-a', 's1', [odd, JSON.stringify({ message: { content: 'x', usage: {} } })])
+    const result = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(result.items, {})
+    assert.equal(result.all.responses, 1)
+  } finally {
+    fx.cleanup()
+  }
+})
