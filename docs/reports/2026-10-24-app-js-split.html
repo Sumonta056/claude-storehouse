@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Storehouse app.js Split Report</title>
+    <meta name="claude:viewport-fit-sides" content="cover" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <style>
+      /* Layout: one reading column, verdict first, then numbers, proof layers, feature matrix, tests, findings */
+      :root {
+        --bg: #f6f5f3;
+        --panel: #ffffff;
+        --fg: #1d1b19;
+        --muted: #6b655f;
+        --line: #e3dfda;
+        --accent: #c8572a;
+        --accent-soft: #f6e3da;
+        --ok: #2f7d4f;
+        --ok-soft: #dff0e5;
+        --bad: #b3261e;
+        --bad-soft: #f8dedc;
+        --warn: #8a5a00;
+        --warn-soft: #f6ead0;
+        --bar: #c8572a;
+        --bar2: #9a8f86;
+        --sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #0f1115;
+          --panel: #171a20;
+          --fg: #ecebe8;
+          --muted: #a29c95;
+          --line: #2a2e36;
+          --accent: #ef8a5c;
+          --accent-soft: #3a2219;
+          --ok: #6fd39a;
+          --ok-soft: #173325;
+          --bad: #ff8a80;
+          --bad-soft: #3a1b19;
+          --warn: #f0c060;
+          --warn-soft: #36290f;
+          --bar: #ef8a5c;
+          --bar2: #6c665f;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme='dark'] {
+        --bg: #0f1115;
+        --panel: #171a20;
+        --fg: #ecebe8;
+        --muted: #a29c95;
+        --line: #2a2e36;
+        --accent: #ef8a5c;
+        --accent-soft: #3a2219;
+        --ok: #6fd39a;
+        --ok-soft: #173325;
+        --bad: #ff8a80;
+        --bad-soft: #3a1b19;
+        --warn: #f0c060;
+        --warn-soft: #36290f;
+        --bar: #ef8a5c;
+        --bar2: #6c665f;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font: 15px/1.55 var(--sans);
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding-block: 40px 72px;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        display: grid;
+        gap: 44px;
+      }
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+        margin: 0;
+        line-height: 1.2;
+      }
+      h1 {
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 21px;
+        font-weight: 700;
+      }
+      h3 {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        max-width: 68ch;
+      }
+      code,
+      .mono {
+        font-family: var(--mono);
+        font-size: 0.88em;
+      }
+      .eyebrow {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      section {
+        display: grid;
+        gap: 16px;
+        min-width: 0;
+      }
+      .head {
+        display: grid;
+        gap: 14px;
+      }
+      .verdict {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 11px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill.ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .pill.bad {
+        background: var(--bad-soft);
+        color: var(--bad);
+      }
+      .pill.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .pill.acc {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .lede {
+        font-size: 17px;
+        color: var(--fg);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 12px;
+      }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+      .stat .k {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .stat .v {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat .from {
+        color: var(--muted);
+        text-decoration: line-through;
+        font-size: 16px;
+      }
+      .stat .to {
+        font-size: 26px;
+        font-weight: 700;
+      }
+      .stat .note {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px;
+        min-width: 0;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        font-variant-numeric: tabular-nums;
+      }
+      th {
+        text-align: left;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 600;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      td.id {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      td.num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .group-row td {
+        background: var(--bg);
+        font-weight: 600;
+        font-size: 13px;
+        padding-top: 12px;
+      }
+      .bars {
+        display: grid;
+        gap: 10px;
+      }
+      .brow {
+        display: grid;
+        grid-template-columns: 150px 1fr 70px;
+        gap: 12px;
+        align-items: center;
+        font-size: 14px;
+      }
+      .brow .name {
+        font-family: var(--mono);
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .track {
+        height: 14px;
+        background: var(--bg);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .fill {
+        height: 100%;
+        background: var(--bar);
+        border-radius: 4px;
+      }
+      .fill.old {
+        background: var(--bar2);
+      }
+      .brow .n {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+      }
+      .layers {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .layer {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: grid;
+        gap: 6px;
+        align-content: start;
+      }
+      .layer .big {
+        font-size: 22px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .layer p {
+        font-size: 14px;
+        color: var(--muted);
+      }
+      ul.plain {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 8px;
+        max-width: 75ch;
+      }
+      .filter {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .filter button {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .filter button[aria-pressed='true'] {
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-color: transparent;
+      }
+      .filter button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+      }
+      .commit {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        gap: 10px;
+        font-size: 14px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .commit:last-child {
+        border-bottom: 0;
+      }
+      .commit .sha {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--accent);
+      }
+      @media (max-width: 560px) {
+        h1 {
+          font-size: 27px;
+        }
+        .brow {
+          grid-template-columns: 100px 1fr 54px;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .fill {
+          transition: width 0.3s ease;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="head">
+        <span class="eyebrow">claude-storehouse · branch refactor/split-app-js · 12 commits on 1fe5e97</span>
+        <h1>Storehouse app.js Split Report</h1>
+        <div class="verdict">
+          <span class="pill ok">59 of 59 features same as main</span>
+          <span class="pill ok">0 regressions</span>
+          <span class="pill ok">814 tests pass, 0 fail</span>
+          <span class="pill ok">0 console errors</span>
+          <span class="pill warn">3 old issues found, not caused by this work</span>
+        </div>
+        <p class="lede">
+          The browser code moved from one 5,265-line <code>public/app.js</code> and one 3,888-line
+          <code>public/app.css</code> into 38 JS modules and 13 stylesheets. Behavior did not change: every feature was
+          checked in a real browser on <code>main</code> and on the branch, side by side, and gave the same result.
+        </p>
+      </header>
+
+      <section>
+        <span class="eyebrow">Before → after</span>
+        <h2>What improved</h2>
+        <div class="stats">
+          <div class="stat">
+            <span class="k">Largest JS file</span
+            ><span class="v"><span class="from">5,265</span><span class="to">497</span></span
+            ><span class="note">lines, <code>ui/drawer.js</code></span>
+          </div>
+          <div class="stat">
+            <span class="k">app.js</span
+            ><span class="v"><span class="from">5,265</span><span class="to">297</span></span
+            ><span class="note">lines: only <code>start</code> and event wiring</span>
+          </div>
+          <div class="stat">
+            <span class="k">Largest CSS file</span
+            ><span class="v"><span class="from">3,888</span><span class="to">571</span></span
+            ><span class="note">lines, <code>css/lists.css</code></span>
+          </div>
+          <div class="stat">
+            <span class="k">JS modules in public/</span
+            ><span class="v"><span class="from">2</span><span class="to">38</span></span
+            ><span class="note">core 5 · logic 11 · pages 12 · ui 8 · app · api</span>
+          </div>
+          <div class="stat">
+            <span class="k">Tests</span><span class="v"><span class="from">333</span><span class="to">814</span></span
+            ><span class="note">+481 tests for browser code, which had 0</span>
+          </div>
+          <div class="stat">
+            <span class="k">Mutable globals</span
+            ><span class="v"><span class="from">25</span><span class="to">0</span></span
+            ><span class="note">all moved into one <code>state</code> object</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Line count per file</span>
+        <h2>Where the code lives now</h2>
+        <div class="panel bars" id="bars"></div>
+        <p class="muted">
+          Total JS grew from 5,316 to 5,670 lines (+354). The growth is <code>import</code> and
+          <code>export</code> lines. No function body changed.
+        </p>
+      </section>
+
+      <section>
+        <span class="eyebrow">How we know nothing broke</span>
+        <h2>Five layers of proof</h2>
+        <div class="layers">
+          <div class="layer">
+            <h3>Codemod, not hand edits</h3>
+            <span class="big">8 stages</span>
+            <p>
+              A script moved each function by name and wrote every import from the parser's reference list. ESLint
+              <code>no-undef</code> and <code>no-unused-vars</code> passed at every stage.
+            </p>
+          </div>
+          <div class="layer">
+            <h3>Text of every page</h3>
+            <span class="big">14 × 7</span>
+            <p>
+              After each stage, all 14 pages rendered in headless Chrome. Their visible text matched
+              <code>main</code> exactly before the commit.
+            </p>
+          </div>
+          <div class="layer">
+            <h3>Screenshots</h3>
+            <span class="big">28 / 28</span>
+            <p>
+              14 pages at 1440 px and 720 px. All were the same, except one clock label that read "8 h ago" instead of
+              "7 h ago".
+            </p>
+          </div>
+          <div class="layer">
+            <h3>Computed styles</h3>
+            <span class="big">1,587</span>
+            <p>
+              Elements compared on 21 CSS properties, plus 18 views compared on every visible element. 0 differences.
+              The CSS parts join to the old file rule for rule.
+            </p>
+          </div>
+          <div class="layer">
+            <h3>Real use in a browser</h3>
+            <span class="big">59 × 2</span>
+            <p>
+              4 agents clicked through every feature on <code>main</code> and on the branch, each with its own fake
+              home. They read the files on disk after each write.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Feature checklist · main vs branch</span>
+        <h2>Every feature, side by side</h2>
+        <div class="filter" role="group" aria-label="Filter features">
+          <button type="button" id="f-all" data-g="all" aria-pressed="true">All 59</button>
+          <button type="button" id="f-A" data-g="A">A · Dashboard, Skills, Context</button>
+          <button type="button" id="f-B" data-g="B">B · Plugins, Duplicates, Doctor, Favorites</button>
+          <button type="button" id="f-C" data-g="C">C · Hooks, MCP, Settings, CLAUDE.md</button>
+          <button type="button" id="f-D" data-g="D">D · Drawer, editor, Activity</button>
+        </div>
+        <div class="panel scroll">
+          <table id="features">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Feature</th>
+                <th>main</th>
+                <th>branch</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">test/public · 30 files · 481 tests</span>
+        <h2>Test cases added</h2>
+        <p class="muted">
+          Node imports the browser modules directly. Pure rules are tested by their return values. Pages are tested by
+          the HTML they render: escaped text, switches, tooltips, buttons. They use a small fake <code>document</code>,
+          so they need no browser.
+        </p>
+        <div class="panel scroll">
+          <table id="tests">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Tests</th>
+                <th>What it proves</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Guards that stay</span>
+        <h2>What keeps the structure from rotting</h2>
+        <ul class="plain">
+          <li>
+            <b>ESLint rule on <code>public/logic/</code>.</b> Any use of <code>document</code>, <code>window</code>,
+            <code>localStorage</code>, and similar globals, or any import of <code>core/dom.js</code>, <code>ui/</code>,
+            <code>pages/</code>, or <code>api.js</code>, fails lint with a message that names the fix. A test file with
+            a bad import proved that the rule fails.
+          </li>
+          <li>
+            <b><code>test/public/index-html.test.js</code>.</b> This test fails when a stylesheet in
+            <code>public/css/</code> has no <code>&lt;link&gt;</code>, or when one is linked twice.
+          </li>
+          <li>
+            <b><code>test/site.test.js</code>.</b> This test now checks that the live demo copies every JS file under
+            <code>public/</code>, not only <code>app.js</code>.
+          </li>
+          <li>
+            <b>Rules updated.</b> <code>.claude/rules/ui.md</code> has the folder table and the "shared mutable values
+            live on <code>state</code>" rule. <code>code-rules.md</code> has the logic and test rules.
+            <code>CLAUDE.md</code> and the README have the new layout.
+          </li>
+        </ul>
+      </section>
+
+      <div class="two">
+        <section>
+          <span class="eyebrow">Not regressions · same on main</span>
+          <h2>Old issues found</h2>
+          <ul class="plain">
+            <li>
+              <b>Arrow keys in lists (A15).</b> The README says <code>↑ ↓ Home End</code> move between items in a list.
+              They work only inside an open "…" menu. On a focused row they do nothing, on main too.
+            </li>
+            <li>
+              <b>Back button (A6).</b> Nav clicks use <code>history.replaceState</code>, so Back does not return to the
+              previous page after a click.
+            </li>
+            <li>
+              <b>Drawer Files tab.</b> Open a plugin while a skill drawer is open: its Files tab can show the earlier
+              skill's folder.
+            </li>
+            <li class="muted">
+              Small text issues: the plugin meta line says "1 agents" and "1 hooks". A one-warning Doctor icon reads
+              "Warnings". <code>**a *b* c**</code> does not render as bold. A hook command that starts with
+              <code>VAR=x</code> gets the label "Inline shell script".
+            </li>
+          </ul>
+        </section>
+        <section>
+          <span class="eyebrow">Trade-offs to know</span>
+          <h2>What this cost</h2>
+          <ul class="plain">
+            <li>
+              <b>91 files load at start, against 43.</b> The browser loads 38 modules and 13 stylesheets. On a local
+              server every request returned 200 and no feature was slower to use. A bundler would undo the "no build
+              step" rule, so I did not add one.
+            </li>
+            <li>
+              <b>Tests import pages through a stub.</b> <code>api.js</code> reads <code>location</code> when it loads,
+              so the page tests set <code>globalThis.location</code> first. If <code>api.js</code> read the token when
+              it is first used, this stub would not be necessary. That is a small follow-up.
+            </li>
+            <li>
+              <b>Logic still reads <code>state</code>.</b> Pure functions read shared state, not arguments, because the
+              move kept every function body the same. Tests set and restore <code>state</code> fields.
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <section>
+        <span class="eyebrow">git log main..refactor/split-app-js</span>
+        <h2>Commits</h2>
+        <div class="panel" id="commits"></div>
+        <p class="muted">
+          The branch is not pushed. The codemod (<code>scripts/split-app.js</code>) did its job and is deleted in
+          <code>5d6e7b2</code>. It stays in the history if you want to see it.
+        </p>
+      </section>
+    </div>
+
+    <script>
+      const bars = [
+        ['app.js (before)', 5265, true],
+        ['app.css (before)', 3888, true],
+        ['ui/drawer.js', 497],
+        ['ui/config-panels.js', 393],
+        ['pages/settings.js', 387],
+        ['ui/drawer-body.js', 373],
+        ['logic/catalog.js', 285],
+        ['app.js (now)', 297],
+        ['core/actions.js', 227],
+        ['logic/config.js', 218],
+        ['css/lists.css', 571],
+        ['css/claudemd.css', 447],
+        ['css/settings.css', 365],
+        ['css/drawer.css', 333]
+      ]
+      const max = 5265
+      document.getElementById('bars').innerHTML = bars
+        .map(
+          ([n, v, old]) =>
+            `<div class="brow"><span class="name" title="${n}">${n}</span><div class="track"><div class="fill${old ? ' old' : ''}" style="width:${Math.max(0.6, (v / max) * 100)}%"></div></div><span class="n">${v.toLocaleString('en-US')}</span></div>`
+        )
+        .join('')
+
+      const P = '<span class="pill ok">Pass</span>'
+      const F = '<span class="pill bad">Fail</span>'
+      const W = '<span class="pill warn">Pass*</span>'
+      const features = [
+        ['A', 'Dashboard, Skills, Agents, Context'],
+        ['A1', 'Dashboard counts', P, P, 'Skills 18 (15 on, 3 off), Agents 7, Plugins 3, Hooks 2, MCP 4'],
+        ['A2', 'Usage band and period switch', P, P, 'Month $7.29 / 9.98M tok; All $8.38; choice kept after reload'],
+        ['A3', 'Recent changes and project files', P, P, '5 recent items; 4 project files'],
+        ['A4', 'Scope filter All / Global / Project', P, P, 'Skills 18 / 16 / 2; all 14 pages the same in 42 renders'],
+        ['A5', 'Search with /', P, P, '/ focuses #q; filters every page; clear restores'],
+        ['A6', 'Nav and hash routing', W, W, 'Hash and aria-current change. *Back after a nav click: old issue'],
+        ['A7', 'Global skill switch', P, P, 'skillOverrides key "off" then removed; toast, banner, tooltip, backup'],
+        ['A8', 'Project skill switch', P, P, 'Writes .claude/settings.local.json; settings.json md5 unchanged'],
+        ['A9', 'Agent switch', P, P, 'doc-writer.md ↔ doc-writer.md.disabled'],
+        ['A10', 'Plugin skill row', P, P, 'No own switch; "follows the plugin"'],
+        ['A11', 'Use chips, Unused 30 d, sort', P, P, 'Unused filters to release-notes; sort kept after reload'],
+        ['A12', 'Switch off N unused', P, P, 'Confirm dialog; release-notes "off"; Activity entry'],
+        ['A13', 'Token chip on rows', P, P, '"14 tok", "17 tok"'],
+        ['A14', 'Context page', P, P, 'Total 358 → 345 with debugging off → 358'],
+        ['A15', 'Arrow keys between list rows', F, F, 'Old issue: keys work only inside the … menu, on main too'],
+        ['B', 'Plugins, Mods, Duplicates, Doctor, Favorites'],
+        ['B1', 'Plugins list', P, P, 'Marketplace, v1.2.0, counts; HTML the same'],
+        ['B2', 'Plugin switch', P, P, 'enabledPlugins false → true; group shows "Plugin off"'],
+        ['B3', 'Uninstall confirm', P, P, 'Dialog names the CLI command; Cancel keeps the plugin'],
+        ['B4', 'Mods page', P, P, 'Empty state renders (demo has no mods)'],
+        ['B5', 'Duplicates groups', P, P, '2 groups "Conflict · 2 on"; nav count 2'],
+        ['B6', 'Keep only this', P, P, 'Project agent renamed .disabled; group OK; nav 2 → 1'],
+        ['B7', 'Doctor list and chips', P, P, 'Errors 0, Warnings 2, Info 0; chips filter'],
+        ['B8', 'Doctor actions', P, P, '"Opened ~/.claude/settings.json"; "Doctor checked 22 files"'],
+        ['B9', 'Star an item', P, P, 'In storehouse.json favorites with category Build'],
+        ['B10', 'Favorite categories', P, P, 'Create, rename, delete; Activity entries'],
+        ['B11', 'Favorite popover', P, P, 'Filter "bui", Create option, Esc closes, Enter picks'],
+        ['B12', 'Drag to reorder', P, P, 'New order on disk and after reload'],
+        ['B13', 'Favorite that is off', P, P, 'Stays listed with Off flag'],
+        ['C', 'Hooks, MCP, Settings, CLAUDE.md'],
+        ['C1', 'Hooks list', P, P, 'PreToolUse, Stop groups with sources'],
+        ['C2', 'Hook switch (park)', P, P, 'Moves to storehouse.json parkedHooks and back'],
+        ['C3', 'Add and delete hook', P, P, 'PostToolUse written; delete confirm removes it'],
+        ['C4', 'MCP list, secrets masked', P, P, 'Transport chips, use chips; env shows •••'],
+        ['C5', 'MCP switch', P, P, 'disabledMcpServers ["postgres","github"] → ["postgres"]'],
+        ['C6', 'Add and delete MCP', P, P, 'stdio with env A=1 written and removed'],
+        ['C7', 'Settings Files view', P, P, '1 Global, 2 Project, 3 Project local; form fields'],
+        ['C8', 'Settings form save', P, P, 'Only model changed on disk'],
+        ['C9', 'Raw JSON save and discard', P, P, 'Saved effortLevel; Discard restored text'],
+        ['C10', 'Effective view', P, P, '11 rows; model "opus" from local overrides "haiku"'],
+        ['C11', 'Create missing file', P, P, 'settings.local.json created as {}'],
+        ['C12', 'Panel backups restore', P, P, 'Confirm; file equal to newest backup'],
+        ['C13', 'CLAUDE.md edit and preview', P, P, 'Saved to disk; preview renders markdown'],
+        ['C14', 'Unsaved change guard', P, P, '"Discard changes?"; Cancel keeps the file'],
+        ['D', 'Drawer, editor, Activity, shell'],
+        ['D1', 'Open drawer', P, P, '4 tabs and path; drawer HTML the same (5,784 bytes)'],
+        ['D2', 'Markdown preview', P, P, 'Front matter card and rendered body'],
+        ['D3', 'Edit and save ⌘S / Ctrl+S', P, P, 'On disk; backup; "Saved · backup written"'],
+        ['D4', 'Bold and italic keys', P, P, '⌘B → **x**, ⌘I → *x*'],
+        ['D5', 'Files tab', P, P, 'Lists files with size; opens reference.md; Back works'],
+        ['D6', 'Backups tab restore', P, P, 'Confirm; restored; new backup written'],
+        ['D7', 'Copy path, Reveal, Open in', P, P, '"Path copied"; Reveal and Open entries present'],
+        ['D8', 'Fork plugin skill', P, P, 'skills/write-plan/SKILL.md created; new row'],
+        ['D9', 'Delete to trash', P, P, 'Folder in backups/storehouse/trash; row gone'],
+        ['D10', 'Read-only plugin file', P, P, 'Textarea readOnly; no Save; lock note'],
+        ['D11', 'Plugin overview', P, P, '3 Skills / 1 Agent / 0 Hooks / 0 MCP; Uninstall button'],
+        ['D12', 'Dirty guard on Esc', P, P, '"Discard changes?" modal; file unchanged on Cancel'],
+        ['D13', 'Esc and focus return', P, P, 'Focus back on the row that opened the drawer'],
+        ['D14', 'Activity undo', P, P, 'Undo switch and undo save both reached disk'],
+        ['D15', 'Toast and banner', P, P, 'Banner Dismiss stays hidden for the session'],
+        ['D16', 'Console', P, P, 'No errors, warnings, page errors, or failed requests'],
+        ['D17', 'Text 14 px or larger', P, P, 'No visible text under 14 px; 18 views same styles']
+      ]
+      function drawFeatures(g) {
+        let group = ''
+        document.querySelector('#features tbody').innerHTML = features
+          .map((r) => {
+            if (r.length === 2) {
+              group = r[0]
+              return g === 'all' || g === group
+                ? `<tr class="group-row"><td colspan="5">${r[0]} · ${r[1]}</td></tr>`
+                : ''
+            }
+            if (g !== 'all' && g !== group) return ''
+            return `<tr><td class="id">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td class="muted">${r[4]}</td></tr>`
+          })
+          .join('')
+      }
+      drawFeatures('all')
+      document.querySelector('.filter').addEventListener('click', (e) => {
+        const b = e.target.closest('button')
+        if (!b) return
+        document.querySelectorAll('.filter button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+        drawFeatures(b.dataset.g)
+      })
+
+      const tests = [
+        [
+          'catalog.test.js',
+          36,
+          'normalize builds keys, plugin meta, mods, dev mods; scope filter; search fields; switch target file per type'
+        ],
+        [
+          'rows.test.js',
+          31,
+          'Row HTML: escaped text, switch tooltip names the file, plugin lock, missing plugin, use chips, menu entries'
+        ],
+        [
+          'config.test.js',
+          27,
+          'Settings form: one key written, others kept, empty deletes, emptied permissions stays {}, wrong type locked'
+        ],
+        [
+          'usage.test.js',
+          25,
+          'Use keys per spec, plugin bare key rule, MCP name escaping, Unused 30 d rules, sort orders'
+        ],
+        [
+          'settings-page.test.js',
+          24,
+          'File list, form fields, locked field "edit in Raw JSON", ignored modes, override notes, invalid JSON'
+        ],
+        [
+          'markdown.test.js',
+          22,
+          'Preview and highlight; raw HTML escaped everywhere; links never become anchors; front matter card'
+        ],
+        [
+          'drawer-view.test.js',
+          21,
+          'Drawer head: switch label and tooltip, star, menu, read-only plugin note, fork, uninstall, dev mod'
+        ],
+        ['drawer-body.test.js', 21, 'Tabs for own vs plugin files, plugin overview cards, JSON notes, backups list'],
+        ['format.test.js', 20, 'esc, tilde, money, compact, modelName, ago, plural, shortVersion, path helpers, sizes'],
+        ['dash-view.test.js', 18, 'Usage band states, stat tiles, favorites, recent changes, project files'],
+        ['mcp-page.test.js', 18, 'Transport, source, env names only (values never shown), switch target file, forms'],
+        [
+          'effective-page.test.js',
+          18,
+          'Winning file tag, overridden values, ignored bypass mode, merged lists, masked secret'
+        ],
+        ['chips.test.js', 18, 'Chip filters and counts on every page, Unused needs 30 days of history'],
+        ['hooks-page.test.js', 17, 'Rows, parked and plugin hooks, grouping order, form validation'],
+        ['context.test.js', 16, 'bytes ÷ 4, 1,536-char cap, UTF-8 bytes, conditional rules, off items count 0'],
+        ['claudemd-page.test.js', 14, 'Read order, Not found + Create, preview and edit, dirty state'],
+        ['catalog-view.test.js', 14, 'Sections, plugin groups open/closed, dev mods read-only, sort'],
+        ['doctor-view.test.js', 13, 'Issue lookup per kind, search across name, message, file'],
+        ['dups-view.test.js', 12, 'Conflict vs OK, Keep only this, skill + agent with one name make no group'],
+        ['duplicates.test.js', 12, 'Groups by kind and exact name, plugin items count as on'],
+        ['context-view.test.js', 12, '"Saves NN tok while off", MCP "not measured", bar widths, order'],
+        ['fav-view.test.js', 12, 'Missing favorite with Remove, off favorite keeps flag, categories, rename form'],
+        ['hooks-view.test.js', 11, 'Readable hook label from a command, which tools a hook runs for'],
+        ['activity-page.test.js', 11, 'Row message, Undo only when allowed, "Undid:" rows, escaping'],
+        ['doctor-page.test.js', 10, 'Checked-file count, severity order, Open button target, Check again'],
+        ['chips-view.test.js', 10, 'Pressed chip, Unused banner text and Switch off N, sort buttons'],
+        ['mcp-view.test.js', 7, 'parseEnv KEY=VALUE rules and errors, transport label'],
+        ['effective-view.test.js', 5, 'Effective rows lookup and groups'],
+        ['state.test.js', 4, 'Defaults; saved period and sort read back; blocked storage falls back'],
+        ['index-html.test.js', 2, 'Every stylesheet linked once; app.js is the only module entry']
+      ]
+      document.querySelector('#tests tbody').innerHTML = tests
+        .map(([f, n, w]) => `<tr><td class="mono">${f}</td><td class="num">${n}</td><td>${w}</td></tr>`)
+        .join('')
+
+      const commits = [
+        ['b76688e', 'refactor(ui): move shared state and helpers out of app.js'],
+        ['ce9909a', 'refactor(ui): move pure logic out of app.js into public/logic'],
+        ['bd974a5', 'refactor(ui): move write actions, row and chip rendering out of app.js'],
+        ['0822c47', 'refactor(ui): move Dashboard, Favorites, and favorite popover into modules'],
+        ['0ad0e75', 'refactor(ui): move Duplicates, Doctor, Context, and catalog pages into modules'],
+        ['eb82f8c', 'refactor(ui): move Hooks and MCP pages into modules'],
+        ['dd07673', 'refactor(ui): move Settings, Effective, and CLAUDE.md pages into modules'],
+        ['7b0b485', 'refactor(ui): move drawer, menu, nav, and Activity out of app.js'],
+        ['d8aca55', 'test(ui): cover page and UI HTML builders in test/public'],
+        ['c28aa7e', 'refactor(ui): split app.css into 13 ordered stylesheets in public/css'],
+        ['5d6e7b2', 'chore(scripts): remove the one-time app.js split codemod'],
+        ['bdfad3a', 'docs(rules): describe the public/ module layout and browser module tests']
+      ]
+      document.getElementById('commits').innerHTML = commits
+        .map(([s, m]) => `<div class="commit"><span class="sha">${s}</span><span>${m}</span></div>`)
+        .join('')
+    </script>
+  </body>
+</html>
