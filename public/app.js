@@ -41,8 +41,7 @@ import {
   relTo,
   shortVersion,
   slug,
-  tilde,
-  tok
+  tilde
 } from './core/format.js'
 import { ICON, kindIcon } from './core/icons.js'
 import {
@@ -105,15 +104,19 @@ import {
   sformValues,
   shortValue
 } from './logic/config.js'
-import { CTX_TYPES, TOKEN_BYTES, contextItems, keepCtx, sumTokens } from './logic/context.js'
-import { DOC_KIND, DOC_SEVERITY, doctorIssues, doctorItem, doctorMatches } from './logic/doctor.js'
-import { DUP_KINDS, duplicateGroups, needsAction, onCount } from './logic/duplicates.js'
+import { contextItems, sumTokens } from './logic/context.js'
+import { doctorIssues } from './logic/doctor.js'
+import { duplicateGroups, needsAction } from './logic/duplicates.js'
 import { EFF_GROUPS, SCOPE_KEY, SCOPE_TAG, effRow, effRows } from './logic/effective.js'
 import { HOOK_EVENTS, HOOK_INFO, hookLabel, hookRunsFor } from './logic/hooks.js'
 import { highlight, isMd, previewHtml } from './logic/markdown.js'
 import { mcpTransport, parseEnv } from './logic/mcp.js'
 import { USAGE_PAGES, sortRows } from './logic/usage.js'
+import { renderCatalog } from './pages/catalog.js'
+import { renderContext } from './pages/context.js'
 import { needUsage, renderDash, setPeriod } from './pages/dash.js'
+import { checkAgain, onDoctor, renderDoctor } from './pages/doctor.js'
+import { keepOnly, renderDups } from './pages/dups.js'
 import { cancelRename, onFavCat, placeFav, renderFav, saveOrder, submitNewCat, submitRename } from './pages/fav.js'
 import { chipsHtml, setSort, switchOffUnused } from './ui/chips.js'
 import { closeFavPop, placeFavPop, starItem } from './ui/fav-popover.js'
@@ -125,304 +128,11 @@ import {
   menuEntries,
   nothingMatches,
   pageBar,
-  rowHtml,
-  rowsHtml,
   scopeTag,
   useChips,
   useFlag,
   viaPlugin
 } from './ui/rows.js'
-
-const SECTIONS = {
-  plugins: [
-    ['global', 'Global · installed for your user', ''],
-    ['project', 'Project · installed for this folder', '']
-  ],
-  mods: [
-    ['global', 'Global · installed for your user', ''],
-    ['project', 'Project · installed for this folder', ''],
-    ['dev', 'Development · ~/.claude/dev-mods', 'Read-only. These mods have no switch.']
-  ],
-  skills: [
-    ['global', 'Global · ~/.claude/skills', 'The switch writes skillOverrides in ~/.claude/settings.json'],
-    ['project', 'Project · ./.claude/skills', 'The switch writes .claude/settings.local.json']
-  ],
-  agents: [
-    ['global', 'Global · ~/.claude/agents', 'Off renames name.md to name.md.disabled'],
-    ['project', 'Project · ./.claude/agents', 'Off renames name.md to name.md.disabled']
-  ]
-}
-
-function pluginGroupsHtml(page, list) {
-  const kind = page === 'skills' ? 'skill' : 'agent'
-  const shown = list.filter((i) => i.scope === 'plugin' && visible(i) && keepChip(page, i))
-  if (!shown.length) return ''
-  const byPlugin = new Map()
-  for (const i of shown) {
-    const id = i.plugin ?? i.source
-    if (!byPlugin.has(id)) byPlugin.set(id, [])
-    byPlugin.get(id).push(i)
-  }
-  const body = [...byPlugin]
-    .map(([id, rows]) => {
-      const plugin = state.catalog.plugin.find((p) => p.id === id)
-      const gk = `${kind}:${id}`
-      const open = groupOpen.has(gk) ? groupOpen.get(gk) : Boolean(state.query.trim())
-      const name = plugin?.name ?? id
-      const panel = `gp-${kind}-${slug(id)}`
-      const stateText = plugin?.enabled ? 'Plugin on' : 'Plugin off'
-      const notice = plugin
-        ? `<div class="pnote" role="note" data-key="${esc(plugin.key)}">${ICON.lock}<span class="pnote-t">These ${kind}s are part of the plugin <b>${esc(name)}</b>. You cannot delete or switch them one by one.</span><span class="pnote-a"><button type="button" class="btn" data-act="toggle">${plugin.enabled ? 'Switch off plugin' : 'Switch on plugin'}</button><button type="button" class="btn danger" data-act="uninstall">Uninstall plugin…</button></span></div>`
-        : ''
-      return `<div class="pgroup${plugin?.enabled ? '' : ' off'}">
-        <h3 class="ghead"><button type="button" class="gbtn" id="gb-${kind}-${slug(id)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(name)}</span><span class="gcount">${esc(plural(rows.length, kind))}</span><span class="gstate${plugin?.enabled ? ' on' : ''}">${stateText}</span></button></h3>
-        <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? notice + rowsHtml(sortRows(rows)) : ''}</div>
-      </div>`
-    })
-    .join('')
-  return `<h2>From plugins <span class="pill">${shown.length}</span><span class="hint">Grouped by plugin. These ${kind}s follow their plugin switch.</span></h2><div class="groups">${body}</div>`
-}
-
-function dupGroupHtml(g) {
-  const word = new Map(DUP_KINDS).get(g.kind)
-  const on = onCount(g)
-  const bad = on > 1
-  const gk = `dup:${g.key}`
-  const open = groupOpen.has(gk) ? groupOpen.get(gk) : bad
-  const panel = `gp-dup-${slug(g.key)}`
-  const first = g.items[0].description
-  const notes = []
-  if (bad)
-    notes.push(
-      `Claude Code sees ${on} ${word}s named <code>${esc(g.name)}</code>. Switch off the ones you do not want.`
-    )
-  if (first && g.items.every((i) => i.description === first))
-    notes.push(`<b>Same description.</b> One ${word} looks like a copy of the other.`)
-  for (const i of g.items.filter((i) => bad && i.enabled && !i.canToggle && i.plugin))
-    notes.push(
-      `<code>${esc(i.name)}</code> follows the plugin <b>${esc(pluginLabel(i.plugin))}</b>. Switch the plugin off on the Plugins page, or keep it.`
-    )
-  const rows = g.items
-    .map((i) => rowHtml(i, 'dups', { keep: i.enabled && g.items.some((o) => o !== i && o.enabled && o.canToggle) }))
-    .join('')
-  const pill = bad
-    ? `<span class="gstate bad">Conflict · ${on} on</span>`
-    : `<span class="gstate ok">OK · ${on} on</span>`
-  return `<div class="pgroup">
-    <h3 class="ghead"><button type="button" class="gbtn" id="gb-dup-${slug(g.key)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(g.name)}</span><span class="gcount">${esc(plural(g.items.length, word))}</span>${pill}</button></h3>
-    <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? `<ul class="rows" data-rows="dups">${rows}</ul>${notes.map((n) => `<p class="dnote">${n}</p>`).join('')}` : ''}</div>
-  </div>`
-}
-
-function renderDups() {
-  const found = duplicateGroups()
-  const all = found.filter((g) => g.items.some(visible))
-  const shown = all.filter((g) => chipFilter.dups === 'all' || needsAction(g))
-  const note =
-    'Skills, agents, or MCP servers of one type that use the same name. Claude Code loads each one that is on. A group needs action when more than one item in it is on.'
-  let body
-  if (shown.length)
-    body = `<h2>Same name <span class="pill">${shown.length}</span><span class="hint">Conflict groups open first.</span></h2><div class="groups">${shown.map(dupGroupHtml).join('')}</div>`
-  else if (!found.length) body = empty('No duplicates. Each skill, agent, and MCP server has its own name.')
-  else if (all.length) body = empty('No group needs action. In each group, only one item is on.')
-  else body = nothingMatches()
-  $('p-dups').innerHTML = chipsHtml('dups', all, note) + body
-}
-
-async function keepOnly(item) {
-  const group = duplicateGroups().find((g) => g.items.includes(item))
-  const keys = group ? group.items.filter((i) => i !== item && i.enabled && i.canToggle).map((i) => i.key) : []
-  for (const key of keys) {
-    const other = items.get(key)
-    if (other?.enabled) await toggle(other)
-  }
-}
-
-function doctorButton(issue) {
-  if (issue.target?.page)
-    return `<button type="button" class="btn" data-go="${esc(issue.target.page)}">Open ${esc(PAGES[issue.target.page])}</button>`
-  if (doctorItem(issue.target)) return '<button type="button" class="btn" data-doc-act="item">Open item</button>'
-  if (issue.file) return '<button type="button" class="btn" data-doc-act="file">Open file</button>'
-  return ''
-}
-
-function doctorRowHtml(issue) {
-  const where = [DOC_KIND[issue.kind] ?? issue.kind, issue.file ? tilde(issue.file) : ''].filter(Boolean).join(' · ')
-  const label = DOC_SEVERITY.find(([k]) => k === issue.severity)?.[1] ?? issue.severity
-  return `<li class="lrow drow" data-doc="${esc(issue.id)}">
-    <div class="lead"><span class="lead-ic sev-${esc(issue.severity)}" role="img" aria-label="${esc(label)}">${ICON[issue.severity === 'warning' ? 'warn' : issue.severity]}</span></div>
-    <div class="body">
-      <div class="l1"><span class="name">${esc(issue.name)}</span><span class="src">${esc(where)}</span></div>
-      <p class="desc">${esc(issue.message)}</p>
-    </div>
-    <div class="tail">${doctorButton(issue)}</div>
-  </li>`
-}
-
-function renderDoctor() {
-  const note = `Doctor reads your config and finds files and items that are broken or that do not do what they say. It never changes a file. <button type="button" class="btn" id="doc-again">Check again</button>`
-  if (state.doctor?.error) {
-    $('p-doctor').innerHTML = empty(`Doctor could not run: ${state.doctor.error}`)
-    return
-  }
-  const all = doctorIssues().filter(doctorMatches)
-  const f = chipFilter.doctor
-  const groups = DOC_SEVERITY.filter(([k]) => f === 'all' || f === k)
-    .map(([k, title, hint]) => [k, title, hint, all.filter((i) => i.severity === k)])
-    .filter(([, , , list]) => list.length)
-  let body
-  if (groups.length)
-    body = groups
-      .map(
-        ([k, title, hint, list]) =>
-          `<h2>${esc(title)} <span class="pill">${list.length}</span><span class="hint">${esc(hint)}</span></h2><ul class="rows" data-rows="doctor-${k}">${list.map(doctorRowHtml).join('')}</ul>`
-      )
-      .join('')
-  else if (!doctorIssues().length)
-    body = empty(`No issues found. Doctor checked ${plural(state.doctor?.checked ?? 0, 'file')}.`)
-  else if (all.length) body = empty('No issues of this type.')
-  else body = nothingMatches()
-  $('p-doctor').innerHTML = chipsHtml('doctor', all, note) + body
-}
-
-function onDoctor(row, e) {
-  const issue = doctorIssues().find((i) => i.id === row.dataset.doc)
-  const act = e.target.closest('[data-doc-act]')?.dataset.docAct
-  if (!issue || !act) return
-  if (act === 'item') {
-    const item = doctorItem(issue.target)
-    if (item) openDrawer(item)
-    return
-  }
-  guarded(`doc-open-${issue.id}`, async () => {
-    try {
-      await send('POST', '/api/open', { path: issue.file, app: 'editor' })
-      toast(`Opened ${tilde(issue.file)}`)
-    } catch (err) {
-      toast(`Could not open: ${err.message}`, true)
-    }
-  })
-}
-
-async function checkAgain() {
-  try {
-    await refresh()
-    toast(`Doctor checked ${plural(state.doctor?.checked ?? 0, 'file')}`)
-  } catch (err) {
-    toast(`Could not check again: ${err.message}`, true)
-  }
-}
-
-function tokHtml(n, max, label = tok(n)) {
-  const width = max && n ? Math.max(4, (n / max) * 100) : 0
-  return `<div class="tok"><span>${esc(label)}</span><span class="mini" aria-hidden="true"><span style="width:${width}%"></span></span></div>`
-}
-
-function ctxNote(e, dups) {
-  const bits = []
-  if (e.type === 'mcp') bits.push('<span class="mchip">Tool names load at start. Not measured.</span>')
-  else if (e.item && !e.enabled) bits.push(`<span class="mchip okc">Saves ${tok(e.cost)} while off</span>`)
-  else if (e.type === 'rules' && e.conditional) bits.push(`<span class="mchip">On use: ${tok(e.onUse)}</span>`)
-  else if (e.item) bits.push(`<span class="mchip">Body on use: ${tok(e.onUse)}</span>`)
-  if (dups.has(e.key))
-    bits.push(
-      `<button type="button" class="mchip btn-plain dupc" data-go="dups">Same name as another ${esc(e.kind === 'mcp' ? 'MCP server' : e.kind)}</button>`
-    )
-  return `<p class="meta chips-s">${bits.join('')}</p>`
-}
-
-function ctxFileRow(e, max, dups) {
-  const where = e.scope === 'global' ? 'Global' : 'Project'
-  const dir = state.inventory.project?.dir
-  const file = dir && e.path.startsWith(dir) ? `.${e.path.slice(dir.length)}` : tilde(e.path)
-  const name =
-    e.type === 'claudemd'
-      ? `<button type="button" class="name btn-plain" data-go="claudemd">${esc(e.name)}</button>`
-      : `<span class="name">${esc(e.name)}</span>`
-  return `<li class="lrow ctx-file">
-    <div class="lead"><span class="lead-ic" role="img" aria-label="${esc(e.type === 'claudemd' ? 'CLAUDE.md file' : 'Rule file')}" title="${esc(tilde(e.path))}">${kindIcon('file', 18)}</span></div>
-    <div class="body">
-      <div class="l1">${name}<span class="src">${esc(`${where} · ${file}`)}</span></div>
-      <p class="desc">${esc(e.description)}</p>
-      ${e.conditional ? ctxNote(e, dups) : ''}
-    </div>
-    ${tokHtml(e.always, max)}
-  </li>`
-}
-
-function ctxRow(e, max, dups) {
-  if (!e.item) return ctxFileRow(e, max, dups)
-  const right = e.type === 'mcp' ? tokHtml(0, max, 'not measured') : tokHtml(e.always, max)
-  return rowHtml(e.item, 'context', { right, note: ctxNote(e, dups) })
-}
-
-function contextBandHtml(list) {
-  const total = sumTokens(list)
-  const types = CTX_TYPES.map(([type, label, cls]) => ({
-    label,
-    cls,
-    n: sumTokens(list.filter((e) => e.type === type))
-  })).filter((t) => t.n)
-  const pct = (n) => `${total ? ((n / total) * 100).toFixed(0) : 0}%`
-  const top = [...types].sort((a, b) => b.n - a.n)[0]
-  const on = (type) => list.filter((e) => e.type === type && e.always).length
-  const parts = [
-    plural(on('claudemd'), 'CLAUDE.md file'),
-    plural(on('rules'), 'rule'),
-    plural(on('skills'), 'skill'),
-    plural(on('agents'), 'agent')
-  ]
-  return `<section class="usage" aria-label="Context cost">
-      <div>
-        <div class="k">Loaded in every session</div>
-        <div class="big" id="ctx-total">${total.toLocaleString('en-US')}<small> tokens</small></div>
-        <p>Estimate: file bytes ÷ ${TOKEN_BYTES}. Run <code>/context</code> in Claude Code for exact numbers.<br>${esc(parts.join(' · '))} · MCP servers not measured · <code>@path</code> imports not followed</p>
-      </div>
-      <div class="right">
-        <div class="k">By type</div>
-        <div class="mon">${top ? esc(top.label) : 'Nothing'}<span>${top ? `${pct(top.n)} of the total` : 'loads at start'}</span></div>
-        <div class="bar" role="img" aria-label="${esc(`Context by type: ${types.map((t) => `${t.label} ${pct(t.n)}`).join(', ')}`)}">${types
-          .map((t) => `<span class="${t.cls}" style="width:${pct(t.n)}"></span>`)
-          .join('')}</div>
-        <div class="legend">${types.map((t) => `<span><i class="${t.cls}"></i>${esc(t.label)} ${pct(t.n)}</span>`).join('')}</div>
-      </div>
-    </section>`
-}
-
-function renderContext() {
-  const all = contextItems().filter(visible)
-  const off = chipFilter.context === 'off'
-  const shown = all.filter((e) => keepCtx(e, chipFilter.context))
-  const max = Math.max(1, ...all.map((e) => e.always))
-  const dups = new Set(duplicateGroups().flatMap((g) => g.items.map((i) => i.key)))
-  const note =
-    'Sorted by tokens. Switch off a large item to give the context window back. Changes apply at the next session.'
-  const body = shown.length
-    ? `<h2>${off ? 'Switched off' : 'Biggest items'} <span class="pill">${shown.length}</span><span class="hint">${esc(off ? `${tok(shown.reduce((sum, e) => sum + (e.cost ?? 0), 0))} saved while off` : `${tok(sumTokens(shown))} at session start`)}</span></h2><ul class="rows" data-rows="context">${shown.map((e) => ctxRow(e, max, dups)).join('')}</ul>`
-    : all.length
-      ? empty('No items match this filter.')
-      : nothingMatches()
-  $('p-context').innerHTML = contextBandHtml(all) + chipsHtml('context', all, note) + body
-}
-
-function catalogBody(page, list) {
-  if (!list.length) return empty(`No ${page} found in ~/.claude or ./.claude.`)
-  const own = SECTIONS[page]
-    .map(([scope, title, hint]) => {
-      const shown = list.filter((i) => i.scope === scope && visible(i) && keepChip(page, i))
-      if (!shown.length) return ''
-      return `<h2>${esc(title)} <span class="pill">${shown.length}</span>${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</h2>${rowsHtml(sortRows(shown))}`
-    })
-    .join('')
-  const html = own + (page === 'plugins' || page === 'mods' ? '' : pluginGroupsHtml(page, list))
-  if (html) return html
-  if (chipFilter[page] !== 'all' && list.some(visible)) return empty(`No ${page} match this filter.`)
-  return nothingMatches()
-}
-
-function renderCatalog(page, list, note) {
-  $(`p-${page}`).innerHTML = chipsHtml(page, list, note) + catalogBody(page, list)
-}
 
 function menuButtonFor(key) {
   const page = document.querySelector('.page:not([hidden])')
@@ -1095,7 +805,7 @@ function openerKey(item) {
   return { key: (usable && cardKey(el)) || item.key, el: usable ? el : null }
 }
 
-function openDrawer(item) {
+export function openDrawer(item) {
   dr.opener = openerKey(item)
   dr.key = item.key
   dr.kind = item.kind
