@@ -4,7 +4,6 @@ import {
   askReload,
   busy,
   deleteRow,
-  editFavCategory,
   guarded,
   loadProjectFiles,
   refresh,
@@ -36,8 +35,6 @@ import {
   isFolderSkill,
   isPlain,
   lineCount,
-  money,
-  monthName,
   opt,
   parentDir,
   plural,
@@ -49,13 +46,11 @@ import {
 } from './core/format.js'
 import { ICON, kindIcon } from './core/icons.js'
 import {
-  PERIOD_KEY,
   bks,
   cfg,
   chipFilter,
   dr,
   eds,
-  favOpen,
   freshHookForm,
   freshMcpForm,
   groupOpen,
@@ -69,16 +64,9 @@ import {
   PAGES,
   SETTINGS_FILE,
   counts,
-  favBody,
-  favCats,
-  favNameError,
-  favOf,
-  favPopOptions,
   favoriteEntries,
   hasSwitch,
   isPluginOwned,
-  itemLabel,
-  matches,
   otherCounts,
   ownerId,
   ownerPlugin,
@@ -124,8 +112,11 @@ import { EFF_GROUPS, SCOPE_KEY, SCOPE_TAG, effRow, effRows } from './logic/effec
 import { HOOK_EVENTS, HOOK_INFO, hookLabel, hookRunsFor } from './logic/hooks.js'
 import { highlight, isMd, previewHtml } from './logic/markdown.js'
 import { mcpTransport, parseEnv } from './logic/mcp.js'
-import { USAGE_PAGES, modelShares, sortRows } from './logic/usage.js'
+import { USAGE_PAGES, sortRows } from './logic/usage.js'
+import { needUsage, renderDash, setPeriod } from './pages/dash.js'
+import { cancelRename, onFavCat, placeFav, renderFav, saveOrder, submitNewCat, submitRename } from './pages/fav.js'
 import { chipsHtml, setSort, switchOffUnused } from './ui/chips.js'
+import { closeFavPop, placeFavPop, starItem } from './ui/fav-popover.js'
 import {
   addButton,
   cellSwitch,
@@ -141,446 +132,6 @@ import {
   useFlag,
   viaPlugin
 } from './ui/rows.js'
-
-function navIcon(page) {
-  return document.querySelector(`#nav [data-p="${page}"] .ic`)?.outerHTML ?? ''
-}
-
-function statTile(page, label, c) {
-  return `<button type="button" class="stat" data-go="${page}">
-    <span class="st-top"><span class="st-ic">${navIcon(page)}</span><span class="l">${esc(label)}</span></span>
-    <span class="n">${c.total}</span>
-    <span class="s"><span class="on">${c.on} on</span><span class="off">${c.total - c.on} off</span></span>
-  </button>`
-}
-
-function setPeriod(period) {
-  state.usagePeriod = period
-  try {
-    localStorage.setItem(PERIOD_KEY, period)
-  } catch {}
-  renderDash()
-}
-
-function usageHtml() {
-  const source = '<code>~/.claude/projects</code>'
-  if (state.usageError)
-    return `<section class="usage note-only"><p>Could not read usage from ${source}: ${esc(state.usageError)}</p></section>`
-  if (!state.usage) return `<section class="usage note-only"><p>Reading usage from ${source}…</p></section>`
-  if (!state.usage.all.responses)
-    return `<section class="usage note-only"><p>No Claude Code usage found in ${source}.</p></section>`
-  const u = state.usage[state.usagePeriod]
-  const label = state.usagePeriod === 'month' ? monthName(state.usage.monthKey) : 'All time'
-  const shares = modelShares(u)
-  const pct = (n) => `${n.toFixed(1)}%`
-  const unpriced = u.unpriced.length
-    ? `<br>No price for ${u.unpriced.map((m) => `<code>${esc(m)}</code>`).join(', ')}. Its tokens count, its cost does not.`
-    : ''
-  const [dollars, cents] = money(u.cost).slice(1).split('.')
-  const periods = [
-    ['month', 'This month'],
-    ['all', 'All time']
-  ]
-    .map(
-      ([k, text]) =>
-        `<button type="button" data-period="${k}" aria-pressed="${k === state.usagePeriod ? 'true' : 'false'}">${text}</button>`
-    )
-    .join('')
-  const legend = shares.length
-    ? `<div class="bar" role="img" aria-label="${esc(`Cost by model: ${shares.map((m) => `${m.name} ${pct(m.share)}`).join(', ')}`)}">${shares
-        .map((m) => `<span class="${m.cls}" style="width:${m.share}%"></span>`)
-        .join('')}</div>
-        <div class="legend">${shares.map((m) => `<span><i class="${m.cls}"></i>${esc(m.name)} ${pct(m.share)}</span>`).join('')}</div>`
-    : '<p>No priced usage in this period.</p>'
-  return `<section class="usage" aria-label="Usage and cost">
-      <div>
-        <div class="k">API-equal value</div>
-        <div class="big"><small>$</small>${esc(dollars)}.${esc(cents)}</div>
-        <p>${esc(label)}. All Claude Code usage on this machine, priced at current Anthropic API rates.<br>Read from ${source}${unpriced}</p>
-      </div>
-      <div class="right">
-        <div class="rhead">
-          <div class="k">Cost by model</div>
-          <div class="scope period" role="group" aria-label="Usage period">${periods}</div>
-        </div>
-        <div class="mon">${compact(u.tokens)}<span>tokens · ${u.responses.toLocaleString('en-US')} responses</span></div>
-        ${legend}
-      </div>
-    </section>
-    <div class="utiles">
-      <div><b>${compact(u.tokens)}</b><span>Total tokens</span></div>
-      <div><b>${u.sessions.toLocaleString('en-US')}</b><span>Sessions across ${u.projects} project${u.projects === 1 ? '' : 's'}</span></div>
-      <div><b class="g">${money(u.saved)}</b><span>Saved by prompt cache</span></div>
-      <div><b>${pct(u.cacheShare * 100)}</b><span>Input tokens served from cache</span></div>
-    </div>`
-}
-
-async function loadUsage() {
-  try {
-    state.usage = await get('/api/usage')
-    state.usageError = ''
-  } catch (err) {
-    state.usageError = err.message
-  }
-  if (state.inventory && USAGE_PAGES.has(state.page)) render()
-}
-
-function needUsage() {
-  state.usageLoad ??= loadUsage()
-}
-
-function renderDash() {
-  const inv = state.inventory
-  const tiles = [
-    statTile('skills', 'Skills', counts(state.catalog.skill)),
-    statTile('agents', 'Agents', counts(state.catalog.agent)),
-    statTile('plugins', 'Plugins', counts(state.catalog.plugin)),
-    statTile('hooks', 'Hooks', otherCounts(inv.hooks)),
-    statTile('mcp', 'MCP servers', otherCounts(inv.mcp))
-  ].join('')
-  const favs = favoriteEntries()
-    .filter((e) => e.item && visible(e.item))
-    .slice(0, 6)
-  const favHtml = favs.length
-    ? `<ul class="rows" data-rows="dfav">${favs.map((e) => rowHtml(e.item, 'dfav', { cat: e.fav.category })).join('')}</ul>`
-    : empty(inv.favorites.length ? 'No favorites in this scope.' : 'No favorites yet. Click the star on any row.')
-  const more =
-    inv.favorites.length > favs.length && favs.length
-      ? '<button type="button" class="btn-link" data-go="fav">All favorites <span aria-hidden="true">→</span></button>'
-      : ''
-  const proj = [...state.catalog.skill, ...state.catalog.agent, ...state.catalog.plugin].filter(
-    (i) => i.scope === 'project' && visible(i)
-  )
-  const projHtml = proj.length
-    ? rowsHtml(proj, 'dproj')
-    : empty(state.query ? `No project items match "${state.query}".` : 'No skills, agents, or plugins in ./.claude.')
-  const errors = inv.errors?.length
-    ? `<div class="warn"><b>${inv.errors.length} file${inv.errors.length > 1 ? 's' : ''} could not be read.</b> ${inv.errors.map((e) => `<code>${esc(tilde(e.path))}</code>: ${esc(e.error)}`).join('; ')}</div>`
-    : ''
-  $('p-dash').innerHTML = `${errors}
-    ${usageHtml()}
-    <div class="stats">${tiles}</div>
-    <div class="two">
-      <div><h2>Favorites ${more}</h2>${favHtml}${recentHtml()}</div>
-      <div>
-        <h2>This project</h2>
-        ${projectOn() ? `${filesHtml()}<h2>Project items <span class="pill">${proj.length}</span></h2>${projHtml}` : projectOffHtml()}
-      </div>
-    </div>`
-}
-
-function recentHtml() {
-  const all = [...state.catalog.skill, ...state.catalog.agent, ...state.catalog.plugin]
-  if (!all.some((i) => typeof i.mtime === 'number')) return ''
-  const recent = all
-    .filter((i) => typeof i.mtime === 'number' && visible(i))
-    .sort((a, b) => b.mtime - a.mtime)
-    .slice(0, 5)
-  const body = recent.length
-    ? `<ul class="clist">${recent
-        .map(
-          (i) =>
-            `<li class="recent" data-key="${esc(i.key)}"><button type="button" class="btn-plain name" data-act="open">${esc(i.name)}</button><span class="ck">${esc(KIND_WORD[i.kind] ?? i.kind)} · ${esc(i.scope)}</span><span class="when" title="${esc(new Date(i.mtime).toLocaleString())}">${esc(ago(i.mtime))}</span></li>`
-        )
-        .join('')}</ul>`
-    : nothingMatches()
-  return `<h2>Recently changed</h2>${body}`
-}
-
-function filesHtml() {
-  const inv = state.inventory
-  const rows = [
-    ['CLAUDE.md', inv.claudeMd?.project?.exists, 'claudemd'],
-    ['.claude/settings.json', inv.settings?.project?.exists, 'settings'],
-    ['.claude/settings.local.json', inv.settings?.projectLocal?.exists, 'settings'],
-    [
-      '.mcp.json',
-      state.projectFiles ? state.projectFiles.has('.mcp.json') : inv.mcp.some((m) => m.origin === 'mcpjson'),
-      'mcp'
-    ]
-  ]
-  return `<ul class="clist files">${rows
-    .map(
-      ([name, yes, page]) =>
-        `<li><span class="dot${yes ? ' yes' : ''}" aria-hidden="true"></span><button type="button" class="btn-plain fname" data-go="${page}" aria-label="${esc(`${name}, ${yes ? 'present' : 'not found'}. Open ${PAGES[page]}`)}">${esc(name)}</button><span class="${yes ? 'yes' : 'no'}">${yes ? 'present' : 'not found'}</span></li>`
-    )
-    .join('')}</ul>`
-}
-
-function missingFavRowHtml(fav) {
-  return `<li class="lrow missing" data-fav="${esc(fav.id)}" draggable="true">
-    <div class="lead"><span class="lead-ic bad" role="img" aria-label="Missing">${ICON.warn}</span></div>
-    <div class="body">
-      <div class="l1"><span class="name">${esc(fav.name)}</span><span class="src">${esc(fav.kind)} · ${esc(fav.source)}</span><span class="flag bad">Missing</span></div>
-      <p class="desc">This ${esc(fav.kind)} is no longer on disk.</p>
-    </div>
-    <div class="tail"><button type="button" class="btn danger" data-act="unfav">Remove</button></div>
-  </li>`
-}
-
-function favHeadHtml(cat, label, count, open, index) {
-  if (cat !== null && state.favEditing === cat) {
-    return `<form class="fav-edit" data-form="cat-rename" data-cat="${esc(cat)}">
-      <input type="text" id="fav-rename" name="n" value="${esc(state.favRenameValue)}" maxlength="40" required aria-label="${esc(`New name for ${cat}`)}">
-      <button type="submit" class="btn p">Rename</button>
-      <button type="button" class="btn ghost" data-fc="cancel">Cancel</button>
-    </form>`
-  }
-  const tools =
-    cat === null
-      ? ''
-      : `<span class="fav-tools"><button type="button" class="icon-btn" data-fc="rename" data-cat="${esc(cat)}" aria-label="${esc(`Rename category ${cat}`)}">${ICON.pen}</button><button type="button" class="icon-btn del" data-fc="delete" data-cat="${esc(cat)}" aria-label="${esc(`Delete category ${cat}`)}">${ICON.bin}</button></span>`
-  return `<button type="button" class="fav-tog${cat === null ? ' uncat' : ''}" data-fc="collapse" data-cat="${esc(cat ?? '')}" aria-expanded="${open}" aria-controls="favsec-${index}">${ICON.chev}<span class="fav-name">${esc(label)}</span><span class="pill">${count}</span></button>${tools}`
-}
-
-function favSectionHtml(cat, list, index) {
-  const label = cat ?? 'Uncategorized'
-  const open = favOpen.get(cat ?? '') !== false
-  const rows = list
-    .map((e) => (e.item ? rowHtml(e.item, 'fav', { draggable: true }) : missingFavRowHtml(e.fav)))
-    .join('')
-  const body = list.length
-    ? `<ul class="rows" data-rows="fav">${rows}</ul>`
-    : `<div class="empty fav-drop">No favorites here. Drag a row here, or pick ${esc(label)} from a star.</div>`
-  return `<section class="fav-sec" data-cat="${esc(cat ?? '')}" aria-label="${esc(label)}">
-    <div class="fav-h">${favHeadHtml(cat, label, list.length, open, index)}</div>
-    <div id="favsec-${index}"${open ? '' : ' hidden'}>${body}</div>
-  </section>`
-}
-
-function renderFav() {
-  const cats = favCats()
-  const entries = favoriteEntries()
-  const shown = entries.filter((e) => (e.item ? visible(e.item) : matches({ name: e.fav.name, source: e.fav.source })))
-  const groups = [
-    ...cats.map((c) => [c, shown.filter((e) => e.fav.category === c)]),
-    [null, shown.filter((e) => e.fav.category === null)]
-  ]
-  const top = `<div class="fav-top">
-    <div class="warn">Favorites and categories live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a row to reorder it or to move it to another category.</div>
-    <form class="fav-new" data-form="cat-new">
-      <input type="text" id="fav-newcat" name="n" value="${esc(state.favNewName)}" maxlength="40" placeholder="New category" aria-label="New category name">
-      <button type="submit" class="btn p">Add category</button>
-    </form>
-  </div>`
-  let body
-  if (!entries.length && !cats.length) body = empty('No favorites yet. Click the star on any row and pick a category.')
-  else if (state.query) {
-    const hits = groups.map((g, i) => [...g, i]).filter(([, list]) => list.length)
-    body = hits.length ? hits.map(([c, list, i]) => favSectionHtml(c, list, i)).join('') : nothingMatches()
-  } else body = groups.map(([c, list], i) => favSectionHtml(c, list, i)).join('')
-  $('p-fav').innerHTML = top + body
-}
-
-function favPopListHtml() {
-  const { options, active, current } = state.favPop
-  return options
-    .map((o, i) => {
-      const cls = ['fp-opt', i === active ? 'active' : '', o.create ? 'create' : ''].filter(Boolean).join(' ')
-      const text = o.create ? `+ Create "${o.create}"` : o.label
-      const cur = !o.create && o.value === current ? '<span class="fp-cur" aria-label="current">✓</span>' : ''
-      return `<li role="option" id="fp-opt-${i}" class="${cls}" data-i="${i}" aria-selected="${i === active}"><span>${esc(text)}</span>${cur}</li>`
-    })
-    .join('')
-}
-
-function favPopHtml(item, fav) {
-  return `<form data-form="favpop">
-    <h3 id="favpop-t">${fav ? 'Change category' : 'Add to favorites'}</h3>
-    <p class="sub">${esc(itemLabel(item))}</p>
-    <input type="text" name="newcat" maxlength="40" placeholder="Search or create a category" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-controls="favpop-list" aria-label="Category">
-    <ul class="fp-list" id="favpop-list" role="listbox" aria-label="Categories"></ul>
-    <p class="err" role="alert" hidden></p>
-    <div class="bar">${fav ? '<button type="button" class="btn danger ghost" data-pop="remove">Remove</button>' : '<button type="button" class="btn ghost" data-pop="cancel">Cancel</button>'}<button type="submit" class="btn p">Save</button></div>
-  </form>`
-}
-
-function drawFavPopList() {
-  const { el, options, active } = state.favPop
-  el.querySelector('.fp-list').innerHTML = favPopListHtml()
-  el.querySelector('input[name="newcat"]').setAttribute(
-    'aria-activedescendant',
-    options.length ? `fp-opt-${active}` : ''
-  )
-  el.querySelector(`#fp-opt-${active}`)?.scrollIntoView({ block: 'nearest' })
-}
-
-function filterFavPop(query) {
-  const options = favPopOptions(query)
-  const q = query.trim().toLowerCase()
-  const exact = options.findIndex((o) => !o.create && o.label.toLowerCase() === q)
-  const current = q ? -1 : options.findIndex((o) => o.value === state.favPop.current)
-  state.favPop.options = options
-  state.favPop.active = Math.max(0, exact, current)
-  state.favPop.el.querySelector('.err').hidden = true
-  drawFavPopList()
-}
-
-function placeFavPop() {
-  if (!state.favPop) return
-  const { el, trigger } = state.favPop
-  if (!trigger?.isConnected) return closeFavPop(false)
-  const r = trigger.getBoundingClientRect()
-  const w = el.offsetWidth
-  const h = el.offsetHeight
-  el.style.left = `${Math.max(16, Math.min(r.right - w, innerWidth - w - 16))}px`
-  el.style.top = `${r.bottom + 6 + h > innerHeight - 16 ? Math.max(16, r.top - h - 6) : r.bottom + 6}px`
-}
-
-function openFavPop(item, trigger) {
-  closeFavPop(false)
-  const fav = favOf(item)
-  const el = document.createElement('div')
-  el.className = 'favpop'
-  el.setAttribute('role', 'dialog')
-  el.setAttribute('aria-labelledby', 'favpop-t')
-  el.innerHTML = favPopHtml(item, fav)
-  document.body.append(el)
-  state.favPop = {
-    el,
-    item,
-    trigger,
-    inDrawer: Boolean(trigger?.closest('#dr')),
-    current: fav ? (fav.category ?? '') : '',
-    options: [],
-    active: 0
-  }
-  filterFavPop('')
-  placeFavPop()
-  const input = el.querySelector('input[name="newcat"]')
-  input.focus()
-  input.addEventListener('input', () => filterFavPop(input.value))
-  input.addEventListener('keydown', (e) => {
-    const step = { ArrowDown: 1, ArrowUp: -1 }[e.key]
-    if (!step || !state.favPop.options.length) return
-    e.preventDefault()
-    state.favPop.active = (state.favPop.active + step + state.favPop.options.length) % state.favPop.options.length
-    drawFavPopList()
-  })
-  el.addEventListener('click', (e) => {
-    const opt = e.target.closest('[data-i]')
-    if (opt) {
-      state.favPop.active = Number(opt.dataset.i)
-      return submitFavPop(el.querySelector('form'))
-    }
-    const act = e.target.closest('[data-pop]')?.dataset.pop
-    if (act === 'cancel') closeFavPop()
-    else if (act === 'remove') {
-      closeFavPop()
-      star(favBody(item, false), `Unstarred ${item.name}`)
-    }
-  })
-  el.addEventListener('submit', (e) => {
-    e.preventDefault()
-    submitFavPop(e.target)
-  })
-}
-
-function closeFavPop(refocus = true) {
-  if (!state.favPop) return
-  const { el, item, trigger, inDrawer } = state.favPop
-  state.favPop = null
-  el.remove()
-  if (!refocus) return
-  if (trigger?.isConnected) return trigger.focus({ preventScroll: true })
-  const scope = inDrawer && drawerOpen() ? $('dr') : document.querySelector('.page:not([hidden])')
-  const btn = inDrawer
-    ? scope?.querySelector('[data-dact="star"]')
-    : [...(scope?.querySelectorAll('[data-act="star"]') ?? [])].find((b) => holderKey(b.closest(HOLDER)) === item.key)
-  btn?.focus({ preventScroll: true })
-}
-
-function submitFavPop(form) {
-  const { item, options, active } = state.favPop
-  const choice = options[active]
-  const fav = favOf(item)
-  const fail = (message) => {
-    const p = form.querySelector('.err')
-    p.textContent = message
-    p.hidden = false
-    form.elements.newcat.focus()
-  }
-  if (!choice) return fail('Type a category name.')
-  if (choice.create) {
-    const error = favNameError(choice.create)
-    if (error) return fail(error)
-  } else if (fav && (fav.category ?? '') === choice.value) return closeFavPop()
-  const category = choice.create ?? (choice.value || null)
-  const label = category ?? 'Uncategorized'
-  closeFavPop()
-  star(favBody(item, true, category), fav ? `Moved ${item.name} to ${label}` : `Starred ${item.name} in ${label}`)
-}
-
-function focusFavTool(cat, tool) {
-  document.querySelector(`#p-fav [data-fc="${tool}"][data-cat="${CSS.escape(cat)}"]`)?.focus({ preventScroll: true })
-}
-
-function startRename(cat) {
-  state.favEditing = cat
-  state.favRenameValue = cat
-  render()
-  const input = $('fav-rename')
-  input?.focus()
-  input?.select()
-}
-
-function cancelRename() {
-  const cat = state.favEditing
-  state.favEditing = null
-  render()
-  if (cat !== null) focusFavTool(cat, 'rename')
-}
-
-async function onFavCat(el) {
-  const act = el.dataset.fc
-  const cat = el.dataset.cat ?? ''
-  if (act === 'collapse') {
-    favOpen.set(cat, el.getAttribute('aria-expanded') !== 'true')
-    render()
-    return focusFavTool(cat, 'collapse')
-  }
-  if (act === 'rename') return startRename(cat)
-  if (act === 'cancel') return cancelRename()
-  if (act === 'delete') {
-    const n = state.inventory.favorites.filter((f) => f.category === cat).length
-    const yes = await ask({
-      title: `Delete category ${cat}?`,
-      message: n
-        ? `Its ${plural(n, 'favorite')} move to Uncategorized. They stay favorites. You can undo this from the activity log.`
-        : 'This category is empty.',
-      ok: 'Delete',
-      danger: true
-    })
-    if (yes) await editFavCategory({ op: 'delete', name: cat }, `Deleted category ${cat}`)
-  }
-}
-
-async function submitNewCat() {
-  const name = state.favNewName.trim()
-  const error = favNameError(name)
-  if (error) return toast(error, true)
-  if (favCats().some((c) => c.toLowerCase() === name.toLowerCase()))
-    return toast(`Category ${name} already exists.`, true)
-  if (await editFavCategory({ op: 'create', name }, `Added category ${name}`)) {
-    state.favNewName = ''
-    render()
-    $('fav-newcat')?.focus()
-  }
-}
-
-async function submitRename(form) {
-  const old = form.dataset.cat
-  const name = state.favRenameValue.trim()
-  if (name === old) return cancelRename()
-  const error = favNameError(name)
-  if (error) return toast(error, true)
-  state.favEditing = null
-  if (await editFavCategory({ op: 'rename', name: old, newName: name }, `Renamed ${old} to ${name}`))
-    return focusFavTool(name, 'rename')
-  state.favEditing = old
-  render()
-  $('fav-rename')?.focus()
-}
 
 const SECTIONS = {
   plugins: [
@@ -1013,13 +564,8 @@ function show(page) {
 
 const PROJECT_OFF_NOTE = 'Started from your home folder — project scope is off. Run it inside a project folder.'
 
-function projectOffHtml() {
+export function projectOffHtml() {
   return `<div class="warn" role="note">${esc(PROJECT_OFF_NOTE)}</div>`
-}
-
-function starItem(item, trigger) {
-  if (state.favPop && state.favPop.item.key === item.key && state.favPop.trigger === trigger) return closeFavPop()
-  openFavPop(item, trigger)
 }
 
 const TEXT_EXT = /\.(md|json|txt)$/i
@@ -3036,44 +2582,6 @@ function onCfg(el) {
     else ed.preview = !ed.preview
     render()
   }
-}
-
-function placeFav(fromKey, cat, toKey, after) {
-  const favs = state.inventory.favorites
-  const from = favs.find((f) => f.id === fromKey)
-  if (!from || toKey === fromKey) return null
-  const ids = favs.map((f) => f.id).filter((id) => id !== fromKey)
-  const target = toKey ? ids.indexOf(toKey) : -1
-  let at = ids.length
-  if (target >= 0) at = target + (after ? 1 : 0)
-  else {
-    const last = favs.filter((f) => f.id !== fromKey && f.category === cat).at(-1)
-    if (last) at = ids.indexOf(last.id) + 1
-  }
-  ids.splice(at, 0, fromKey)
-  const move = from.category === cat ? undefined : { id: fromKey, category: cat }
-  if (!move && ids.every((id, i) => id === favs[i].id)) return null
-  return { ids, move }
-}
-
-async function saveOrder({ ids, move }) {
-  const byId = new Map(state.inventory.favorites.map((f) => [f.id, f]))
-  state.inventory.favorites = ids
-    .map((id) => byId.get(id))
-    .map((f) => (move && f.id === move.id ? { ...f, category: move.category } : f))
-  render()
-  try {
-    await send('PUT', '/api/favorites/order', move ? { ids, move } : { ids })
-    toast(
-      move
-        ? `Moved ${byId.get(move.id).name} to ${move.category ?? 'Uncategorized'} · ~/.claude/storehouse.json`
-        : 'Saved order · ~/.claude/storehouse.json'
-    )
-  } catch (err) {
-    toast(`Could not save order: ${err.message}`, true)
-  }
-  await refresh().catch(() => {})
-  loadActivity()
 }
 
 const ACT_PATH = {
