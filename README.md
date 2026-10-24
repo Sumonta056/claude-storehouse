@@ -289,6 +289,8 @@ Tests never touch your real `~/.claude`. Each one makes a fake home with `fs.mkd
 
 ## Changelog
 
+- **1.4.0** — Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
+  - Skeleton loaders for the page and the usage band, and usage loads at the same time as the inventory.
 - **1.3.0** — Full history in [CHANGELOG.md](https://github.com/Sumonta056/claude-storehouse/blob/main/CHANGELOG.md).
   - Use per item: 30-day use for skills, agents, and MCP servers, an Unused 30 d filter, a sort by use, and "Switch off N".
   - Context page with the tokens each item adds to every session.

@@ -6,6 +6,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-24
+
+This release makes the dashboard feel faster when it opens. The page shows its layout at once, and usage now loads at the same time as the rest of your setup.
+
+### Added
+
+- While your setup loads, the page shows a skeleton in the shape of the page: the usage band, the tiles, and the type cards on the Dashboard, and rows on other pages.
+- While usage loads, the usage band shows its own skeleton. The rest of the Dashboard is ready before it.
+- The shimmer stops when your system asks for reduced motion. Screen readers hear that the page is loading.
+
+### Performance
+
+- The Dashboard, Skills, Agents, and MCP pages start to read usage when the page opens. Before, usage started only after the inventory arrived, so the two waits added up.
+
+### Changed
+
+- The browser code is split into small modules, and the stylesheet into 13 files. The pages look and work the same.
+- Development: tests for each browser module, a UI structure skill and reviewer agent, and an architecture overview.
+
 ## [1.3.0] - 2026-10-24
 
 This release helps you see what your Claude Code setup costs and what it really uses. New pages show the tokens each item adds to every session, find config that is broken, and show the settings value that wins in this folder. Skills, agents, and MCP servers now show how often Claude used them in the last 30 days.
@@ -152,7 +171,8 @@ First stable release. Claude Storehouse is a local web dashboard for your Claude
 - New README with screenshots, MIT license, and full npm package metadata.
 - Development: ESLint, Prettier, Husky, and commitlint; CI on Node 20 and 22 on Ubuntu and macOS; tag-driven npm publish with provenance.
 
-[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.0.0...v1.1.0
