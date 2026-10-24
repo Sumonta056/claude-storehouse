@@ -159,6 +159,42 @@ Doctor never writes and never runs a command. Check 3 only looks for an executab
 - The nav count is errors plus warnings. It is red when an error exists. The page ignores the scope filter and uses the search box.
 - The live demo serves a static snapshot from build time.
 
+## Settings page
+
+- Layout like the CLAUDE.md page: a numbered file list on the left (1 Global, 2 Project, 3 Project local) and one file on the right. The higher number wins. Without a project folder, only Global shows.
+- Each file has 2 tabs: Form and Raw JSON. Invalid JSON opens Raw JSON and disables Form.
+- Form fields (`FORM_FIELDS` in `public/app.js`): `model`, `effortLevel`, `outputStyle`, `theme`, `permissions.defaultMode`, `skipDangerousModePermissionPrompt`. A field with the wrong type is locked: "edit in Raw JSON".
+- `autoMode` is classifier rules (an object), not an on/off switch. The form never writes it.
+- `permissions.defaultMode` values: `default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`. `auto` and `bypassPermissions` do not take effect from project or local files.
+- The form writes one key into the file read from disk and keeps every other key, also inside `permissions`. An empty value deletes the key. An emptied `permissions` stays as `{}`.
+- Read-only groups: permission rules (allow, ask, deny), keys managed on other pages (`enabledPlugins`, `skillOverrides`, `hooks`, with a link), other keys (link to Raw JSON).
+
+## Effective settings
+
+The Settings page has a second view, Effective. `src/scan/effective.js` builds `inventory.settings.effective` = `{ rows, skipped, invalid }`. `inventory.settings.managed` is true when a managed settings file exists. Verified against code.claude.com/docs/en/settings.md on 2026-10-24.
+
+| Item                                                       | Rule                                                                                                                                                                             |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Precedence                                                 | managed > command line > project local > shared project > user                                                                                                                   |
+| Scalars and other values                                   | the highest file that sets the key wins                                                                                                                                          |
+| Lists (top-level keys, and the lists inside `permissions`) | combine from all files, no duplicates, highest file first                                                                                                                        |
+| `permissions`, `env`, `modelSettings`                      | per key, one level deep                                                                                                                                                          |
+| Any other object, for example `statusLine` or `sandbox`    | one whole value: the highest file wins. The docs do not say that other objects merge                                                                                             |
+| `fallbackModel`                                            | highest file wins, no combine                                                                                                                                                    |
+| `modelPicker`                                              | whole value; project and local files are ignored                                                                                                                                 |
+| `permissions.defaultMode` = `auto` or `bypassPermissions`  | ignored in project and local files                                                                                                                                               |
+| Deny and ask over allow                                    | an allow rule does not outrank a deny or ask rule from another file                                                                                                              |
+| `enabledPlugins`, `skillOverrides`                         | docs silent; the higher file per key, marked `docsSilent`                                                                                                                        |
+| `hooks`                                                    | not in the table; hooks from all files run                                                                                                                                       |
+| `null`                                                     | counts as not set                                                                                                                                                                |
+| A list next to a value of another type                     | the lists combine; the other value is `wrongType` and ignored                                                                                                                    |
+| `permissions`, `env`, … that is not an object              | left out and listed in `invalid`                                                                                                                                                 |
+| Managed settings                                           | not read; the page notes that they exist. macOS `/Library/Application Support/ClaudeCode`, Linux `/etc/claude-code`, file `managed-settings.json` or `managed-settings.d/*.json` |
+
+- Each file tag in the table opens that file in the Files view.
+- A form field that a higher file overrides shows "↑ <file> sets <value>. That value wins in this folder." A value that Claude Code ignores in that file says so.
+- The live demo loads `effective.js` and recomputes the view after each settings write. `effective.js` must stay free of imports.
+
 ## Undo, delete, fork
 
 - Toggles and favorites undo with the inverse operation. Two toggles on one file undo independently.

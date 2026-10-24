@@ -14,6 +14,8 @@ paths:
 
 Dashboard, Favorites, Duplicates, Doctor, Context, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUDE.md.
 
+Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective switch at the top. Details: `business-logic.md` › Settings page.
+
 ## Behavior
 
 - Scope filter: All, Global, Project.

@@ -3113,8 +3113,58 @@ async function onDrawerClick(e) {
 }
 
 const EFFORT = ['low', 'medium', 'high']
-const FORM_KEYS = ['model', 'effortLevel', 'outputStyle', 'theme', 'autoMode', 'skipDangerousModePermissionPrompt']
-const SWITCH_KEYS = ['autoMode', 'skipDangerousModePermissionPrompt']
+const MODES = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']
+const FORM_GROUPS = [
+  ['model', 'Model and output'],
+  ['perm', 'Permissions']
+]
+const FORM_FIELDS = [
+  {
+    key: 'model',
+    group: 'model',
+    name: 'Model',
+    type: 'text',
+    help: 'The model that every new session uses. You do not have to pick one with <code>/model</code> each time.'
+  },
+  {
+    key: 'effortLevel',
+    group: 'model',
+    name: 'Effort',
+    type: 'select',
+    options: EFFORT,
+    help: 'The default effort level for models that have no saved level.'
+  },
+  { key: 'outputStyle', group: 'model', name: 'Output style', type: 'text', help: 'The output style, by name.' },
+  { key: 'theme', group: 'model', name: 'Theme', type: 'text', help: 'The color theme of the interface.' },
+  {
+    key: 'permissions.defaultMode',
+    path: ['permissions', 'defaultMode'],
+    group: 'perm',
+    name: 'Start mode',
+    type: 'select',
+    options: MODES,
+    help: 'The permission mode that new sessions start in.'
+  },
+  {
+    key: 'skipDangerousModePermissionPrompt',
+    group: 'perm',
+    name: 'Skip the dangerous-mode prompt',
+    type: 'switch',
+    help: 'Skip the confirm dialog before a session enters <code>bypassPermissions</code> mode.'
+  }
+]
+const ELSEWHERE = [
+  ['enabledPlugins', 'plugins', 'Plugins'],
+  ['skillOverrides', 'skills', 'Skills'],
+  ['hooks', 'hooks', 'Hooks']
+]
+const SET_ORDER = ['sg', 'sp', 'sl']
+const SET_WHERE = { sg: 'every project', sp: 'this folder · in git', sl: 'this folder · only you' }
+const SET_ABOUT = {
+  sg: 'This file applies to every project on this computer.',
+  sp: 'This file is for the team. It goes into git with the project.',
+  sl: 'This file is only for you. Git ignores it. Storehouse writes your on/off switches for this folder here.'
+}
 
 function freshHookForm() {
   return { open: false, scope: 'global', event: 'PreToolUse', matcher: '*', command: '', error: '', invalid: '' }
@@ -3135,7 +3185,16 @@ function freshMcpForm() {
   }
 }
 
-const cfg = { hook: freshHookForm(), mcp: freshMcpForm(), stab: 'form', sform: null, sformMsg: '' }
+const cfg = {
+  hook: freshHookForm(),
+  mcp: freshMcpForm(),
+  sview: 'files',
+  efilter: 'all',
+  ssel: null,
+  stab: 'form',
+  sforms: {},
+  sformMsg: ''
+}
 const eds = {}
 const bks = {}
 const msgs = {}
@@ -3578,24 +3637,52 @@ function edDirty(ed) {
   return Boolean(ed && ed.status === 'ready' && ed.text !== ed.loaded)
 }
 
-function sformBase() {
-  const d = state.inventory.settings?.global?.data
-  const data = isPlain(d) ? d : {}
-  const text = (v) => (v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v))
-  return {
-    model: text(data.model),
-    effortLevel: text(data.effortLevel),
-    outputStyle: text(data.outputStyle),
-    theme: text(data.theme),
-    autoMode: data.autoMode === true,
-    skipDangerousModePermissionPrompt: data.skipDangerousModePermissionPrompt === true
-  }
+function setData(k) {
+  const d = cfgPanels()[k]?.info?.data
+  return isPlain(d) ? d : {}
 }
 
-function lockedKeys() {
-  const d = state.inventory.settings?.global?.data
-  if (!isPlain(d)) return []
-  return FORM_KEYS.filter((k) => d[k] !== undefined && typeof d[k] !== (SWITCH_KEYS.includes(k) ? 'boolean' : 'string'))
+function fieldPath(f) {
+  return f.path ?? [f.key]
+}
+
+function fieldGet(data, f) {
+  let v = data
+  for (const part of fieldPath(f)) v = isPlain(v) ? v[part] : undefined
+  return v
+}
+
+function fieldSet(data, f, value) {
+  const path = fieldPath(f)
+  let parent = data
+  for (const part of path.slice(0, -1)) {
+    if (parent[part] === undefined) {
+      if (value === '') return
+      parent[part] = {}
+    }
+    parent = parent[part]
+  }
+  const last = path.at(-1)
+  if (value === '') delete parent[last]
+  else parent[last] = value
+}
+
+function sformBase(k) {
+  const data = setData(k)
+  const text = (v) => (v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v))
+  return Object.fromEntries(
+    FORM_FIELDS.map((f) => [f.key, f.type === 'switch' ? fieldGet(data, f) === true : text(fieldGet(data, f))])
+  )
+}
+
+function lockedKeys(k) {
+  const data = setData(k)
+  return FORM_FIELDS.filter((f) => {
+    const parent = f.path ? data[f.path[0]] : data
+    if (parent !== undefined && !isPlain(parent)) return true
+    const v = fieldGet(data, f)
+    return v !== undefined && typeof v !== (f.type === 'switch' ? 'boolean' : 'string')
+  }).map((f) => f.key)
 }
 
 function lockedText(value) {
@@ -3608,26 +3695,33 @@ function formValue(value) {
   return typeof value === 'string' ? value.trim() : value
 }
 
-function sformValues() {
-  return cfg.sform ? cfg.sform.values : sformBase()
+function sformValues(k) {
+  return cfg.sforms[k] ? cfg.sforms[k].values : sformBase(k)
 }
 
-function sformDirtyKeys() {
-  if (!cfg.sform) return []
-  const locked = lockedKeys()
-  return FORM_KEYS.filter((k) => !locked.includes(k) && formValue(cfg.sform.values[k]) !== formValue(cfg.sform.base[k]))
+function sformDirtyKeys(k) {
+  const form = cfg.sforms[k]
+  if (!form) return []
+  const locked = lockedKeys(k)
+  return FORM_FIELDS.map((f) => f.key).filter(
+    (key) => !locked.includes(key) && formValue(form.values[key]) !== formValue(form.base[key])
+  )
 }
 
-function sformEdit(key, value) {
-  if (!cfg.sform) {
-    const base = sformBase()
-    cfg.sform = { base, values: { ...base } }
+function sformEdit(k, key, value) {
+  if (!cfg.sforms[k]) {
+    const base = sformBase(k)
+    cfg.sforms[k] = { base, values: { ...base } }
   }
-  cfg.sform.values[key] = value
+  cfg.sforms[k].values[key] = value
+}
+
+function setDirty(k) {
+  return sformDirtyKeys(k).length > 0 || edDirty(eds[k])
 }
 
 function cfgDirty() {
-  return sformDirtyKeys().length > 0 || Object.values(eds).some(edDirty)
+  return SET_ORDER.some((k) => sformDirtyKeys(k).length > 0) || Object.values(eds).some(edDirty)
 }
 
 function markStale() {
@@ -3707,160 +3801,144 @@ function panelBackupsHtml(k) {
   return `<div class="backups" id="${k}-bkbox">${inner}</div>`
 }
 
-function panelHead(k, p) {
-  const info = p.info
-  const size = p.md && info?.exists ? `<span class="pill">${esc(fmtSize(info.size))}</span>` : ''
-  const pill = p.pill ? `<span class="pill">${esc(p.pill)}</span>` : ''
-  return `<h2 id="${k}-h">${esc(p.label)} · <code>${esc(p.file)}</code>${size}${pill}</h2>`
-}
-
-function editorHtml(k, p) {
-  const ed = eds[k]
-  if (!ed || ed.status === 'loading') return '<p class="note">Loading…</p>'
-  if (ed.status === 'error') return `<p class="note">${esc(`Could not read ${p.file}: ${ed.error}`)}</p>${msgHtml(k)}`
-  const dirty = edDirty(ed)
-  const btns = [
-    `<button type="button" class="btn p" id="${k}-save" data-c="save" data-k="${k}"${dirty ? '' : ' disabled'}>Save</button>`,
-    `<span class="dirty" id="${k}-dirty" aria-live="polite">${dirty ? '● unsaved' : ''}</span>`,
-    backupsBtn(k)
-  ]
-  if (p.del)
-    btns.push(
-      `<button type="button" class="btn danger x" id="${k}-del" data-c="delete" data-k="${k}">Delete file</button>`
-    )
-  const area = `<textarea id="${k}-txt" class="ed code" data-ed="${k}" spellcheck="false" aria-label="${esc(`${p.file} contents`)}">\n${esc(ed.text)}</textarea>`
-  return `${area}<div class="row">${btns.join('')}</div>${panelBackupsHtml(k)}${msgHtml(k)}`
-}
-
 function edChrome(k) {
   const ed = eds[k]
   const dirty = edDirty(ed)
   const md = MD_ORDER.includes(k)
   const mark = $(`${k}-dirty`)
-  if (mark)
-    mark.textContent = md
-      ? dirty
-        ? '● Unsaved changes'
-        : `${plural(lineCount(ed?.text ?? ''), 'line')} · Saved`
-      : dirty
-        ? '● unsaved'
-        : ''
-  if (mark && md) mark.classList.toggle('is-dirty', dirty)
+  if (mark) {
+    mark.textContent = dirty
+      ? '● Unsaved changes'
+      : md
+        ? `${plural(lineCount(ed?.text ?? ''), 'line')} · Saved`
+        : 'Saved'
+    mark.classList.toggle('is-dirty', dirty)
+  }
   const save = $(`${k}-save`)
   if (save) save.disabled = !dirty
   const dot = $(`cm-dot-${k}`)
   if (dot) dot.textContent = dirty ? '● unsaved' : ''
-  const cancel = md ? $(`${k}-cancel`) : null
+  const cancel = $(`${k}-cancel`)
   if (cancel) cancel.hidden = !dirty
 }
 
-function sformChrome() {
-  const dirty = sformDirtyKeys().length > 0
-  const mark = $('sg-fdirty')
-  if (mark) mark.textContent = dirty ? '● unsaved' : ''
-  for (const id of ['sg-fsave', 'sg-freset']) {
-    const b = $(id)
-    if (b) b.disabled = !dirty
-  }
+function sformState(k) {
+  const dirty = sformDirtyKeys(k)
+  return dirty.length
+    ? `● ${plural(dirty.length, 'unsaved change')} · ${dirty.join(', ')}`
+    : `${plural(Object.keys(setData(k)).length, 'key')} · Saved`
 }
 
-function managedHtml(data) {
-  const size = (v) => (Array.isArray(v) ? v.length : isPlain(v) ? Object.keys(v).length : 0)
-  const rows = []
-  const perms = isPlain(data.permissions) ? data.permissions : null
-  if (perms) {
-    for (const key of ['allow', 'deny', 'ask']) {
-      if (perms[key] !== undefined) rows.push([`permissions.${key}`, `${size(perms[key])} rules`])
+function sformChrome(k) {
+  const dirty = sformDirtyKeys(k)
+  const mark = $(`${k}-fdirty`)
+  if (mark) {
+    mark.textContent = sformState(k)
+    mark.classList.toggle('is-dirty', dirty.length > 0)
+  }
+  for (const id of [`${k}-fsave`, `${k}-freset`]) {
+    const b = $(id)
+    if (b) b.disabled = !dirty.length
+  }
+  const dot = $(`cm-dot-${k}`)
+  if (dot) dot.textContent = setDirty(k) ? '● unsaved' : ''
+  for (const f of FORM_FIELDS) $(`sf-${f.key}`)?.closest('.srow')?.classList.toggle('changed', dirty.includes(f.key))
+}
+
+function shortValue(value) {
+  if (Array.isArray(value)) return `list of ${value.length}`
+  if (isPlain(value)) return plural(Object.keys(value).length, 'key')
+  const text = JSON.stringify(value)
+  return text.length > 60 ? `${text.slice(0, 57)}…` : text
+}
+
+function fieldHtml(k, f, v, data, locked, changed) {
+  const id = `sf-${f.key}`
+  const name = `${esc(f.name)} <span class="key">${esc(f.key)}</span>`
+  const head =
+    f.type === 'switch' ? `<span class="t" id="${id}-l">${name}</span>` : `<label class="t" for="${id}">${name}</label>`
+  const help =
+    f.key === 'permissions.defaultMode' && k !== 'sg'
+      ? `${f.help} <code>auto</code> and <code>bypassPermissions</code> do not work from this file.`
+      : f.help
+  let ctl
+  if (locked) {
+    const value = fieldGet(data, f) ?? data[fieldPath(f)[0]]
+    ctl = `<span class="note">${esc(`${lockedText(value)} — edit in Raw JSON`)}</span>`
+  } else if (f.type === 'switch') {
+    ctl = `<button type="button" class="sw" role="switch" id="${id}" data-c="sfsw" data-v="${f.key}" aria-checked="${v[f.key] ? 'true' : 'false'}" aria-labelledby="${id}-l"></button>`
+  } else if (f.type === 'select') {
+    const opts = [['', '(not set)'], ...f.options.map((o) => [o, o])]
+    for (const extra of [cfg.sforms[k]?.base[f.key], v[f.key]]) {
+      if (extra && !opts.some(([o]) => o === extra)) opts.push([extra, `${extra} (current)`])
+    }
+    ctl = `<select id="${id}" data-sf="${f.key}">${opts.map(([o, label]) => opt(o, label, v[f.key])).join('')}</select>`
+  } else {
+    ctl = `<input id="${id}" data-sf="${f.key}" value="${esc(v[f.key])}" placeholder="not set" autocomplete="off" spellcheck="false">`
+  }
+  return `<div class="srow${changed ? ' changed' : ''}"><div class="lbl">${head}<p>${help}</p>${formHint(k, f)}</div><div class="ctl">${ctl}</div></div>`
+}
+
+function rulesHtml(data) {
+  const perms = isPlain(data.permissions) ? data.permissions : {}
+  const col = (key, label) => {
+    const list = Array.isArray(perms[key]) ? perms[key] : []
+    const items = list.length
+      ? list.map((r) => `<span class="fm-chip">${esc(typeof r === 'string' ? r : JSON.stringify(r))}</span>`).join('')
+      : '<span class="none">No rules</span>'
+    return `<div><h4>${label} <b>${list.length}</b></h4>${items}</div>`
+  }
+  return `<div class="sgroup"><h3>Permission rules <span class="hint">Read-only here · edit in Raw JSON</span></h3><div class="rules">${col('allow', 'Allow')}${col('ask', 'Ask')}${col('deny', 'Deny')}</div></div>`
+}
+
+function elsewhereText(key, value) {
+  const values = isPlain(value) ? Object.values(value) : []
+  if (key === 'enabledPlugins')
+    return `${plural(values.length, 'plugin')} · ${values.filter((x) => x === false).length} off`
+  if (key === 'skillOverrides') return `${plural(values.filter((x) => x === 'off').length, 'skill')} off`
+  return plural(values.length, 'event')
+}
+
+function elsewhereHtml(data) {
+  const rows = ELSEWHERE.filter(([key]) => data[key] !== undefined).map(
+    ([key, page, label]) =>
+      `<li><code>${key}</code><span class="s">${esc(elsewhereText(key, data[key]))}</span><button type="button" class="btn" data-go="${page}">Open ${label}</button></li>`
+  )
+  if (!rows.length) return ''
+  return `<div class="sgroup"><h3>Managed on other pages <span class="hint">${plural(rows.length, 'key')}</span></h3><ul class="lrows">${rows.join('')}</ul></div>`
+}
+
+function otherKeysHtml(data) {
+  const known = new Set([...FORM_FIELDS.map((f) => fieldPath(f)[0]), ...ELSEWHERE.map(([key]) => key)])
+  const rows = Object.keys(data)
+    .filter((key) => !known.has(key))
+    .map((key) => [key, data[key]])
+  if (isPlain(data.permissions)) {
+    for (const key of Object.keys(data.permissions)) {
+      if (!['allow', 'ask', 'deny', 'defaultMode'].includes(key))
+        rows.push([`permissions.${key}`, data.permissions[key]])
     }
   }
-  if (data.enabledPlugins !== undefined)
-    rows.push(['enabledPlugins', `${size(data.enabledPlugins)} entries — managed on Plugins page`])
-  if (data.skillOverrides !== undefined) {
-    const off = isPlain(data.skillOverrides) ? Object.values(data.skillOverrides).filter((v) => v === 'off').length : 0
-    rows.push(['skillOverrides', `${off} off — managed on Skills page`])
-  }
-  if (data.hooks !== undefined) rows.push(['hooks', `${size(data.hooks)} events — managed on Hooks page`])
-  const known = new Set([...FORM_KEYS, 'permissions', 'enabledPlugins', 'skillOverrides', 'hooks'])
-  for (const key of Object.keys(data)) {
-    if (!known.has(key))
-      rows.push([
-        key,
-        isPlain(data[key]) || Array.isArray(data[key])
-          ? `${size(data[key])} entries — edit in Raw JSON`
-          : 'set — edit in Raw JSON'
-      ])
-  }
-  if (!rows.length) return '<p class="note">No other keys.</p>'
-  return `<ul class="files">${rows.map(([k, v]) => `<li><code>${esc(k)}</code><span class="no">${esc(v)}</span></li>`).join('')}</ul>`
+  if (!rows.length) return ''
+  return `<div class="sgroup"><h3>Other keys <span class="hint">Edit in Raw JSON</span></h3><ul class="lrows">${rows
+    .map(
+      ([key, value]) =>
+        `<li><code>${esc(key)}</code><span class="s">${esc(shortValue(value))}</span><button type="button" class="btn-link" data-c="stab" data-v="raw">Show in Raw JSON</button></li>`
+    )
+    .join('')}</ul></div>`
 }
 
-function settingsFormHtml(info) {
-  const v = sformValues()
-  const data = isPlain(info.data) ? info.data : {}
-  const dirty = sformDirtyKeys().length > 0
-  const effort = [['', '(not set)'], ...EFFORT.map((e) => [e, e])]
-  for (const extra of [cfg.sform?.base.effortLevel, v.effortLevel]) {
-    if (extra && !effort.some(([value]) => value === extra)) effort.push([extra, `${extra} (current)`])
-  }
-  const locked = lockedKeys()
-  const lockedRow = (key) =>
-    `<span class="label">${key}</span><span class="note">${esc(`${lockedText(data[key])} — edit in Raw JSON`)}</span>`
-  const text = (key, ph) =>
-    locked.includes(key)
-      ? lockedRow(key)
-      : `<label for="sf-${key}">${key}</label><input id="sf-${key}" data-sf="${key}" value="${esc(v[key])}" placeholder="${esc(ph)}" autocomplete="off" spellcheck="false">`
-  const sw = (key) =>
-    locked.includes(key)
-      ? lockedRow(key)
-      : `<label for="sf-${key}">${key}</label><span><button type="button" class="sw" role="switch" id="sf-${key}" data-c="sfsw" data-v="${key}" aria-checked="${v[key] ? 'true' : 'false'}"></button></span>`
-  return `<div class="kv">
-      ${text('model', 'not set')}
-      ${locked.includes('effortLevel') ? lockedRow('effortLevel') : `<label for="sf-effortLevel">effortLevel</label><select id="sf-effortLevel" data-sf="effortLevel">${effort.map(([value, label]) => opt(value, label, v.effortLevel)).join('')}</select>`}
-      ${text('outputStyle', 'not set')}
-      ${text('theme', 'not set')}
-      ${SWITCH_KEYS.map(sw).join('')}
-    </div>
-    <div class="row">
-      <button type="button" class="btn p" id="sg-fsave" data-c="fsave"${dirty ? '' : ' disabled'}>Save</button>
-      <button type="button" class="btn" id="sg-freset" data-c="freset"${dirty ? '' : ' disabled'}>Reset</button>
-      <span class="dirty" id="sg-fdirty" aria-live="polite">${dirty ? '● unsaved' : ''}</span>
-      ${backupsBtn('sg')}
-    </div>
-    ${panelBackupsHtml('sg')}
-    <p class="form-err" id="sg-ferr" role="alert">${esc(cfg.sformMsg)}</p>
-    <h3>Other keys</h3>
-    ${managedHtml(data)}`
-}
-
-function settingsGlobalHtml(p) {
-  const info = p.info
-  const head = panelHead('sg', p)
-  if (!info) return `${head}<div class="warn">This file could not be scanned.</div>`
-  const broken = info.exists && !info.ok
-  const tab = broken ? 'raw' : cfg.stab
-  const tabs = broken
-    ? ''
-    : `<div class="row"><div class="tabs" role="tablist" aria-label="Global settings view">${[
-        ['form', 'Form'],
-        ['raw', 'Raw JSON']
-      ]
-        .map(
-          ([value, label]) =>
-            `<button type="button" role="tab" id="sg-tab-${value}" data-c="stab" data-v="${value}" aria-selected="${tab === value}" aria-controls="sg-pane">${label}</button>`
-        )
-        .join('')}</div></div>`
-  const warn = broken
-    ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix it below. The form comes back once the file parses.`)}</div>`
-    : ''
-  let body
-  if (tab === 'form') body = settingsFormHtml(info)
-  else if (!info.exists) body = '<p class="note">The file does not exist yet. Save the form to create it.</p>'
-  else {
-    ensureEd('sg', info.path)
-    body = editorHtml('sg', p)
-  }
-  const label = broken ? 'aria-label="Raw JSON"' : `aria-labelledby="sg-tab-${tab}"`
-  return `${head}${tabs}${warn}<div id="sg-pane" role="tabpanel" ${label}>${body}</div>`
+function settingsFormHtml(k) {
+  const data = setData(k)
+  const v = sformValues(k)
+  const locked = lockedKeys(k)
+  const dirty = sformDirtyKeys(k)
+  const groups = FORM_GROUPS.map(([group, title]) => {
+    const fields = FORM_FIELDS.filter((f) => f.group === group)
+    const rows = fields.map((f) => fieldHtml(k, f, v, data, locked.includes(f.key), dirty.includes(f.key))).join('')
+    return `<div class="sgroup"><h3>${title} <span class="hint">${plural(fields.length, 'key')}</span></h3>${rows}</div>`
+  }).join('')
+  return `${groups}${rulesHtml(data)}${elsewhereHtml(data)}${otherKeysHtml(data)}`
 }
 
 function missingHtml(k, p) {
@@ -3871,29 +3949,263 @@ function missingHtml(k, p) {
   return `<div class="empty">No ${esc(p.file)} yet.<div class="row center">${buttons}</div></div>${msgHtml(k)}`
 }
 
-function panelHtml(k, p) {
+function setKeys() {
+  return projectOn() ? SET_ORDER : ['sg']
+}
+
+function setSelected(panels) {
+  const keys = setKeys()
+  if (!cfg.ssel || !keys.includes(cfg.ssel)) cfg.ssel = keys.find((k) => panels[k].info?.exists) ?? keys[0]
+  return cfg.ssel
+}
+
+function setMeta(k, p) {
   const info = p.info
+  const pill = p.pill ? ` · ${p.pill}` : ''
+  if (!info) return 'Could not be scanned'
+  if (!info.exists) return `Not found${pill}`
+  if (!info.ok) return `Invalid JSON${pill}`
+  return `${plural(Object.keys(setData(k)).length, 'key')} · ${SET_WHERE[k]}${pill}`
+}
+
+function setListHtml(panels, sel) {
+  return setKeys()
+    .map((k, i) => {
+      const p = panels[k]
+      const exists = Boolean(p.info?.exists)
+      const cur = k === sel
+      const create =
+        p.info && !exists
+          ? `<button type="button" class="btn" id="cm-create-${k}" data-c="create" data-k="${k}" data-v="empty" aria-label="${esc(`Create ${p.file}`)}">Create</button>`
+          : ''
+      return `<li class="cm-file${cur ? ' cur' : ''}${exists ? '' : ' missing'}">
+        <span class="cm-num" aria-hidden="true">${exists ? i + 1 : '–'}</span>
+        <button type="button" class="cm-pick" id="cm-pick-${k}" data-c="spick" data-k="${k}"${cur ? ' aria-current="true"' : ''}>
+          <span class="cm-label">${esc(p.label)}<span class="dirty" id="cm-dot-${k}">${setDirty(k) ? '● unsaved' : ''}</span></span>
+          <span class="cm-path">${esc(p.file)}</span>
+          <span class="cm-meta">${esc(setMeta(k, p))}</span>
+        </button>
+        ${create}
+      </li>`
+    })
+    .join('')
+}
+
+function setBarHtml(k, p, form, dirty, stateText) {
+  const del = p.del
+    ? `<button type="button" class="btn danger ghost" id="${k}-del" data-c="delete" data-k="${k}">Delete…</button>`
+    : ''
+  const undo = form
+    ? `<button type="button" class="btn ghost" id="${k}-freset" data-c="freset"${dirty ? '' : ' disabled'}>Reset</button>`
+    : `<button type="button" class="btn ghost" id="${k}-cancel" data-c="cancel" data-k="${k}"${dirty ? '' : ' hidden'}>Discard</button>`
+  const save = form
+    ? `<button type="button" class="btn p" id="${k}-fsave" data-c="fsave"${dirty ? '' : ' disabled'}>Save</button>`
+    : `<button type="button" class="btn p" id="${k}-save" data-c="save" data-k="${k}"${dirty ? '' : ' disabled'}>Save</button>`
+  return `<div class="cm-bar">
+      ${del}
+      <span class="cm-state${dirty ? ' is-dirty' : ''}" id="${k}-${form ? 'fdirty' : 'dirty'}" aria-live="polite">${esc(stateText)}</span>
+      ${undo}
+      ${backupsBtn(k)}
+      <button type="button" class="btn" id="${k}-open" data-c="editor" data-k="${k}">Open in editor</button>
+      ${save}
+    </div>`
+}
+
+function settingsPanelHtml(k, p) {
+  const info = p.info
+  const pill = p.pill ? `<span class="pill">${esc(p.pill)}</span>` : ''
+  const broken = Boolean(info?.exists && !info.ok)
+  const tab = broken ? 'raw' : cfg.stab
+  const tabs = info?.exists
+    ? `<div class="tabs" role="tablist" aria-label="View">${[
+        ['form', 'Form'],
+        ['raw', 'Raw JSON']
+      ]
+        .map(
+          ([value, label]) =>
+            `<button type="button" role="tab" id="${k}-tab-${value}" data-c="stab" data-v="${value}" aria-selected="${tab === value}" aria-controls="${k}-pane"${value === 'form' && broken ? ' disabled title="Fix the JSON first"' : ''}>${label}</button>`
+        )
+        .join('')}</div>`
+    : ''
+  const head = `<div class="cm-head"><div class="cm-title"><h2 id="${k}-h">${esc(p.label)}${pill}</h2><code class="cm-path">${esc(info ? tilde(info.path) : p.file)}</code></div>${tabs}</div>`
   let body
+  let bar = ''
   if (!info) body = '<div class="warn">This file could not be scanned.</div>'
-  else if (!info.exists) body = missingHtml(k, p)
-  else {
+  else if (!info.exists) body = `<p class="note">${SET_ABOUT[k]}</p>${missingHtml(k, p)}`
+  else if (tab === 'form') {
+    const dirty = sformDirtyKeys(k).length > 0
+    body = `<p class="form-err" id="${k}-ferr" role="alert">${esc(cfg.sformMsg)}</p><div class="cm-pane" id="${k}-pane" role="tabpanel" aria-labelledby="${k}-tab-form">${settingsFormHtml(k)}</div>${panelBackupsHtml(k)}`
+    bar = setBarHtml(k, p, true, dirty, sformState(k))
+  } else {
     ensureEd(k, info.path)
-    const warn =
-      !p.md && info.ok === false
-        ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix the JSON and save.`)}</div>`
-        : ''
-    body = warn + editorHtml(k, p)
+    const ed = eds[k]
+    const warn = broken
+      ? `<div class="warn">${esc(`Cannot parse ${p.file}: ${info.error}. Fix it here. The form comes back once the file parses.`)}</div>`
+      : ''
+    if (!ed || ed.status === 'loading') body = '<p class="note">Loading…</p>'
+    else if (ed.status === 'error')
+      body = `<p class="note">${esc(`Could not read ${p.file}: ${ed.error}`)}</p>${msgHtml(k)}`
+    else {
+      const dirty = edDirty(ed)
+      body = `${warn}${msgHtml(k)}<div class="cm-pane" id="${k}-pane" role="tabpanel" aria-labelledby="${k}-tab-raw"><textarea id="${k}-txt" class="ed" data-ed="${k}" spellcheck="false" aria-label="${esc(`${p.file} contents`)}">\n${esc(ed.text)}</textarea></div>${panelBackupsHtml(k)}`
+      bar = setBarHtml(k, p, false, dirty, dirty ? '● Unsaved changes' : 'Saved')
+    }
   }
-  return `<section class="panel" aria-labelledby="${k}-h">${panelHead(k, p)}${body}</section>`
+  return `<section class="panel cm-panel" aria-labelledby="${k}-h">${head}<div class="cm-body">${body}</div>${bar}</section>`
 }
 
 function renderSettings() {
   const panels = cfgPanels()
-  const project = projectOn() ? `${panelHtml('sp', panels.sp)}${panelHtml('sl', panels.sl)}` : projectOffHtml()
-  $('p-settings').innerHTML = `<div class="two">
-      <section class="panel" aria-labelledby="sg-h">${settingsGlobalHtml(panels.sg)}</section>
-      <div>${project}</div>
+  const sel = setSelected(panels)
+  const arrow = projectOn() ? '<span class="arrow">1 Global <span class="bar"></span> 3 Project local</span>' : ''
+  const view = cfg.sview === 'effective' ? 'effective' : 'files'
+  const vtab = (value, label) =>
+    `<button type="button" role="tab" id="sv-${value}" data-c="sview" data-v="${value}" aria-selected="${view === value}">${label}</button>`
+  const top = `<div class="st-top"><p class="note">Claude Code reads these files at the start of a session in this folder. Each save writes a backup to <code>~/.claude/backups/storehouse/</code> first.</p><div class="vtabs" role="tablist" aria-label="Settings view">${vtab('files', 'Files')}${vtab('effective', `Effective <span class="n">${plural(effRows().length, 'key')}</span>`)}</div></div>`
+  if (view === 'effective') {
+    $('p-settings').innerHTML = `${top}${effectiveHtml()}`
+    return
+  }
+  $('p-settings').innerHTML = `${top}
+    <div class="cm">
+      <nav class="cm-nav" aria-label="Settings files">
+        <ul class="cm-list">${setListHtml(panels, sel)}</ul>
+        <div class="prec"><b>Which file wins?</b><span>When two files set the same key, the higher number wins. Lists such as <code>permissions.allow</code> add up from all files. A deny rule in any file blocks the tool.</span>${arrow}</div>
+        ${projectOn() ? '' : projectOffHtml()}
+      </nav>
+      ${settingsPanelHtml(sel, panels[sel])}
     </div>`
+}
+
+const SCOPE_KEY = { global: 'sg', project: 'sp', projectLocal: 'sl' }
+const SCOPE_TAG = { global: ['global', 'global'], project: ['project', 'project'], projectLocal: ['local', 'local'] }
+const EFF_GROUPS = [
+  ['model', 'Model and output', ''],
+  ['rules', 'Permissions', 'Lists add up from all files. An allow rule does not outrank a deny or ask rule.'],
+  ['env', 'Environment', 'Per variable, the higher file wins. Values that look like secrets are masked.'],
+  [
+    'plugins',
+    'Plugins and skills',
+    'The Claude Code docs do not say how these merge. Storehouse shows the higher file for each key.'
+  ],
+  ['other', 'Other', '']
+]
+
+function effRows() {
+  return state.inventory.settings?.effective?.rows ?? []
+}
+
+function effRow(key) {
+  return effRows().find((r) => r.key === key)
+}
+
+function effTag(scope) {
+  const [label, cls] = SCOPE_TAG[scope] ?? [scope, '']
+  const k = SCOPE_KEY[scope]
+  return `<button type="button" class="tag ${cls}" data-c="efile" data-k="${k}" aria-label="${esc(`Open ${cfgPanels()[k]?.file ?? label}`)}">${label}</button>`
+}
+
+function effValue(value) {
+  return `<code>${esc(value === undefined ? '' : JSON.stringify(value))}</code>`
+}
+
+function effLost(list) {
+  return list
+    .map((o) => {
+      const note = o.wrongType
+        ? ' <span class="note">wrong type · ignored</span>'
+        : o.ignored
+          ? ' <span class="note">ignored in this file</span>'
+          : ''
+      return `<li><span class="lost">${effValue(o.value)}</span> ${effTag(o.file)}${note}</li>`
+    })
+    .join('')
+}
+
+function effRowHtml(r) {
+  const value = r.merged
+    ? `<ul>${r.value.map((x) => `<li>${effValue(x.v)} ${effTag(x.from)}</li>`).join('')}</ul>`
+    : r.from
+      ? `${effValue(r.value)}${r.masked ? ' <span class="mchip key">masked</span>' : ''}`
+      : '<span class="note">Not used</span>'
+  const from = r.merged
+    ? `<span class="mergedl">merged · ${plural(r.files.length, 'file')}</span>`
+    : r.from
+      ? effTag(r.from)
+      : '—'
+  const lost = effLost([...r.overridden, ...(r.ignored ?? []).map((o) => ({ ...o, ignored: true }))])
+  return `<tr><td class="key"><code>${esc(r.key)}</code></td><td>${value}</td><td>${from}</td><td>${lost ? `<ul>${lost}</ul>` : '—'}</td></tr>`
+}
+
+function effectiveHtml() {
+  const all = effRows()
+  const over = all.filter((r) => r.overridden.length || r.ignored?.length)
+  const merged = all.filter((r) => r.merged)
+  const q = state.query.trim().toLowerCase()
+  const pool = cfg.efilter === 'over' ? over : cfg.efilter === 'merged' ? merged : all
+  const rows = q ? pool.filter((r) => r.key.toLowerCase().includes(q)) : pool
+  const chip = (value, label, n) =>
+    `<button type="button" class="chip" data-c="efilt" data-v="${value}" aria-pressed="${cfg.efilter === value}">${label} <span class="n">${n}</span></button>`
+  const order = projectOn()
+    ? `Highest first: ${effTag('projectLocal')} <code>.claude/settings.local.json</code> → ${effTag('project')} <code>.claude/settings.json</code> → ${effTag('global')} <code>~/.claude/settings.json</code>.`
+    : `Only ${effTag('global')} <code>~/.claude/settings.json</code> applies. Project scope is off.`
+  const skipped = state.inventory.settings?.effective?.skipped ?? []
+  const invalid = state.inventory.settings?.effective?.invalid ?? []
+  const notes = [
+    state.inventory.settings?.managed
+      ? '<div class="warn">Managed settings exist on this computer. They win over all files below. Storehouse does not read them. Run <code>/status</code> in Claude Code to see them.</div>'
+      : '',
+    skipped.length
+      ? `<div class="warn">${esc(`Left out because the JSON is invalid: ${skipped.map((s) => cfgPanels()[SCOPE_KEY[s]].file).join(', ')}. Fix it in the Files view.`)}</div>`
+      : '',
+    invalid.length
+      ? `<div class="warn">${esc(`Left out because the value is not an object: ${invalid.map((x) => `${x.key} in ${cfgPanels()[SCOPE_KEY[x.file]].file}`).join(', ')}.`)}</div>`
+      : ''
+  ].join('')
+  const body = EFF_GROUPS.map(([group, title, hint]) => {
+    const list = rows.filter((r) => r.group === group)
+    if (!list.length) return ''
+    return `<tr class="sec"><th colspan="4" scope="colgroup">${title}<span>${esc(hint || plural(list.length, 'key'))}</span></th></tr>${list.map(effRowHtml).join('')}`
+  }).join('')
+  const table = rows.length
+    ? `<div class="eff-wrap"><table class="eff"><thead><tr><th scope="col">Key</th><th scope="col">Value Claude Code uses</th><th scope="col">From</th><th scope="col">Overridden</th></tr></thead><tbody>${body}</tbody></table></div>`
+    : empty(q ? `No key matches "${state.query}".` : 'No settings in these files.')
+  return `${notes}<div class="chipbar"><div class="chips" role="group" aria-label="Filter keys">${chip('all', 'All keys', all.length)}${chip('over', 'Overridden', over.length)}${chip('merged', 'Merged lists', merged.length)}</div><p class="note">${order}</p></div>
+    ${table}
+    <p class="note under">Not shown: hooks (hooks from all files run, see the Hooks page), command line flags, environment variables of your shell, and managed settings.</p>`
+}
+
+function formHint(k, f) {
+  const r = effRow(f.key)
+  if (!r || r.merged) return ''
+  const scope = Object.keys(SCOPE_KEY).find((s) => SCOPE_KEY[s] === k)
+  if (r.ignored?.some((o) => o.file === scope))
+    return '<span class="ovr">Claude Code ignores this value in this file.</span>'
+  if (!r.from || r.from === scope) return ''
+  const order = ['global', 'project', 'projectLocal']
+  if (order.indexOf(r.from) < order.indexOf(scope)) return ''
+  return `<span class="ovr">↑ ${esc(cfgPanels()[SCOPE_KEY[r.from]].label)} sets ${effValue(r.value)}. That value wins in this folder.</span>`
+}
+
+async function pickSet(k) {
+  if (!SET_ORDER.includes(k)) return false
+  if (k === cfg.ssel) return true
+  const cur = cfg.ssel
+  if (cur && setDirty(cur)) {
+    const yes = await ask({
+      title: 'Discard changes?',
+      message: `Your unsaved edits in ${cfgPanels()[cur].file} are lost.`,
+      ok: 'Discard',
+      danger: true
+    })
+    if (!yes) return false
+    delete cfg.sforms[cur]
+    if (eds[cur]) eds[cur].text = eds[cur].loaded
+  }
+  cfg.ssel = k
+  cfg.sformMsg = ''
+  render()
+  return true
 }
 
 const MD_ORDER = ['mg', 'mp', 'mc', 'ml']
@@ -4063,8 +4375,8 @@ function onCfgInput(e) {
     return
   }
   if (t.dataset.sf) {
-    sformEdit(t.dataset.sf, t.value)
-    sformChrome()
+    sformEdit(cfg.ssel, t.dataset.sf, t.value)
+    sformChrome(cfg.ssel)
     return
   }
   if (t.dataset.f) {
@@ -4076,8 +4388,12 @@ function onCfgInput(e) {
 }
 
 async function setSettingsTab(tab) {
-  if (tab === cfg.stab) return
-  if (tab === 'raw' && sformDirtyKeys().length) {
+  const k = cfg.ssel
+  if (tab === cfg.stab) {
+    $(`${k}-tab-${tab}`)?.focus()
+    return
+  }
+  if (tab === 'raw' && sformDirtyKeys(k).length) {
     const yes = await ask({
       title: 'Discard form changes?',
       message: 'Raw JSON shows the file on disk. Your unsaved form changes are lost.',
@@ -4085,9 +4401,9 @@ async function setSettingsTab(tab) {
       danger: true
     })
     if (!yes) return
-    cfg.sform = null
+    delete cfg.sforms[k]
   }
-  if (tab === 'form' && edDirty(eds.sg)) {
+  if (tab === 'form' && edDirty(eds[k])) {
     const yes = await ask({
       title: 'Discard JSON changes?',
       message: 'The form shows the file on disk. Your unsaved Raw JSON edits are lost.',
@@ -4095,18 +4411,19 @@ async function setSettingsTab(tab) {
       danger: true
     })
     if (!yes) return
-    eds.sg.text = eds.sg.loaded
+    eds[k].text = eds[k].loaded
   }
   cfg.stab = tab
   cfg.sformMsg = ''
   render()
-  $(`sg-tab-${tab}`)?.focus()
+  $(`${k}-tab-${tab}`)?.focus()
 }
 
 function saveSettingsForm() {
   return busy('sform', async () => {
-    const info = state.inventory.settings?.global
-    const keys = sformDirtyKeys()
+    const k = cfg.ssel
+    const info = cfgPanels()[k]?.info
+    const keys = sformDirtyKeys(k)
     if (!keys.length || !info) return
     cfg.sformMsg = ''
     try {
@@ -4125,13 +4442,14 @@ function saveSettingsForm() {
       }
       if (!isPlain(data)) throw new Error(`${tilde(info.path)} does not hold a JSON object.`)
       for (const key of keys) {
-        const value = formValue(cfg.sform.values[key])
-        if (typeof value === 'boolean') data[key] = value
-        else if (value === '') delete data[key]
-        else data[key] = value
+        const f = FORM_FIELDS.find((x) => x.key === key)
+        const parent = f.path ? data[f.path[0]] : data
+        if (parent !== undefined && !isPlain(parent))
+          throw new Error(`${f.path[0]} in ${tilde(info.path)} is not an object. Fix it in Raw JSON.`)
+        fieldSet(data, f, formValue(cfg.sforms[k].values[key]))
       }
       await send('PUT', '/api/file', { path: info.path, content: `${JSON.stringify(data, null, 2)}\n`, stamp })
-      cfg.sform = null
+      delete cfg.sforms[k]
       toast(`Saved ${keys.join(', ')} · wrote ${tilde(info.path)}`)
       showBanner()
       await afterWrite()
@@ -4141,7 +4459,7 @@ function saveSettingsForm() {
         cfg.sformMsg = 'This file changed on disk. Reload it before you save.'
         render()
         if (await askReload(info.path)) {
-          cfg.sform = null
+          delete cfg.sforms[k]
           cfg.sformMsg = ''
           await afterWrite()
         }
@@ -4165,7 +4483,7 @@ function saveEd(k) {
       ed.loaded = res.content
       ed.stamp = res.stamp
       if (ed.text === sent) ed.text = res.content
-      if (k === 'sg') cfg.sform = null
+      if (SET_ORDER.includes(k)) delete cfg.sforms[k]
       toast(`Saved ${tilde(p.info.path)} · backup written`)
       await afterWrite()
       $(p.md && !ed.editing ? `${k}-edit` : `${k}-txt`)?.focus()
@@ -4178,7 +4496,7 @@ function saveEd(k) {
           ed.editing = false
           ed.stale = true
           delete msgs[k]
-          if (k === 'sg') cfg.sform = null
+          if (SET_ORDER.includes(k)) delete cfg.sforms[k]
           await afterWrite()
         }
         return
@@ -4219,7 +4537,7 @@ function createPanel(k, template) {
       delete bks[k]
       toast(`Created ${tilde(file)}`)
       await afterWrite()
-      const target = p.md ? `${k}-edit` : `${k}-txt`
+      const target = p.md ? `${k}-edit` : SET_ORDER.includes(k) ? `${k}-tab-${cfg.stab}` : `${k}-txt`
       await waitFor(() => $(target))
       $(target)?.focus()
     } catch (err) {
@@ -4284,7 +4602,7 @@ function restorePanel(k, backup) {
   return busy(`restore:${k}`, async () => {
     const p = cfgPanels()[k]
     if (!p?.info) return
-    const dirty = edDirty(eds[k]) || (k === 'sg' && sformDirtyKeys().length > 0)
+    const dirty = edDirty(eds[k]) || sformDirtyKeys(k).length > 0
     const yes = await ask({
       title: 'Restore this backup?',
       message: `${tilde(p.info.path)} is replaced with the backup. The current file is backed up first.${dirty ? ' Your unsaved edits are lost.' : ''}`,
@@ -4300,7 +4618,7 @@ function restorePanel(k, backup) {
         ed.stamp = res.stamp
         ed.status = 'ready'
       }
-      if (k === 'sg') cfg.sform = null
+      if (SET_ORDER.includes(k)) delete cfg.sforms[k]
       delete bks[k]
       delete msgs[k]
       toast(`Restored ${tilde(p.info.path)} from backup`)
@@ -4308,7 +4626,7 @@ function restorePanel(k, backup) {
       $(`${k}-bk`)?.focus()
     } catch (err) {
       msgs[k] = `Could not restore: ${err.message}`
-      if (k === 'sg' && cfg.stab === 'form') cfg.sformMsg = msgs[k]
+      if (SET_ORDER.includes(k) && cfg.stab === 'form') cfg.sformMsg = msgs[k]
       render()
     }
   })
@@ -4336,16 +4654,16 @@ function onCfg(el) {
   if (act === 'mf-cancel') return closeForm('mcp')
   if (act === 'stab') return void setSettingsTab(v)
   if (act === 'sfsw') {
-    sformEdit(v, !sformValues()[v])
+    sformEdit(cfg.ssel, v, !sformValues(cfg.ssel)[v])
     render()
     return
   }
   if (act === 'fsave') return void saveSettingsForm()
   if (act === 'freset') {
-    cfg.sform = null
+    delete cfg.sforms[cfg.ssel]
     cfg.sformMsg = ''
     render()
-    $('sf-model')?.focus()
+    $(`${cfg.ssel}-tab-form`)?.focus()
     return
   }
   if (act === 'pick') {
@@ -4353,6 +4671,30 @@ function onCfg(el) {
   }
   if (act === 'create' && MD_ORDER.includes(k) && k !== cmd.sel) {
     return void pickMd(k).then((ok) => ok && createPanel(k, v))
+  }
+  if (act === 'sview') {
+    cfg.sview = v
+    render()
+    $(`sv-${v}`)?.focus()
+    return
+  }
+  if (act === 'efilt') {
+    cfg.efilter = v
+    render()
+    return
+  }
+  if (act === 'efile') {
+    cfg.sview = 'files'
+    return void pickSet(k).then((ok) => {
+      render()
+      if (ok) $(`cm-pick-${k}`)?.focus()
+    })
+  }
+  if (act === 'spick') {
+    return void pickSet(k).then((ok) => ok && $(`cm-pick-${k}`)?.focus())
+  }
+  if (act === 'create' && SET_ORDER.includes(k) && k !== cfg.ssel) {
+    return void pickSet(k).then((ok) => ok && createPanel(k, v))
   }
   if (act === 'editor') return void openCfgFile(k)
   if (act === 'backups') return void togglePanelBackups(k)
