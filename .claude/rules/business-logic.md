@@ -16,7 +16,7 @@ The developer has about 110 skills and 28 plugins across 10 marketplaces. The da
 ## Non-goals
 
 - Install or update plugins or marketplaces. Use `/plugin`. Uninstall is allowed: it calls `claude plugin uninstall <id> --scope <scope>`.
-- Run Claude, start sessions, or read session text. The usage band reads only token counts from transcripts.
+- Run Claude, start sessions, or read session text. The usage scanner reads only token counts and, per tool call, the tool name and one target field (see Usage band).
 - Multi-user, remote, or hosted use.
 - A database, a cloud account, or a UI build pipeline.
 
@@ -86,6 +86,26 @@ Target file per scope:
 - An unknown model counts tokens but no cost, and the band names it.
 - "Saved by prompt cache" is cache-read tokens × (input price − cache-read price).
 - A project is one folder under `~/.claude/projects`. "This month" uses local time.
+
+### Use per item
+
+`GET /api/usage` also returns `items`: `{ "<key>": { count30, last } }`, where `last` is epoch ms. The scanner reads `tool_use` blocks on the same lines that hold `"usage"` and keeps only these fields:
+
+| Tool call in the transcript                      | Key                                                       |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| `"name":"Skill"`                                 | `skill:<input.skill>`, for example `skill:plugin:name`    |
+| `"name":"Agent"` or `"name":"Task"`              | `agent:<input.subagent_type>`, absent → `general-purpose` |
+| `"name":"mcp__<server>__<tool>"`                 | `mcp:<server>`                                            |
+| `"name":"mcp__plugin_<plugin>_<server>__<tool>"` | `mcp:plugin:<plugin>:<server>`, split at the first `_`    |
+
+- It never keeps `input.prompt`, `input.args`, or any message text. A test puts a secret in the prompt and asserts that the response does not hold it.
+- Count each `tool_use` `id` one time across all files. A call stamped after now does not count.
+- `count30` counts calls in the 30 days before now. `last` is the newest call.
+- Slash commands typed by the user and hooks are not counted. Counts are for all projects together.
+- The browser matches a local or project item by `<kind>:<name>`, and a plugin item by `<kind>:<plugin>:<name>` plus `<kind>:<name>`. Items whose keys overlap share one count, and the row says "Shared with N items of this name".
+- "Unused 30 d" = the item is on, has no call in 30 days, and its file is older than 30 days. MCP servers have no file time, so only the call count applies.
+- "Switch off N" toggles each switchable unused item one at a time after a confirm dialog. Each toggle gets its own Activity entry with undo.
+- The sort (Most used, Least used, Name) is kept in `localStorage` key `storehouse.usageSort`. The default is Name.
 
 ## Favorites
 
