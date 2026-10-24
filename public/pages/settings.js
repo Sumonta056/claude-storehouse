@@ -1,5 +1,4 @@
 import { get, send } from '../api.js'
-import { projectOffHtml, render } from '../app.js'
 import { afterWrite, askReload, busy } from '../core/actions.js'
 import { $, ask, showBanner, toast } from '../core/dom.js'
 import { esc, isPlain, opt, plural, tilde } from '../core/format.js'
@@ -28,6 +27,7 @@ import {
 import { SCOPE_KEY, effRow, effRows } from '../logic/effective.js'
 import { effValue, effectiveHtml } from './effective.js'
 import { backupsBtn, ensureEd, missingHtml, msgHtml, panelBackupsHtml } from '../ui/config-panels.js'
+import { projectOffHtml, render } from '../ui/nav.js'
 
 const SET_WHERE = { sg: 'every project', sp: 'this folder · in git', sl: 'this folder · only you' }
 

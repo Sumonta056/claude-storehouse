@@ -1,5 +1,4 @@
 import { send } from '../api.js'
-import { render } from '../app.js'
 import { afterWrite, busy } from '../core/actions.js'
 import { $, showBanner, toast } from '../core/dom.js'
 import { esc, opt, plural, slug, tilde } from '../core/format.js'
@@ -9,6 +8,7 @@ import { SETTINGS_FILE, projectOn, visible } from '../logic/catalog.js'
 import { keepChip } from '../logic/chips.js'
 import { HOOK_EVENTS, HOOK_INFO, hookLabel, hookRunsFor } from '../logic/hooks.js'
 import { chipsHtml } from '../ui/chips.js'
+import { render } from '../ui/nav.js'
 import { addButton, cellSwitch, empty, invalidAttr, nothingMatches, pageBar, scopeTag, viaPlugin } from '../ui/rows.js'
 
 function hookSource(h) {

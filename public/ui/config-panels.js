@@ -1,5 +1,4 @@
 import { get, send } from '../api.js'
-import { backupsListHtml, render } from '../app.js'
 import { afterWrite, askReload, busy } from '../core/actions.js'
 import { $, ask, toast, waitFor } from '../core/dom.js'
 import { esc, lineCount, plural, tilde } from '../core/format.js'
@@ -18,6 +17,8 @@ import {
 } from '../logic/config.js'
 import { pickMd } from '../pages/claudemd.js'
 import { pickSet, saveSettingsForm, setSettingsTab, sformChrome } from '../pages/settings.js'
+import { backupsListHtml } from './drawer-body.js'
+import { render } from './nav.js'
 
 export function ensureEd(k, file) {
   let ed = eds[k]

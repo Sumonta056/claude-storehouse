@@ -1,11 +1,12 @@
 import { send } from '../api.js'
-import { loadActivity, render } from '../app.js'
 import { editFavCategory, refresh } from '../core/actions.js'
 import { $, ask, toast } from '../core/dom.js'
 import { esc, plural } from '../core/format.js'
 import { ICON } from '../core/icons.js'
 import { favOpen, state } from '../core/state.js'
 import { favCats, favNameError, favoriteEntries, matches, visible } from '../logic/catalog.js'
+import { loadActivity } from './activity.js'
+import { render } from '../ui/nav.js'
 import { empty, nothingMatches, rowHtml } from '../ui/rows.js'
 
 function missingFavRowHtml(fav) {

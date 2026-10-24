@@ -1,10 +1,10 @@
 import { get } from '../api.js'
-import { projectOffHtml, render } from '../app.js'
 import { $ } from '../core/dom.js'
 import { ago, compact, esc, money, monthName, tilde } from '../core/format.js'
 import { PERIOD_KEY, state } from '../core/state.js'
 import { KIND_WORD, PAGES, counts, favoriteEntries, otherCounts, projectOn, visible } from '../logic/catalog.js'
 import { USAGE_PAGES, modelShares } from '../logic/usage.js'
+import { projectOffHtml, render } from '../ui/nav.js'
 import { empty, nothingMatches, rowHtml, rowsHtml } from '../ui/rows.js'
 
 function navIcon(page) {

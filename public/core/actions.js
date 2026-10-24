@@ -1,10 +1,12 @@
 import { get, send } from '../api.js'
-import { drawerOpen, loadActivity, render } from '../app.js'
 import { ask, showBanner, toast } from './dom.js'
 import { baseName, tilde } from './format.js'
 import { dr, pending, state } from './state.js'
 import { normalize } from '../logic/catalog.js'
 import { markStale } from '../logic/config.js'
+import { loadActivity } from '../pages/activity.js'
+import { drawerOpen } from '../ui/drawer.js'
+import { render } from '../ui/nav.js'
 import { cliScope, pluginParts } from '../ui/rows.js'
 
 export async function editFavCategory(body, message) {

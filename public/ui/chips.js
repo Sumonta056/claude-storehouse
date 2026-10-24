@@ -1,4 +1,3 @@
-import { render } from '../app.js'
 import { toggle } from '../core/actions.js'
 import { ask } from '../core/dom.js'
 import { esc, plural, tok } from '../core/format.js'
@@ -7,6 +6,7 @@ import { PAGES, switchable, visible } from '../logic/catalog.js'
 import { CHIPS, chipCounts } from '../logic/chips.js'
 import { listingTokens } from '../logic/context.js'
 import { USE_WORD, isUnused, useReady } from '../logic/usage.js'
+import { render } from './nav.js'
 
 export function setSort(value) {
   state.usageSort = value

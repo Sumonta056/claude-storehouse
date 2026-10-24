@@ -1,5 +1,4 @@
 import { send } from '../api.js'
-import { openDrawer } from '../app.js'
 import { guarded, refresh } from '../core/actions.js'
 import { $, toast } from '../core/dom.js'
 import { esc, plural, tilde } from '../core/format.js'
@@ -8,6 +7,7 @@ import { chipFilter, state } from '../core/state.js'
 import { PAGES } from '../logic/catalog.js'
 import { DOC_KIND, DOC_SEVERITY, doctorIssues, doctorItem, doctorMatches } from '../logic/doctor.js'
 import { chipsHtml } from '../ui/chips.js'
+import { openDrawer } from '../ui/drawer.js'
 import { empty, nothingMatches } from '../ui/rows.js'
 
 function doctorButton(issue) {

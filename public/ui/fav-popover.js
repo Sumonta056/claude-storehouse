@@ -1,9 +1,9 @@
-import { drawerOpen } from '../app.js'
 import { star } from '../core/actions.js'
 import { $, HOLDER, holderKey } from '../core/dom.js'
 import { esc } from '../core/format.js'
 import { state } from '../core/state.js'
 import { favBody, favNameError, favOf, favPopOptions, itemLabel } from '../logic/catalog.js'
+import { drawerOpen } from './drawer.js'
 
 function favPopListHtml() {
   const { options, active, current } = state.favPop

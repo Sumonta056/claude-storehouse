@@ -1,4 +1,3 @@
-import { projectOffHtml, render } from '../app.js'
 import { $, ask } from '../core/dom.js'
 import { esc, fmtSize, lineCount, plural, tilde } from '../core/format.js'
 import { eds, msgs } from '../core/state.js'
@@ -6,6 +5,7 @@ import { projectOn } from '../logic/catalog.js'
 import { MD_ORDER, cfgPanels, cmd, edDirty, mdDirtyKey } from '../logic/config.js'
 import { previewHtml } from '../logic/markdown.js'
 import { backupsBtn, ensureEd, missingHtml, msgHtml, panelBackupsHtml } from '../ui/config-panels.js'
+import { projectOffHtml, render } from '../ui/nav.js'
 
 const MD_WHERE = {
   mg: 'every project',

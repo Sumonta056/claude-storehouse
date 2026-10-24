@@ -1,5 +1,5 @@
-import { drawerOpen } from '../app.js'
 import { state } from './state.js'
+import { drawerOpen } from '../ui/drawer.js'
 
 export const HOLDER = '.recent, tr[data-key], .lrow, .pnote'
 
