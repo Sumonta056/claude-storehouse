@@ -14,7 +14,6 @@ import {
   waitFor
 } from './core/dom.js'
 import {
-  MODEL_CLASSES,
   ago,
   baseName,
   compact,
@@ -22,9 +21,7 @@ import {
   fmtSize,
   isFolderSkill,
   isPlain,
-  keyOf,
   lineCount,
-  modelName,
   money,
   monthName,
   opt,
@@ -34,8 +31,7 @@ import {
   shortVersion,
   slug,
   tilde,
-  tok,
-  unquote
+  tok
 } from './core/format.js'
 import { ICON, kindIcon } from './core/icons.js'
 import {
@@ -56,263 +52,79 @@ import {
   pending,
   state
 } from './core/state.js'
-
-const PAGES = {
-  dash: 'Dashboard',
-  fav: 'Favorites',
-  dups: 'Duplicates',
-  doctor: 'Doctor',
-  context: 'Context',
-  skills: 'Skills',
-  agents: 'Agents',
-  plugins: 'Plugins',
-  mods: 'Mods',
-  hooks: 'Hooks',
-  mcp: 'MCP servers',
-  settings: 'Settings',
-  claudemd: 'CLAUDE.md',
-  activity: 'Activity'
-}
-
-const HOOK_EVENTS = [
-  'PreToolUse',
-  'PostToolUse',
-  'UserPromptSubmit',
-  'Notification',
-  'Stop',
-  'SubagentStop',
-  'SessionStart',
-  'SessionEnd',
-  'PreCompact'
-]
-
-const SETTINGS_FILE = {
-  global: '~/.claude/settings.json',
-  project: '.claude/settings.json',
-  projectLocal: '.claude/settings.local.json'
-}
-
-const MCP_ORIGIN = { user: '~/.claude.json', local: '~/.claude.json · this folder', mcpjson: '.mcp.json' }
-
-const HOOK_INFO = [
-  ['SessionStart', 'When a session starts, resumes, or clears.'],
-  ['InstructionsLoaded', 'When Claude Code loads a CLAUDE.md or rules file.'],
-  ['UserPromptSubmit', 'When you send a prompt, before Claude reads it. It can block the prompt.'],
-  ['PreToolUse', 'Before Claude runs a tool. It can block the tool.'],
-  ['PermissionRequest', 'When Claude asks you for permission. It can allow or deny for you.'],
-  ['PostToolUse', 'After a tool runs with success.'],
-  ['PostToolUseFailure', 'After a tool fails.'],
-  ['Notification', 'When Claude Code shows a notification, such as a permission prompt.'],
-  ['SubagentStart', 'When a subagent starts.'],
-  ['SubagentStop', 'When a subagent finishes.'],
-  ['TaskCreated', 'When Claude creates a task.'],
-  ['TaskCompleted', 'When a task is marked complete.'],
-  ['TeammateIdle', 'When a team agent is about to go idle.'],
-  ['Stop', 'When Claude finishes its reply. It can make Claude continue.'],
-  ['StopFailure', 'When a reply stops because of an API error.'],
-  ['PreCompact', 'Before Claude Code compacts the conversation.'],
-  ['PostCompact', 'After Claude Code compacts the conversation.'],
-  ['ConfigChange', 'When a settings file changes during the session.'],
-  ['WorktreeCreate', 'When Claude Code creates a git worktree.'],
-  ['WorktreeRemove', 'When Claude Code removes a git worktree.'],
-  ['Elicitation', 'When an MCP server asks you for input.'],
-  ['ElicitationResult', 'After you answer an MCP server request.'],
-  ['SessionEnd', 'When the session ends.']
-]
-
-const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest'])
-
-const SCRIPT_RE = /[\w@.-]+\.(?:sh|bash|zsh|js|mjs|cjs|ts|py|rb|cmd|ps1)\b/g
-
-const INLINE = { node: 'Node', bun: 'Bun', deno: 'Deno', python: 'Python', python3: 'Python', ruby: 'Ruby' }
-
-const SHELLS = new Set(['sh', 'bash', 'zsh'])
-
-const SHELL_WORDS = new Set(['if', 'for', 'while', 'case', '[', '[[', '{', '(', 'test', 'until'])
-
-const USAGE_PAGES = new Set(['dash', 'skills', 'agents', 'mcp'])
-
-const USE_WORD = { skills: 'skill', agents: 'agent', mcp: 'MCP server' }
-
-const DAY = 86400000
-
-function pluginById(id) {
-  return state.inventory.plugins.find((p) => p.id === id)
-}
-
-function pluginLabel(id) {
-  return pluginById(id)?.name ?? id
-}
-
-function normalize(inv) {
-  items.clear()
-  const out = { skill: [], agent: [], plugin: [], mod: [], hook: [], mcp: [] }
-  for (const s of inv.skills) {
-    const item = { ...s, key: keyOf('skill', s.source, s.name) }
-    items.set(item.key, item)
-    out.skill.push(item)
-  }
-  for (const a of inv.agents) {
-    const item = { ...a, key: keyOf('agent', a.source, a.name) }
-    items.set(item.key, item)
-    out.agent.push(item)
-  }
-  for (const p of inv.plugins) {
-    const parts = [p.version ? `v${p.version}` : '', `${p.skills.length} skills`, `${p.agents.length} agents`]
-    if (p.hooks.length) parts.push(`${p.hooks.length} hooks`)
-    if (p.mcp.length) parts.push(`${p.mcp.length} MCP`)
-    const item = {
-      kind: 'plugin',
-      key: keyOf('plugin', 'plugin', p.id),
-      id: p.id,
-      name: p.name,
-      source: p.marketplace || 'plugin',
-      favSource: 'plugin',
-      description: p.description,
-      meta: parts.filter(Boolean).join(' · '),
-      scope: p.scope,
-      path: p.installPath,
-      enabled: p.enabled,
-      missing: p.missing,
-      canToggle: !p.missing,
-      favorite: p.favorite,
-      mtime: p.mtime ?? null,
-      isMod: Boolean(p.isMod),
-      modules: p.modules ?? []
-    }
-    items.set(item.key, item)
-    out.plugin.push(item)
-    if (item.isMod) out.mod.push(item)
-  }
-  for (const m of inv.devMods ?? []) {
-    const item = {
-      kind: 'plugin',
-      dev: true,
-      key: keyOf('plugin', 'dev', m.id),
-      id: m.id,
-      name: m.name,
-      source: 'dev',
-      description: m.description,
-      scope: 'dev',
-      path: m.path,
-      enabled: true,
-      missing: false,
-      canToggle: false,
-      favorite: false,
-      mtime: m.mtime ?? null,
-      version: m.version,
-      session: m.session,
-      isMod: true,
-      modules: m.modules ?? []
-    }
-    items.set(item.key, item)
-    out.mod.push(item)
-  }
-  for (const h of inv.hooks) {
-    const item = {
-      ...h,
-      kind: 'hook',
-      key: `hook:${h.id}:${h.file}:${h.index?.group}:${h.index?.hook}${h.parked ? ':parked' : ''}`,
-      name: String(h.command ?? ''),
-      description: `${h.event} · ${h.matcher}`,
-      source: h.plugin ? pluginLabel(h.plugin) : h.parked ? 'parked' : (SETTINGS_FILE[h.file] ?? h.file)
-    }
-    items.set(item.key, item)
-    out.hook.push(item)
-  }
-  for (const m of inv.mcp) {
-    const item = {
-      ...m,
-      kind: 'mcp',
-      key: `mcp:${m.origin}:${m.plugin ?? ''}:${m.name}`,
-      description: m.command ?? m.url ?? '',
-      source: m.plugin ? pluginLabel(m.plugin) : (MCP_ORIGIN[m.origin] ?? m.origin)
-    }
-    items.set(item.key, item)
-    out.mcp.push(item)
-  }
-  return out
-}
-
-function inScope(scope) {
-  if (state.scope === 'all') return true
-  if (state.scope === 'global') return scope === 'global' || scope === 'plugin' || scope === 'dev'
-  return scope === 'project'
-}
-
-function matches(item) {
-  const q = state.query.trim().toLowerCase()
-  if (!q) return true
-  return [item.name, item.description, item.source, item.plugin, item.id, item.model, item.tools?.join(' ')].some((v) =>
-    String(v ?? '')
-      .toLowerCase()
-      .includes(q)
-  )
-}
-
-function visible(item) {
-  return inScope(item.scope) && matches(item)
-}
-
-function switchInfo(item) {
-  if (item.kind === 'plugin') {
-    if (item.dev)
-      return {
-        disabled: true,
-        text: 'dev mod',
-        title: `Development mod in ~/.claude/dev-mods/${item.session}. It has no switch here.`
-      }
-    if (item.missing)
-      return { disabled: true, text: 'not installed', title: `${item.id} is listed but its folder is missing` }
-    const file = item.scope === 'project' ? '.claude/settings.local.json' : '~/.claude/settings.json'
-    return { disabled: false, title: `Writes enabledPlugins["${item.id}"] in ${file}` }
-  }
-  if (item.kind === 'hook' && !item.plugin) {
-    if (!item.canToggle)
-      return {
-        disabled: true,
-        text: 'cannot switch',
-        title: 'This hook has no command string, so it cannot be parked.'
-      }
-    const file = SETTINGS_FILE[item.file] ?? item.file
-    return {
-      disabled: false,
-      title: item.enabled
-        ? `Off moves this hook from ${file} to ~/.claude/storehouse.json`
-        : `On puts this hook back in ${file}`
-    }
-  }
-  if (item.kind === 'mcp') {
-    if (!item.canToggle)
-      return { disabled: true, text: 'cannot switch', title: `${item.name} cannot be switched here.` }
-    return {
-      disabled: false,
-      title:
-        item.origin === 'mcpjson'
-          ? 'Writes enabledMcpjsonServers or disabledMcpjsonServers in .claude/settings.local.json'
-          : 'Writes disabledMcpServers for this folder in ~/.claude.json'
-    }
-  }
-  if (!item.canToggle) {
-    const name = item.plugin ? pluginLabel(item.plugin) : ''
-    return {
-      disabled: true,
-      text: name ? `via plugin ${name}` : `via plugin ${item.source}`,
-      title: `Follows the plugin ${item.plugin ?? item.source}. Switch the plugin on the Plugins page.`
-    }
-  }
-  if (item.kind === 'agent') {
-    const file = item.path.split(/[\\/]/).pop()
-    return {
-      disabled: false,
-      title: item.enabled
-        ? `Renames ${file} to ${file}.disabled`
-        : `Renames ${file} back to ${file.replace(/\.disabled$/, '')}`
-    }
-  }
-  const file = item.scope === 'project' ? '.claude/settings.local.json' : '~/.claude/settings.json'
-  return { disabled: false, title: `Writes skillOverrides["${item.name}"] in ${file}` }
-}
+import {
+  KIND_WORD,
+  PAGES,
+  SETTINGS_FILE,
+  counts,
+  favBody,
+  favCats,
+  favNameError,
+  favOf,
+  favPopOptions,
+  favoriteEntries,
+  hasSwitch,
+  isPluginOwned,
+  itemLabel,
+  matches,
+  normalize,
+  otherCounts,
+  ownerId,
+  ownerPlugin,
+  pluginById,
+  pluginLabel,
+  projectOn,
+  switchInfo,
+  switchable,
+  visible
+} from './logic/catalog.js'
+import { CHIPS, chipCounts, keepChip } from './logic/chips.js'
+import {
+  ELSEWHERE,
+  FORM_FIELDS,
+  FORM_GROUPS,
+  MD_ORDER,
+  SET_ORDER,
+  cfgDirty,
+  cfgPanels,
+  cmd,
+  dropMissing,
+  edDirty,
+  elsewhereText,
+  fieldGet,
+  fieldPath,
+  fieldSet,
+  formValue,
+  isCfgPage,
+  lockedKeys,
+  lockedText,
+  markStale,
+  mdDirtyKey,
+  setData,
+  setDirty,
+  sformDirtyKeys,
+  sformEdit,
+  sformValues,
+  shortValue
+} from './logic/config.js'
+import { CTX_TYPES, TOKEN_BYTES, contextItems, keepCtx, listingTokens, sumTokens, tokensOf } from './logic/context.js'
+import { DOC_KIND, DOC_SEVERITY, doctorIssues, doctorItem, doctorMatches } from './logic/doctor.js'
+import { DUP_KINDS, dupSource, duplicateGroups, needsAction, onCount } from './logic/duplicates.js'
+import { EFF_GROUPS, SCOPE_KEY, SCOPE_TAG, effRow, effRows } from './logic/effective.js'
+import { HOOK_EVENTS, HOOK_INFO, hookLabel, hookRunsFor } from './logic/hooks.js'
+import { highlight, isMd, previewHtml } from './logic/markdown.js'
+import { mcpTransport, parseEnv } from './logic/mcp.js'
+import {
+  USAGE_PAGES,
+  USE_WORD,
+  isUnused,
+  lastText,
+  modelShares,
+  sharedWith,
+  sortRows,
+  useOf,
+  useReady
+} from './logic/usage.js'
 
 function scopeTag(scope) {
   return `<span class="tag ${esc(scope)}">${esc(scope)}</span>`
@@ -326,15 +138,6 @@ function nothingMatches() {
   return empty(state.query ? `Nothing matches "${state.query}" in this scope.` : 'Nothing in this scope.')
 }
 
-function favoriteEntries() {
-  return state.inventory.favorites.map((f) => ({ fav: f, item: items.get(f.id) ?? null }))
-}
-
-function counts(list) {
-  const shown = list.filter(visible)
-  return { total: shown.length, on: shown.filter((i) => i.enabled).length }
-}
-
 function navIcon(page) {
   return document.querySelector(`#nav [data-p="${page}"] .ic`)?.outerHTML ?? ''
 }
@@ -345,13 +148,6 @@ function statTile(page, label, c) {
     <span class="n">${c.total}</span>
     <span class="s"><span class="on">${c.on} on</span><span class="off">${c.total - c.on} off</span></span>
   </button>`
-}
-
-function otherCounts(list) {
-  const shown = list.filter(
-    (i) => inScope(i.scope) && matches({ name: i.name ?? i.command, description: i.event, source: i.plugin })
-  )
-  return { total: shown.length, on: shown.filter((i) => i.enabled).length }
 }
 
 function setSort(value) {
@@ -368,14 +164,6 @@ function setPeriod(period) {
     localStorage.setItem(PERIOD_KEY, period)
   } catch {}
   renderDash()
-}
-
-function modelShares(u) {
-  if (!u.cost) return []
-  const top = u.models.slice(0, 3).map((m) => ({ name: modelName(m.model), cost: m.cost }))
-  const rest = u.cost - top.reduce((sum, m) => sum + m.cost, 0)
-  if (rest > 0.005) top.push({ name: 'Other', cost: rest })
-  return top.map((m, i) => ({ ...m, share: (m.cost / u.cost) * 100, cls: MODEL_CLASSES[i] }))
 }
 
 function usageHtml() {
@@ -523,10 +311,6 @@ function filesHtml() {
     .join('')}</ul>`
 }
 
-function favCats() {
-  return state.inventory.favoriteCategories ?? []
-}
-
 function missingFavRowHtml(fav) {
   return `<li class="lrow missing" data-fav="${esc(fav.id)}" draggable="true">
     <div class="lead"><span class="lead-ic bad" role="img" aria-label="Missing">${ICON.warn}</span></div>
@@ -590,29 +374,6 @@ function renderFav() {
     body = hits.length ? hits.map(([c, list, i]) => favSectionHtml(c, list, i)).join('') : nothingMatches()
   } else body = groups.map(([c, list], i) => favSectionHtml(c, list, i)).join('')
   $('p-fav').innerHTML = top + body
-}
-
-function favOf(item) {
-  return state.inventory.favorites.find((f) => f.id === item.key) ?? null
-}
-
-function favNameError(name) {
-  if (name === '') return 'Type a category name.'
-  if (name.length > 40) return 'Use 40 characters or fewer.'
-  if (name.toLowerCase() === 'uncategorized') return 'Uncategorized is a reserved name.'
-  return null
-}
-
-function itemLabel(item) {
-  return item.plugin ? `${item.name} · via plugin ${pluginLabel(item.plugin)}` : item.name
-}
-
-function favPopOptions(query) {
-  const q = query.trim().toLowerCase()
-  const all = [{ value: '', label: 'Uncategorized' }, ...favCats().map((c) => ({ value: c, label: c }))]
-  const shown = q ? all.filter((o) => o.label.toLowerCase().includes(q)) : all
-  if (q && !all.some((o) => o.label.toLowerCase() === q)) shown.push({ create: query.trim() })
-  return shown
 }
 
 function favPopListHtml() {
@@ -733,17 +494,6 @@ function closeFavPop(refocus = true) {
   btn?.focus({ preventScroll: true })
 }
 
-function favBody(item, favorite, category) {
-  const body = {
-    kind: item.kind,
-    name: item.kind === 'plugin' ? item.id : item.name,
-    source: item.kind === 'plugin' ? 'plugin' : item.source,
-    favorite
-  }
-  if (category !== undefined) body.category = category
-  return body
-}
-
 function submitFavPop(form) {
   const { item, options, active } = state.favPop
   const choice = options[active]
@@ -853,67 +603,6 @@ async function submitRename(form) {
   $('fav-rename')?.focus()
 }
 
-const CHIPS = {
-  context: [
-    ['all', 'All'],
-    ['claudemd', 'CLAUDE.md'],
-    ['rules', 'Rules'],
-    ['skills', 'Skills'],
-    ['agents', 'Agents'],
-    ['mcp', 'MCP'],
-    ['off', 'Off']
-  ],
-  dups: [
-    ['all', 'All'],
-    ['needs', 'Needs action']
-  ],
-  doctor: [
-    ['all', 'All'],
-    ['error', 'Errors'],
-    ['warning', 'Warnings'],
-    ['info', 'Info']
-  ],
-  plugins: [
-    ['all', 'All'],
-    ['on', 'On'],
-    ['off', 'Off'],
-    ['broken', 'Broken']
-  ],
-  skills: [
-    ['all', 'All'],
-    ['on', 'On'],
-    ['off', 'Off'],
-    ['plugin', 'From plugins'],
-    ['unused', 'Unused 30 d']
-  ],
-  agents: [
-    ['all', 'All'],
-    ['on', 'On'],
-    ['off', 'Off'],
-    ['plugin', 'From plugins'],
-    ['unused', 'Unused 30 d']
-  ],
-  hooks: [
-    ['all', 'All'],
-    ['on', 'On'],
-    ['off', 'Off'],
-    ['plugin', 'From plugins']
-  ],
-  mcp: [
-    ['all', 'All'],
-    ['on', 'On'],
-    ['off', 'Off'],
-    ['plugin', 'From plugins'],
-    ['unused', 'Unused 30 d']
-  ],
-  mods: [
-    ['all', 'All'],
-    ['on', 'On'],
-    ['off', 'Off'],
-    ['dev', 'Dev']
-  ]
-}
-
 const SECTIONS = {
   plugins: [
     ['global', 'Global · installed for your user', ''],
@@ -932,57 +621,6 @@ const SECTIONS = {
     ['global', 'Global · ~/.claude/agents', 'Off renames name.md to name.md.disabled'],
     ['project', 'Project · ./.claude/agents', 'Off renames name.md to name.md.disabled']
   ]
-}
-
-function useReady() {
-  return Boolean(state.usage?.items && state.usage.all?.responses)
-}
-
-function useCovered() {
-  return useReady() && typeof state.usage.since === 'number' && state.usage.since <= Date.now() - 30 * DAY
-}
-
-function toolName(value) {
-  return String(value).replace(/[^A-Za-z0-9_-]/g, '_')
-}
-
-function useKeys(item) {
-  const p = item.plugin ? String(pluginLabel(item.plugin)).replace(/@.*/, '') : ''
-  if (item.kind === 'mcp')
-    return [p ? `mcp:plugin:${toolName(p)}:${toolName(item.name)}` : `mcp:${toolName(item.name)}`]
-  const bare = `${item.kind}:${item.name}`
-  if (!p) return [bare]
-  const local = state.catalog[item.kind].some((o) => !o.plugin && o.name === item.name)
-  return local ? [`${item.kind}:${p}:${item.name}`] : [`${item.kind}:${p}:${item.name}`, bare]
-}
-
-function useOf(item) {
-  if (!useReady() || !['skill', 'agent', 'mcp'].includes(item.kind)) return null
-  let count30 = 0
-  let last = 0
-  for (const key of useKeys(item)) {
-    const u = state.usage.items[key]
-    if (!u) continue
-    count30 += u.count30
-    last = Math.max(last, u.last)
-  }
-  return { count30, last }
-}
-
-function isUnused(item) {
-  const u = useOf(item)
-  if (!u || u.count30 || !item.enabled || item.disableModelInvocation || !useCovered()) return false
-  return typeof item.mtime !== 'number' || item.mtime < Date.now() - 30 * DAY
-}
-
-function sharedWith(item) {
-  const mine = useKeys(item)
-  return state.catalog[item.kind].filter((o) => o !== item && useKeys(o).some((k) => mine.includes(k))).length
-}
-
-function lastText(ms) {
-  const days = Math.floor((Date.now() - ms) / DAY)
-  return days >= 1 ? `${days} d ago` : ago(ms)
 }
 
 function useChips(item) {
@@ -1004,19 +642,6 @@ function useChips(item) {
 
 function useFlag(item) {
   return USAGE_PAGES.has(state.page) && isUnused(item) ? '<span class="flag bad">Unused 30 d</span>' : ''
-}
-
-function sortRows(list) {
-  if (!useReady() || !USAGE_PAGES.has(state.page)) return list
-  const out = [...list]
-  if (state.usageSort === 'name') return out.sort((a, b) => a.name.localeCompare(b.name))
-  const dir = state.usageSort === 'most' ? -1 : 1
-  const val = (i) => useOf(i) ?? { count30: 0, last: 0 }
-  return out.sort((a, b) => {
-    const ua = val(a)
-    const ub = val(b)
-    return dir * (ua.count30 - ub.count30) || dir * (ua.last - ub.last) || a.name.localeCompare(b.name)
-  })
 }
 
 function sortHtml() {
@@ -1142,12 +767,6 @@ function metaHtml(item) {
   return bits.length ? `<p class="meta chips-s">${bits.join('')}</p>` : ''
 }
 
-function dupSource(item) {
-  if (item.plugin) return `via plugin ${pluginLabel(item.plugin)}`
-  if (item.kind === 'mcp') return item.source
-  return item.scope === 'project' ? 'Project' : 'Global'
-}
-
 const FAV_KINDS = new Set(['skill', 'agent', 'plugin'])
 
 function tokChip(item) {
@@ -1196,58 +815,6 @@ function rowsHtml(list, ctx = '') {
   return `<ul class="rows" data-rows="${ctx}">${list.map((i) => rowHtml(i, ctx)).join('')}</ul>`
 }
 
-function switchable(page, item) {
-  return page === 'mcp' ? item.canToggle : item.scope !== 'plugin'
-}
-
-function keepChip(page, item) {
-  const f = chipFilter[page]
-  if (f === 'all') return true
-  if (page === 'mods') return f === 'dev' ? Boolean(item.dev) : !item.dev && (f === 'on') === Boolean(item.enabled)
-  if (page === 'plugins')
-    return f === 'broken' ? Boolean(item.missing) : !item.missing && (f === 'on') === Boolean(item.enabled)
-  if (f === 'plugin') return item.scope === 'plugin'
-  if (f === 'unused') return isUnused(item)
-  return switchable(page, item) && (f === 'on') === Boolean(item.enabled)
-}
-
-function chipCounts(page, list) {
-  if (page === 'dups') return { all: list.length, needs: list.filter(needsAction).length }
-  if (page === 'doctor')
-    return Object.fromEntries(
-      CHIPS.doctor.map(([k]) => [k, k === 'all' ? list.length : list.filter((i) => i.severity === k).length])
-    )
-  if (page === 'context')
-    return Object.fromEntries(CHIPS.context.map(([k]) => [k, list.filter((e) => keepCtx(e, k)).length]))
-  const shown = list.filter(visible)
-  if (page === 'mods') {
-    const own = shown.filter((m) => !m.dev)
-    return {
-      all: shown.length,
-      on: own.filter((m) => m.enabled).length,
-      off: own.filter((m) => !m.enabled).length,
-      dev: shown.length - own.length
-    }
-  }
-  if (page === 'plugins') {
-    const ok = shown.filter((p) => !p.missing)
-    return {
-      all: shown.length,
-      on: ok.filter((p) => p.enabled).length,
-      off: ok.filter((p) => !p.enabled).length,
-      broken: shown.length - ok.length
-    }
-  }
-  const own = shown.filter((i) => switchable(page, i))
-  return {
-    all: shown.length,
-    on: own.filter((i) => i.enabled).length,
-    off: own.filter((i) => !i.enabled).length,
-    plugin: shown.filter((i) => i.scope === 'plugin').length,
-    unused: shown.filter(isUnused).length
-  }
-}
-
 function chipsHtml(page, list, note) {
   const n = chipCounts(page, list)
   const buttons = CHIPS[page]
@@ -1291,31 +858,6 @@ function pluginGroupsHtml(page, list) {
     })
     .join('')
   return `<h2>From plugins <span class="pill">${shown.length}</span><span class="hint">Grouped by plugin. These ${kind}s follow their plugin switch.</span></h2><div class="groups">${body}</div>`
-}
-
-const DUP_KINDS = [
-  ['skill', 'skill'],
-  ['agent', 'agent'],
-  ['mcp', 'MCP server']
-]
-
-function duplicateGroups() {
-  const groups = new Map()
-  for (const [kind] of DUP_KINDS)
-    for (const item of state.catalog[kind]) {
-      const key = `${kind}:${item.name}`
-      if (!groups.has(key)) groups.set(key, { key, kind, name: item.name, items: [] })
-      groups.get(key).items.push(item)
-    }
-  return [...groups.values()].filter((g) => g.items.length > 1)
-}
-
-function onCount(group) {
-  return group.items.filter((i) => i.enabled).length
-}
-
-function needsAction(group) {
-  return onCount(group) > 1
 }
 
 function dupGroupHtml(g) {
@@ -1371,47 +913,6 @@ async function keepOnly(item) {
     const other = items.get(key)
     if (other?.enabled) await toggle(other)
   }
-}
-
-const DOC_SEVERITY = [
-  ['error', 'Errors', 'Claude Code cannot read these files.'],
-  ['warning', 'Warnings', 'These items do not work as the file says.'],
-  ['info', 'Info', 'These items work, but can be better.']
-]
-
-const DOC_KIND = {
-  file: 'Config file',
-  hook: 'Hook',
-  mcp: 'MCP server',
-  plugin: 'Plugin',
-  skill: 'Skill',
-  agent: 'Agent',
-  claudemd: 'CLAUDE.md'
-}
-
-function doctorIssues() {
-  return state.doctor?.issues ?? []
-}
-
-function doctorItem(target) {
-  if (!target?.kind) return null
-  if (target.kind === 'hook') return state.catalog.hook.find((h) => h.id === target.id) ?? null
-  if (target.kind === 'mcp') return items.get(`mcp:${target.origin}:${target.plugin ?? ''}:${target.name}`) ?? null
-  return (
-    (state.catalog[target.kind] ?? []).find(
-      (i) => i.name === target.name && i.scope === target.scope && (i.plugin ?? null) === (target.plugin ?? null)
-    ) ?? null
-  )
-}
-
-function doctorMatches(issue) {
-  const q = state.query.trim().toLowerCase()
-  if (!q) return true
-  return [issue.name, issue.message, issue.file].some((v) =>
-    String(v ?? '')
-      .toLowerCase()
-      .includes(q)
-  )
 }
 
 function doctorButton(issue) {
@@ -1489,115 +990,6 @@ async function checkAgain() {
   }
 }
 
-const TOKEN_BYTES = 4
-
-const DESC_CAP = 1536
-
-const CTX_TYPES = [
-  ['claudemd', 'CLAUDE.md', 'm0'],
-  ['skills', 'Skills', 'm1'],
-  ['rules', 'Rules', 'm2'],
-  ['agents', 'Agents', 'm3']
-]
-
-const CTX_FILES = [
-  ['global', '~/.claude/CLAUDE.md'],
-  ['project', 'CLAUDE.md'],
-  ['projectLocal', 'CLAUDE.local.md'],
-  ['projectClaudeDir', '.claude/CLAUDE.md']
-]
-
-const utf8 = new TextEncoder()
-
-function tokensOf(bytes) {
-  return Math.ceil(bytes / TOKEN_BYTES)
-}
-
-function listingTokens(item) {
-  return tokensOf(utf8.encode(`${item.name}: ${String(item.description ?? '').slice(0, DESC_CAP)}`).length)
-}
-
-function sumTokens(list) {
-  return list.reduce((sum, e) => sum + e.always, 0)
-}
-
-function contextItems() {
-  const m = state.inventory.claudeMd ?? {}
-  const out = []
-  for (const [k, name] of CTX_FILES) {
-    const f = m[k]
-    if (!f?.exists) continue
-    const scope = k === 'global' ? 'global' : 'project'
-    out.push({
-      type: 'claudemd',
-      kind: 'claudemd',
-      key: `ctx:md:${k}`,
-      name,
-      scope,
-      path: f.path,
-      description: 'Loads in full at session start.',
-      always: tokensOf(f.size),
-      onUse: 0,
-      enabled: true
-    })
-  }
-  for (const r of m.rules ?? []) {
-    const size = tokensOf(r.size)
-    out.push({
-      type: 'rules',
-      kind: 'rule',
-      key: `ctx:rule:${r.path}`,
-      name: `rules/${r.path.split(/[\\/]rules[\\/]/).pop()}`,
-      scope: r.scope,
-      path: r.path,
-      conditional: r.conditional,
-      description: r.conditional
-        ? 'Has paths: in its frontmatter. Loads when Claude reads a matching file.'
-        : 'Loads in full at session start.',
-      always: r.conditional ? 0 : size,
-      onUse: r.conditional ? size : 0,
-      enabled: true
-    })
-  }
-  for (const [type, list] of [
-    ['skills', state.catalog.skill],
-    ['agents', state.catalog.agent]
-  ])
-    for (const item of list) {
-      const cost = listingTokens(item)
-      out.push({
-        type,
-        kind: item.kind,
-        key: item.key,
-        item,
-        name: item.name,
-        scope: item.scope,
-        description: item.description,
-        source: item.source,
-        plugin: item.plugin,
-        cost,
-        always: item.enabled ? cost : 0,
-        onUse: tokensOf(item.size ?? 0),
-        enabled: item.enabled
-      })
-    }
-  for (const item of state.catalog.mcp)
-    out.push({
-      type: 'mcp',
-      kind: 'mcp',
-      key: item.key,
-      item,
-      name: item.name,
-      scope: item.scope,
-      description: item.description,
-      source: item.source,
-      always: 0,
-      onUse: 0,
-      enabled: item.enabled
-    })
-  return out.sort((a, b) => b.always - a.always || b.onUse - a.onUse || a.name.localeCompare(b.name))
-}
-
 function tokHtml(n, max, label = tok(n)) {
   const width = max && n ? Math.max(4, (n / max) * 100) : 0
   return `<div class="tok"><span>${esc(label)}</span><span class="mini" aria-hidden="true"><span style="width:${width}%"></span></span></div>`
@@ -1672,15 +1064,6 @@ function contextBandHtml(list) {
         <div class="legend">${types.map((t) => `<span><i class="${t.cls}"></i>${esc(t.label)} ${pct(t.n)}</span>`).join('')}</div>
       </div>
     </section>`
-}
-
-function isOff(e) {
-  return Boolean(e.item) && !e.enabled
-}
-
-function keepCtx(e, f) {
-  if (f === 'off') return isOff(e)
-  return !isOff(e) && (f === 'all' || e.type === f)
 }
 
 function renderContext() {
@@ -1896,10 +1279,6 @@ function show(page) {
   window.scrollTo(0, 0)
 }
 
-function projectOn() {
-  return Boolean(state.inventory?.project?.dir)
-}
-
 const PROJECT_OFF_NOTE = 'Started from your home folder — project scope is off. Run it inside a project folder.'
 
 function projectOffHtml() {
@@ -2030,21 +1409,7 @@ function isDirty() {
   return Boolean(drawerOpen() && txt && dr.editable && txt.value !== dr.loaded)
 }
 
-const KIND_WORD = { skill: 'Skill', agent: 'Agent', plugin: 'Plugin', hook: 'Hook', mcp: 'MCP server' }
-
 const LOCK_WORD = { skill: 'skill', agent: 'agent', hook: 'hook', mcp: 'MCP server' }
-
-function isPluginOwned(item) {
-  return item.kind !== 'plugin' && Boolean(item.plugin || item.scope === 'plugin')
-}
-
-function ownerId(item) {
-  return item.plugin ?? item.source
-}
-
-function ownerPlugin(item) {
-  return isPluginOwned(item) ? (state.catalog.plugin.find((p) => p.id === ownerId(item)) ?? null) : null
-}
 
 function drawerMetaHtml(item) {
   const parts = [`<b class="k">${esc(item.isMod ? 'Mod' : (KIND_WORD[item.kind] ?? item.kind))}</b>`]
@@ -2080,10 +1445,6 @@ function stateHtml(item) {
   const on = owner ? owner.enabled : item.enabled !== false
   const title = owner ? ` title="${esc(`Follows the plugin ${owner.name}`)}"` : ''
   return `<span class="st-chip ${on ? 'on' : 'off'}"${title}>${on ? 'On' : 'Off'}</span>`
-}
-
-function hasSwitch(item) {
-  return !item.missing && !item.dev && !isPluginOwned(item) && item.kind !== 'hook' && item.kind !== 'mcp'
 }
 
 function drawerName(item) {
@@ -2411,51 +1772,6 @@ function paintPreview() {
   $('dr-prev').innerHTML = previewHtml($('dr-txt').value, dr.file, hide)
 }
 
-function isMd(file) {
-  return /\.md(\.disabled)?$/i.test(file ?? '')
-}
-
-function hlInline(text) {
-  return text
-    .split(/(`[^`]+`)/)
-    .map((part) => {
-      if (/^`[^`]+`$/.test(part)) return `<span class="hl-c">${part}</span>`
-      return part
-        .replace(/(\*\*[^*]+\*\*)/g, '<span class="hl-b">$1</span>')
-        .replace(/(^|[^\w*])(\*[^*\s](?:[^*]*[^*\s])?\*)(?!\w)/g, '$1<span class="hl-i">$2</span>')
-        .replace(/(\[[^\]]+\]\([^)\s]+\))/g, '<span class="hl-a">$1</span>')
-    })
-    .join('')
-}
-
-function highlight(src, file) {
-  if (!isMd(file)) return `${esc(src)}\n`
-  const lines = src.split('\n')
-  let front = lines[0] === '---'
-  let fence = false
-  return `${lines
-    .map((line, n) => {
-      const e = esc(line)
-      if (front) {
-        if (n > 0 && line === '---') front = false
-        if (line === '---') return `<span class="hl-fm">${e}</span>`
-        return e.replace(/^([\w-]+)(:)/, '<span class="hl-key">$1</span><span class="hl-fm">$2</span>')
-      }
-      if (/^\s*```/.test(line)) {
-        fence = !fence
-        return `<span class="hl-fence">${e}</span>`
-      }
-      if (fence) return `<span class="hl-c">${e}</span>`
-      if (/^#{1,6}\s/.test(line)) return `<span class="hl-h">${e}</span>`
-      if (/^>/.test(line)) return `<span class="hl-q">${e}</span>`
-      if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return `<span class="hl-fm">${e}</span>`
-      const li = /^(\s*)([-*+]|\d+[.)])(\s.*)$/.exec(e)
-      if (li) return `${li[1]}<span class="hl-li">${li[2]}</span>${hlInline(li[3])}`
-      return hlInline(e)
-    })
-    .join('\n')}\n`
-}
-
 function paintEditor() {
   const hl = $('dr-hl')
   const txt = $('dr-txt')
@@ -2596,141 +1912,6 @@ function backupsListHtml(list, attrs, canRestore, prefix) {
         `<li><span class="when">${esc(b.time ? new Date(b.time).toLocaleString() : baseName(b.path))}</span><button type="button" class="btn" id="${prefix}-rs-${i}" ${attrs} data-path="${esc(b.path)}"${canRestore ? '' : ' disabled'}>Restore</button></li>`
     )
     .join('')}</ul><p class="note">Newest first.</p>`
-}
-
-function inline(text) {
-  return text
-    .split(/(`[^`]+`)/)
-    .map((part) => {
-      if (/^`[^`]+`$/.test(part)) return `<code>${part.slice(1, -1)}</code>`
-      return part
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/(^|[^\w*])\*([^*\s](?:[^*]*[^*\s])?)\*(?!\w)/g, '$1<em>$2</em>')
-        .replace(/\[([^\]]+)\]\(([^\s]+?)\)(?=\s|$|[.,;:!?])/g, '$1 <span class="link">($2)</span>')
-    })
-    .join('')
-}
-
-function tableCells(line) {
-  return line
-    .trim()
-    .replace(/^\||\|$/g, '')
-    .split('|')
-    .map((c) => inline(esc(c.trim())))
-}
-
-function splitFront(src) {
-  const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(src)
-  if (!m) return { meta: [], body: src }
-  const meta = []
-  for (const line of m[1].split(/\r?\n/)) {
-    const kv = /^([A-Za-z0-9_-]+):\s?(.*)$/.exec(line)
-    if (kv) meta.push([kv[1], kv[2]])
-    else if (meta.length && line.trim()) meta[meta.length - 1][1] += ` ${line.trim()}`
-  }
-  return { meta, body: src.slice(m[0].length) }
-}
-
-function markdown(body) {
-  const lines = body.split(/\r?\n/)
-  const out = []
-  const blockStart = /^(\s*```|#{1,6}\s|>|\s*\||\s*[-*+]\s|\s*\d+[.)]\s)/
-  const rule = /^\s*([-*_])(\s*\1){2,}\s*$/
-  const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/
-  let i = 0
-  while (i < lines.length) {
-    const line = lines[i]
-    const fence = /^\s*```\s*([\w+-]*)/.exec(line)
-    if (fence) {
-      const code = []
-      i++
-      while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++])
-      i++
-      const label = fence[1] ? `<figcaption>${esc(fence[1])}</figcaption>` : ''
-      out.push(`<figure class="code">${label}<pre><code>${esc(code.join('\n'))}</code></pre></figure>`)
-      continue
-    }
-    const h = /^(#{1,6})\s+(.*)$/.exec(line)
-    if (h) {
-      const level = Math.min(h[1].length + 2, 6)
-      out.push(`<h${level}>${inline(esc(h[2]))}</h${level}>`)
-      i++
-      continue
-    }
-    if (rule.test(line)) {
-      out.push('<hr>')
-      i++
-      continue
-    }
-    if (/^>/.test(line)) {
-      const quote = []
-      while (i < lines.length && /^>/.test(lines[i])) quote.push(lines[i++].replace(/^>\s?/, ''))
-      out.push(`<blockquote>${markdown(quote.join('\n'))}</blockquote>`)
-      continue
-    }
-    if (/^\s*\|/.test(line) && tableSep.test(lines[i + 1] ?? '')) {
-      const head = tableCells(line)
-      i += 2
-      const rows = []
-      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(tableCells(lines[i++]))
-      out.push(
-        `<div class="tbl-md"><table><thead><tr>${head.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rows
-          .map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`)
-          .join('')}</tbody></table></div>`
-      )
-      continue
-    }
-    const listKind = /^\s*[-*+]\s+/.test(line) ? 'ul' : /^\s*\d+[.)]\s+/.test(line) ? 'ol' : null
-    if (listKind) {
-      const re = listKind === 'ul' ? /^\s*[-*+]\s+(.*)$/ : /^\s*\d+[.)]\s+(.*)$/
-      const lis = []
-      while (i < lines.length && re.test(lines[i])) lis.push(`<li>${inline(esc(re.exec(lines[i++])[1]))}</li>`)
-      out.push(`<${listKind}>${lis.join('')}</${listKind}>`)
-      continue
-    }
-    if (!line.trim()) {
-      i++
-      continue
-    }
-    const para = []
-    while (i < lines.length && lines[i].trim() && !blockStart.test(lines[i])) para.push(lines[i++])
-    if (!para.length) para.push(lines[i++])
-    out.push(`<p>${inline(esc(para.join(' ')))}</p>`)
-  }
-  return out.join('')
-}
-
-function fmValues(key, value) {
-  const v = value.trim()
-  const list = /^\[.*\]$/.test(v)
-    ? v.slice(1, -1).split(',')
-    : v.startsWith('- ')
-      ? v.slice(2).split(/\s+-\s+/)
-      : /tools$/i.test(key)
-        ? v.split(/,\s*/)
-        : [v]
-  return list.map((x) => x.trim().replace(/^(['"])(.*)\1$/, '$2')).filter(Boolean)
-}
-
-function fmCardHtml(meta) {
-  if (!meta.length) return ''
-  const rows = meta.map(([k, v]) => {
-    const values = fmValues(k, v)
-    const accent = k === 'model' ? ' k' : ''
-    const dd =
-      values.length > 1 || accent || /tools$/i.test(k)
-        ? values.map((x) => `<span class="fm-chip${accent}">${esc(x)}</span>`).join('')
-        : `<span>${esc(values[0] ?? '')}</span>`
-    return `<div class="fm-row"><dt>${esc(k)}</dt><dd>${dd}</dd></div>`
-  })
-  return `<section class="fm-card" aria-label="Frontmatter"><h3 class="fm-h">Frontmatter</h3><dl>${rows.join('')}</dl></section>`
-}
-
-function previewHtml(src, file, hide = []) {
-  if (file && !isMd(file)) return `<pre><code>${esc(src)}</code></pre>`
-  const { meta, body } = splitFront(src)
-  const html = markdown(body)
-  return fmCardHtml(meta.filter(([k]) => !hide.includes(k))) + (html || '<p class="note">Nothing to preview.</p>')
 }
 
 function openerKey(item) {
@@ -3030,59 +2211,6 @@ async function onDrawerClick(e) {
   }
 }
 
-const EFFORT = ['low', 'medium', 'high']
-
-const MODES = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']
-
-const FORM_GROUPS = [
-  ['model', 'Model and output'],
-  ['perm', 'Permissions']
-]
-
-const FORM_FIELDS = [
-  {
-    key: 'model',
-    group: 'model',
-    name: 'Model',
-    type: 'text',
-    help: 'The model that every new session uses. You do not have to pick one with <code>/model</code> each time.'
-  },
-  {
-    key: 'effortLevel',
-    group: 'model',
-    name: 'Effort',
-    type: 'select',
-    options: EFFORT,
-    help: 'The default effort level for models that have no saved level.'
-  },
-  { key: 'outputStyle', group: 'model', name: 'Output style', type: 'text', help: 'The output style, by name.' },
-  { key: 'theme', group: 'model', name: 'Theme', type: 'text', help: 'The color theme of the interface.' },
-  {
-    key: 'permissions.defaultMode',
-    path: ['permissions', 'defaultMode'],
-    group: 'perm',
-    name: 'Start mode',
-    type: 'select',
-    options: MODES,
-    help: 'The permission mode that new sessions start in.'
-  },
-  {
-    key: 'skipDangerousModePermissionPrompt',
-    group: 'perm',
-    name: 'Skip the dangerous-mode prompt',
-    type: 'switch',
-    help: 'Skip the confirm dialog before a session enters <code>bypassPermissions</code> mode.'
-  }
-]
-
-const ELSEWHERE = [
-  ['enabledPlugins', 'plugins', 'Plugins'],
-  ['skillOverrides', 'skills', 'Skills'],
-  ['hooks', 'hooks', 'Hooks']
-]
-
-const SET_ORDER = ['sg', 'sp', 'sl']
-
 const SET_WHERE = { sg: 'every project', sp: 'this folder · in git', sl: 'this folder · only you' }
 
 const SET_ABOUT = {
@@ -3142,29 +2270,6 @@ function addButton(name, label) {
   const open = cfg[name].open
   const id = name === 'hook' ? 'hf' : 'mf'
   return `<button type="button" class="btn${open ? '' : ' p'}" id="${id}-open" data-c="${id}-open" aria-expanded="${open}" aria-controls="${name}-form">${open ? 'Close form' : label}</button>`
-}
-
-function hookLabel(h) {
-  const command = String(h.command ?? '').trim()
-  if (!command) return h.type === 'prompt' ? 'Prompt hook' : h.type === 'agent' ? 'Agent hook' : '(no command)'
-  const scripts = command.match(SCRIPT_RE)
-  if (scripts) return baseName(scripts[scripts.length - 1])
-  const tokens = command.match(/'[^']*'|"[^"]*"|\S+/g) ?? []
-  const first = unquote(tokens[0] ?? '')
-  const flag = tokens[1]
-  if (INLINE[first] && (flag === '-e' || flag === '-c')) return `Inline ${INLINE[first]} script`
-  if (SHELLS.has(first) && flag === '-c') return 'Inline shell script'
-  if (SHELL_WORDS.has(first) || /^[A-Z_]+=/.test(first)) return 'Inline shell script'
-  return baseName(first) || command
-}
-
-function hookRunsFor(h) {
-  const m = String(h.matcher ?? '').trim()
-  const any = !m || m === '*' || m === '.*'
-  const names = m.split('|').join(', ')
-  if (TOOL_EVENTS.has(h.event)) return any ? 'All tools' : `Tools: ${names}`
-  if (h.event === 'SessionStart') return any ? 'Every start' : `On: ${names}`
-  return any ? '' : `Matcher: ${m}`
 }
 
 function hookSource(h) {
@@ -3281,10 +2386,6 @@ function submitHook() {
   })
 }
 
-function mcpTransport(m) {
-  return m.transport === 'stdio' ? 'Local · stdio' : `Remote · ${m.transport}`
-}
-
 function mcpRowHtml(m, counts) {
   const label = `MCP server ${m.name}`
   const target = m.command ?? m.url ?? ''
@@ -3375,18 +2476,6 @@ function mcpFormHtml() {
     <div class="form-actions"><button type="submit" class="btn p" id="mf-save">Save server</button><button type="button" class="btn" id="mf-cancel" data-c="mf-cancel">Cancel</button></div>
     <p class="form-err" id="mf-err" role="alert">${esc(f.error)}</p>
   </form>`
-}
-
-function parseEnv(text) {
-  const env = {}
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim()
-    if (!line) continue
-    const m = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line)
-    if (!m) return { error: `"${line}" is not KEY=VALUE.` }
-    env[m[1]] = m[2]
-  }
-  return { env }
 }
 
 function submitMcp() {
@@ -3480,138 +2569,6 @@ function jsonBodyHtml(item) {
     </div>`
 }
 
-function cfgPanels() {
-  const inv = state.inventory
-  const s = inv.settings ?? {}
-  const m = inv.claudeMd ?? {}
-  return {
-    sg: { info: s.global, label: 'Global', file: '~/.claude/settings.json' },
-    sp: { info: s.project, label: 'Project', file: '.claude/settings.json', create: 'projectSettings', del: true },
-    sl: {
-      info: s.projectLocal,
-      label: 'Project local',
-      file: '.claude/settings.local.json',
-      create: 'projectSettingsLocal',
-      del: true,
-      pill: 'git-ignored'
-    },
-    mg: { info: m.global, label: 'Global', file: '~/.claude/CLAUDE.md', create: 'globalClaudemd', md: true, del: true },
-    mp: { info: m.project, label: 'Project', file: './CLAUDE.md', create: 'claudemd', md: true, del: true },
-    ml: {
-      info: m.projectLocal,
-      label: 'Project local',
-      file: './CLAUDE.local.md',
-      create: 'claudemdLocal',
-      md: true,
-      del: true,
-      pill: 'git-ignored'
-    },
-    mc: {
-      info: m.projectClaudeDir,
-      label: 'Project .claude folder',
-      file: './.claude/CLAUDE.md',
-      create: 'claudemdClaudeDir',
-      md: true,
-      del: true
-    }
-  }
-}
-
-function edDirty(ed) {
-  return Boolean(ed && ed.status === 'ready' && ed.text !== ed.loaded)
-}
-
-function setData(k) {
-  const d = cfgPanels()[k]?.info?.data
-  return isPlain(d) ? d : {}
-}
-
-function fieldPath(f) {
-  return f.path ?? [f.key]
-}
-
-function fieldGet(data, f) {
-  let v = data
-  for (const part of fieldPath(f)) v = isPlain(v) ? v[part] : undefined
-  return v
-}
-
-function fieldSet(data, f, value) {
-  const path = fieldPath(f)
-  let parent = data
-  for (const part of path.slice(0, -1)) {
-    if (parent[part] === undefined) {
-      if (value === '') return
-      parent[part] = {}
-    }
-    parent = parent[part]
-  }
-  const last = path.at(-1)
-  if (value === '') delete parent[last]
-  else parent[last] = value
-}
-
-function sformBase(k) {
-  const data = setData(k)
-  const text = (v) => (v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v))
-  return Object.fromEntries(
-    FORM_FIELDS.map((f) => [f.key, f.type === 'switch' ? fieldGet(data, f) === true : text(fieldGet(data, f))])
-  )
-}
-
-function lockedKeys(k) {
-  const data = setData(k)
-  return FORM_FIELDS.filter((f) => {
-    const parent = f.path ? data[f.path[0]] : data
-    if (parent !== undefined && !isPlain(parent)) return true
-    const v = fieldGet(data, f)
-    return v !== undefined && typeof v !== (f.type === 'switch' ? 'boolean' : 'string')
-  }).map((f) => f.key)
-}
-
-function lockedText(value) {
-  if (Array.isArray(value)) return `list of ${value.length}`
-  if (isPlain(value)) return `object with ${Object.keys(value).length} keys`
-  return `${typeof value} ${JSON.stringify(value)}`
-}
-
-function formValue(value) {
-  return typeof value === 'string' ? value.trim() : value
-}
-
-function sformValues(k) {
-  return cfg.sforms[k] ? cfg.sforms[k].values : sformBase(k)
-}
-
-function sformDirtyKeys(k) {
-  const form = cfg.sforms[k]
-  if (!form) return []
-  const locked = lockedKeys(k)
-  return FORM_FIELDS.map((f) => f.key).filter(
-    (key) => !locked.includes(key) && formValue(form.values[key]) !== formValue(form.base[key])
-  )
-}
-
-function sformEdit(k, key, value) {
-  if (!cfg.sforms[k]) {
-    const base = sformBase(k)
-    cfg.sforms[k] = { base, values: { ...base } }
-  }
-  cfg.sforms[k].values[key] = value
-}
-
-function setDirty(k) {
-  return sformDirtyKeys(k).length > 0 || edDirty(eds[k])
-}
-
-function cfgDirty() {
-  return SET_ORDER.some((k) => sformDirtyKeys(k).length > 0) || Object.values(eds).some(edDirty)
-}
-
-function markStale() {
-  for (const ed of Object.values(eds)) if (!edDirty(ed)) ed.stale = true
-}
-
 function ensureEd(k, file) {
   let ed = eds[k]
   if (ed && ed.path !== file) {
@@ -3655,14 +2612,6 @@ function ensureEd(k, file) {
       ed.error = err.message
       if (isCfgPage()) render()
     })
-}
-
-function isCfgPage() {
-  return state.page === 'settings' || state.page === 'claudemd'
-}
-
-function dropMissing(k) {
-  if (!edDirty(eds[k])) delete eds[k]
 }
 
 function msgHtml(k) {
@@ -3729,13 +2678,6 @@ function sformChrome(k) {
   for (const f of FORM_FIELDS) $(`sf-${f.key}`)?.closest('.srow')?.classList.toggle('changed', dirty.includes(f.key))
 }
 
-function shortValue(value) {
-  if (Array.isArray(value)) return `list of ${value.length}`
-  if (isPlain(value)) return plural(Object.keys(value).length, 'key')
-  const text = JSON.stringify(value)
-  return text.length > 60 ? `${text.slice(0, 57)}…` : text
-}
-
 function fieldHtml(k, f, v, data, locked, changed) {
   const id = `sf-${f.key}`
   const name = `${esc(f.name)} <span class="key">${esc(f.key)}</span>`
@@ -3773,14 +2715,6 @@ function rulesHtml(data) {
     return `<div><h4>${label} <b>${list.length}</b></h4>${items}</div>`
   }
   return `<div class="sgroup"><h3>Permission rules <span class="hint">Read-only here · edit in Raw JSON</span></h3><div class="rules">${col('allow', 'Allow')}${col('ask', 'Ask')}${col('deny', 'Deny')}</div></div>`
-}
-
-function elsewhereText(key, value) {
-  const values = isPlain(value) ? Object.values(value) : []
-  if (key === 'enabledPlugins')
-    return `${plural(values.length, 'plugin')} · ${values.filter((x) => x === false).length} off`
-  if (key === 'skillOverrides') return `${plural(values.filter((x) => x === 'off').length, 'skill')} off`
-  return plural(values.length, 'event')
 }
 
 function elsewhereHtml(data) {
@@ -3961,30 +2895,6 @@ function renderSettings() {
     </div>`
 }
 
-const SCOPE_KEY = { global: 'sg', project: 'sp', projectLocal: 'sl' }
-
-const SCOPE_TAG = { global: ['global', 'global'], project: ['project', 'project'], projectLocal: ['local', 'local'] }
-
-const EFF_GROUPS = [
-  ['model', 'Model and output', ''],
-  ['rules', 'Permissions', 'Lists add up from all files. An allow rule does not outrank a deny or ask rule.'],
-  ['env', 'Environment', 'Per variable, the higher file wins. Values that look like secrets are masked.'],
-  [
-    'plugins',
-    'Plugins and skills',
-    'The Claude Code docs do not say how these merge. Storehouse shows the higher file for each key.'
-  ],
-  ['other', 'Other', '']
-]
-
-function effRows() {
-  return state.inventory.settings?.effective?.rows ?? []
-}
-
-function effRow(key) {
-  return effRows().find((r) => r.key === key)
-}
-
 function effTag(scope) {
   const [label, cls] = SCOPE_TAG[scope] ?? [scope, '']
   const k = SCOPE_KEY[scope]
@@ -4094,16 +3004,12 @@ async function pickSet(k) {
   return true
 }
 
-const MD_ORDER = ['mg', 'mp', 'mc', 'ml']
-
 const MD_WHERE = {
   mg: 'every project',
   mp: 'this folder · in git',
   mc: 'this folder · in git',
   ml: 'this folder · only you'
 }
-
-const cmd = { sel: null }
 
 function mdKeys() {
   return projectOn() ? MD_ORDER : ['mg']
@@ -4203,10 +3109,6 @@ function renderClaudeMd() {
       </nav>
       ${mdPanelHtml(sel, panels[sel])}
     </div>`
-}
-
-function mdDirtyKey() {
-  return MD_ORDER.find((k) => edDirty(eds[k])) ?? null
 }
 
 async function discardMd(k) {
