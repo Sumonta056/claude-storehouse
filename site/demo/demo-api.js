@@ -2,6 +2,8 @@
   const realFetch = window.fetch.bind(window)
   const NOT_IN_DEMO = 'not available in the live demo. Run npx claude-storehouse to use it on your own setup'
   let db = null
+  let effectiveSettings = null
+  import('./effective.js').then((m) => (effectiveSettings = m.effectiveSettings))
   const ready = realFetch('demo-data.json')
     .then((res) => res.json())
     .then((data) => {
@@ -241,7 +243,11 @@
     if (settings) {
       try {
         settings.data = JSON.parse(content)
+        settings.ok = true
       } catch {}
+      const inv = db.inventory.settings
+      if (effectiveSettings)
+        inv.effective = effectiveSettings([inv.global, inv.project, inv.projectLocal].filter(Boolean))
     }
     const memory = Object.values(db.inventory.claudeMd).find((m) => m.path === file)
     if (memory) memory.size = content.length

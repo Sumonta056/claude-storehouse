@@ -37,7 +37,12 @@ async function record() {
   execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'demo-home.js'), tmp], { stdio: 'ignore' })
   const home = path.join(tmp, 'home')
   const token = crypto.randomBytes(16).toString('hex')
-  const server = await startServer({ home, projectDir: path.join(home, 'acme-api'), token })
+  const server = await startServer({
+    home,
+    projectDir: path.join(home, 'acme-api'),
+    token,
+    managedDir: path.join(tmp, 'managed')
+  })
   const get = async (route) => {
     const res = await fetch(`http://127.0.0.1:${server.port}${route}`, { headers: { 'x-storehouse-token': token } })
     return res.ok ? res.json() : null
@@ -66,6 +71,7 @@ async function record() {
 function buildDemo(dir, data) {
   copyDir(path.join(ROOT, 'public'), dir)
   copyDir(path.join(ROOT, 'site', 'demo'), dir)
+  fs.copyFileSync(path.join(ROOT, 'src', 'scan', 'effective.js'), path.join(dir, 'effective.js'))
   fs.writeFileSync(path.join(dir, 'demo-data.json'), data)
   const page = path.join(dir, 'index.html')
   const html = fs

@@ -152,6 +152,7 @@
             <li>Open <b>CLAUDE.md</b>, edit it, and press <kbd>⌘S</kbd></li>
             <li>Press <kbd>/</kbd> and type <b>review</b></li>
             <li>Switch the <b>toolkit</b> plugin off and look at its skills</li>
+            <li>Open <b>Settings</b>, then <b>Effective</b>: <b>model</b> comes from the local file</li>
           </ul>
           <div class="demo-bar">
             <div class="demo-tabs" role="tablist" aria-label="Demo page">
@@ -164,6 +165,7 @@
               <button role="tab" aria-selected="false" data-page="plugins">Plugins</button>
               <button role="tab" aria-selected="false" data-page="hooks">Hooks</button>
               <button role="tab" aria-selected="false" data-page="mcp">MCP</button>
+              <button role="tab" aria-selected="false" data-page="settings">Settings</button>
             </div>
             <span class="spacer"></span>
             <button class="btn ghost sm" id="demoReset" type="button">Reset demo</button>
@@ -428,6 +430,32 @@
             />
           </figure>
         </div>
+        <div class="wrap feature flip">
+          <div class="txt">
+            <h3>Settings, and which file wins</h3>
+            <p>
+              Three files can set one key. The Settings page shows one file at a time, and the Effective view shows the
+              value Claude Code uses in this folder.
+            </p>
+            <ul>
+              <li>One form for the global, project, and local file, with plain names and help</li>
+              <li>Effective view: the value that wins, its file, and the values it overrides</li>
+              <li>Lists such as <code>permissions.allow</code> add up from all files</li>
+              <li>Env values that look like secrets are masked</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="settings">See which file wins in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/settings-effective.png"
+              alt="Settings page, Effective view: a table of keys with the value Claude Code uses, the file it comes from, and crossed-out values from lower files"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
       </section>
 
       <section id="switches" class="envs wrap" aria-labelledby="sw-h">
@@ -610,6 +638,10 @@ claude-storehouse</code></pre>
                   <td>
                     Reads only. It never writes a file or runs a command, and it shows env key names, never values.
                   </td>
+                </tr>
+                <tr>
+                  <td>Env</td>
+                  <td>The Effective view masks env values that look like secrets before they leave the server.</td>
                 </tr>
                 <tr>
                   <td>Allow-list</td>

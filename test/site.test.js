@@ -32,6 +32,14 @@ test('site build makes the landing page and a live demo from the current public/
   assert.ok(!raw.includes(os.tmpdir()), 'demo data leaks a temp path')
   const data = JSON.parse(raw)
   assert.equal(data.home, '/Users/demo')
+  assert.equal(
+    fs.readFileSync(path.join(out, 'demo', 'effective.js'), 'utf8'),
+    fs.readFileSync(path.join(root, 'src', 'scan', 'effective.js'), 'utf8')
+  )
+  assert.equal(data.inventory.settings.managed, false)
+  const model = data.inventory.settings.effective.rows.find((r) => r.key === 'model')
+  assert.equal(model.from, 'projectLocal')
+  assert.deepEqual(model.overridden, [{ file: 'global', value: 'sonnet' }])
   assert.ok(data.inventory.skills.length > 0)
   assert.ok(data.usage.all.cost > 0)
   assert.deepEqual(data.doctor.issues.map((i) => `${i.check}:${i.name}`).sort(), [

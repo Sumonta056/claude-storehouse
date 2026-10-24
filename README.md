@@ -98,6 +98,18 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 ![Doctor page with Errors, Warnings, and Info filter chips and warning rows, each with an Open button](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/doctor.png)
 
+### Settings, and which file wins
+
+- The Settings page shows one file at a time: global `~/.claude/settings.json`, project `.claude/settings.json`, and local `.claude/settings.local.json`. The higher number wins.
+- One form for all three files, with a plain name, one line of help, and the JSON key for each field. Raw JSON is one tab away.
+- The Effective view shows the value Claude Code uses for each key, the file it comes from, and the values it overrides.
+- Lists such as `permissions.allow` add up from all files. `auto` and `bypassPermissions` start modes in a project file are marked ignored.
+- Env values that look like secrets are masked.
+
+![Settings page, Files view: a numbered list of the three settings files and a form with model, effort, and permission fields](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/settings.png)
+
+![Settings page, Effective view: a table of keys with the value Claude Code uses, the file it comes from, and crossed-out values from lower files](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/settings-effective.png)
+
 ### See context cost
 
 - The Context page estimates the tokens that each item adds to every session before you type a word.
@@ -203,17 +215,18 @@ Global switches write `~/.claude/settings.json`. Project switches write `./.clau
 
 ## Safety and privacy
 
-| Topic         | Rule                                                                                                           |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| Backups       | Before any write, the old file is copied to `~/.claude/backups/storehouse/`. The last 20 per file are kept.    |
-| Atomic writes | Each write goes to a temp file, then a rename. A file that does not parse is never touched.                    |
-| Delete        | Moves the item to `~/.claude/backups/storehouse/trash/`. Restore it from the Backups panel.                    |
-| Local only    | The server listens on `127.0.0.1` and rejects a foreign `Host` header.                                         |
-| Token         | Every API call needs the random token from the start URL. Without it the server returns 401.                   |
-| Allow-list    | Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only. |
-| Session files | The usage band reads only token counts. It never keeps or returns message text.                                |
-| Doctor        | Reads only. It never writes a file or runs a command, and it returns env key names, never values.              |
-| Dependencies  | The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.            |
+| Topic          | Rule                                                                                                           |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| Backups        | Before any write, the old file is copied to `~/.claude/backups/storehouse/`. The last 20 per file are kept.    |
+| Atomic writes  | Each write goes to a temp file, then a rename. A file that does not parse is never touched.                    |
+| Delete         | Moves the item to `~/.claude/backups/storehouse/trash/`. Restore it from the Backups panel.                    |
+| Local only     | The server listens on `127.0.0.1` and rejects a foreign `Host` header.                                         |
+| Token          | Every API call needs the random token from the start URL. Without it the server returns 401.                   |
+| Allow-list     | Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only. |
+| Session files  | The usage band reads only token counts. It never keeps or returns message text.                                |
+| Doctor         | Reads only. It never writes a file or runs a command, and it returns env key names, never values.              |
+| Effective view | Reads only. Env values that look like secrets are masked before they leave the server.                         |
+| Dependencies   | The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.            |
 
 ## How it works
 

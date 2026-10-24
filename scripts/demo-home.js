@@ -93,6 +93,10 @@ for (const [id, def] of Object.entries(plugins)) {
 write(path.join(claude, 'plugins', 'installed_plugins.json'), installed)
 
 write(path.join(claude, 'settings.json'), {
+  model: 'sonnet',
+  effortLevel: 'high',
+  permissions: { allow: ['Bash(git status)', 'WebSearch'], defaultMode: 'acceptEdits' },
+  env: { LOG_LEVEL: 'info', DEBUG: '0' },
   enabledPlugins: {
     'toolkit@demo-market': true,
     'docs-kit@demo-market': true,
@@ -133,6 +137,7 @@ skill(path.join(project, '.claude', 'skills'), 'seed-data', 'Load demo data into
 agent(path.join(project, '.claude', 'agents'), 'repo-guide', 'Answer questions about this repo layout.')
 agent(path.join(project, '.claude', 'agents'), 'code-reviewer', 'Review acme-api diffs against the team checklist.')
 write(path.join(project, '.claude', 'settings.json'), { permissions: { allow: ['Bash(npm test:*)'] } })
+write(path.join(project, '.claude', 'settings.local.json'), { model: 'opus', env: { DEBUG: '1' } })
 write(path.join(project, 'CLAUDE.md'), '# acme-api\n\nRun `npm test` before you push.\n')
 write(
   path.join(project, '.claude', 'rules', 'api-style.md'),
