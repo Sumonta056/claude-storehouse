@@ -4,6 +4,7 @@ const PAGES = {
   dash: 'Dashboard',
   fav: 'Favorites',
   dups: 'Duplicates',
+  doctor: 'Doctor',
   context: 'Context',
   skills: 'Skills',
   agents: 'Agents',
@@ -70,6 +71,7 @@ const items = new Map()
 let projectFiles = null
 let usage = null
 let usageError = ''
+let doctor = null
 const PERIOD_KEY = 'storehouse.usagePeriod'
 let usagePeriod = readPeriod()
 let bannerDismissed = false
@@ -856,6 +858,9 @@ const ICON = {
   bin: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   lock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   warn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5"/><path d="M12 18h.01"/></svg>',
+  error:
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>',
+  info: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>',
   dots: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   copy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   chev: '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>'
@@ -887,6 +892,12 @@ const CHIPS = {
   dups: [
     ['all', 'All'],
     ['needs', 'Needs action']
+  ],
+  doctor: [
+    ['all', 'All'],
+    ['error', 'Errors'],
+    ['warning', 'Warnings'],
+    ['info', 'Info']
   ],
   plugins: [
     ['all', 'All'],
@@ -949,6 +960,7 @@ const SECTIONS = {
 const chipFilter = {
   context: 'all',
   dups: 'all',
+  doctor: 'all',
   plugins: 'all',
   mods: 'all',
   skills: 'all',
@@ -1126,6 +1138,10 @@ function keepChip(page, item) {
 
 function chipCounts(page, list) {
   if (page === 'dups') return { all: list.length, needs: list.filter(needsAction).length }
+  if (page === 'doctor')
+    return Object.fromEntries(
+      CHIPS.doctor.map(([k]) => [k, k === 'all' ? list.length : list.filter((i) => i.severity === k).length])
+    )
   if (page === 'context')
     return Object.fromEntries(CHIPS.context.map(([k]) => [k, list.filter((e) => keepCtx(e, k)).length]))
   const shown = list.filter(visible)
@@ -1161,7 +1177,7 @@ function chipsHtml(page, list, note) {
   const buttons = CHIPS[page]
     .map(([k, label]) => {
       const on = chipFilter[page] === k
-      const bad = k === 'broken' && n.broken ? ' bad' : ''
+      const bad = (k === 'broken' || k === 'error') && n[k] ? ' bad' : ''
       return `<button type="button" class="chip${bad}" id="chip-${page}-${k}" data-chip="${k}" aria-pressed="${on ? 'true' : 'false'}">${esc(label)} <span class="n">${n[k]}</span></button>`
     })
     .join('')
@@ -1275,6 +1291,121 @@ async function keepOnly(item) {
   for (const key of keys) {
     const other = items.get(key)
     if (other?.enabled) await toggle(other)
+  }
+}
+
+const DOC_SEVERITY = [
+  ['error', 'Errors', 'Claude Code cannot read these files.'],
+  ['warning', 'Warnings', 'These items do not work as the file says.'],
+  ['info', 'Info', 'These items work, but can be better.']
+]
+const DOC_KIND = {
+  file: 'Config file',
+  hook: 'Hook',
+  mcp: 'MCP server',
+  plugin: 'Plugin',
+  skill: 'Skill',
+  agent: 'Agent',
+  claudemd: 'CLAUDE.md'
+}
+
+function doctorIssues() {
+  return doctor?.issues ?? []
+}
+
+function doctorItem(target) {
+  if (!target?.kind) return null
+  if (target.kind === 'hook') return catalog.hook.find((h) => h.id === target.id) ?? null
+  if (target.kind === 'mcp') return items.get(`mcp:${target.origin}:${target.plugin ?? ''}:${target.name}`) ?? null
+  return (
+    (catalog[target.kind] ?? []).find(
+      (i) => i.name === target.name && i.scope === target.scope && (i.plugin ?? null) === (target.plugin ?? null)
+    ) ?? null
+  )
+}
+
+function doctorMatches(issue) {
+  const q = state.query.trim().toLowerCase()
+  if (!q) return true
+  return [issue.name, issue.message, issue.file].some((v) =>
+    String(v ?? '')
+      .toLowerCase()
+      .includes(q)
+  )
+}
+
+function doctorButton(issue) {
+  if (issue.target?.page)
+    return `<button type="button" class="btn" data-go="${esc(issue.target.page)}">Open ${esc(PAGES[issue.target.page])}</button>`
+  if (doctorItem(issue.target)) return '<button type="button" class="btn" data-doc-act="item">Open item</button>'
+  if (issue.file) return '<button type="button" class="btn" data-doc-act="file">Open file</button>'
+  return ''
+}
+
+function doctorRowHtml(issue) {
+  const where = [DOC_KIND[issue.kind] ?? issue.kind, issue.file ? tilde(issue.file) : ''].filter(Boolean).join(' · ')
+  const label = DOC_SEVERITY.find(([k]) => k === issue.severity)?.[1] ?? issue.severity
+  return `<li class="lrow drow" data-doc="${esc(issue.id)}">
+    <div class="lead"><span class="lead-ic sev-${esc(issue.severity)}" role="img" aria-label="${esc(label)}">${ICON[issue.severity === 'warning' ? 'warn' : issue.severity]}</span></div>
+    <div class="body">
+      <div class="l1"><span class="name">${esc(issue.name)}</span><span class="src">${esc(where)}</span></div>
+      <p class="desc">${esc(issue.message)}</p>
+    </div>
+    <div class="tail">${doctorButton(issue)}</div>
+  </li>`
+}
+
+function renderDoctor() {
+  const note = `Doctor reads your config and finds files and items that are broken or that do not do what they say. It never changes a file. <button type="button" class="btn" id="doc-again">Check again</button>`
+  if (doctor?.error) {
+    $('p-doctor').innerHTML = empty(`Doctor could not run: ${doctor.error}`)
+    return
+  }
+  const all = doctorIssues().filter(doctorMatches)
+  const f = chipFilter.doctor
+  const groups = DOC_SEVERITY.filter(([k]) => f === 'all' || f === k)
+    .map(([k, title, hint]) => [k, title, hint, all.filter((i) => i.severity === k)])
+    .filter(([, , , list]) => list.length)
+  let body
+  if (groups.length)
+    body = groups
+      .map(
+        ([k, title, hint, list]) =>
+          `<h2>${esc(title)} <span class="pill">${list.length}</span><span class="hint">${esc(hint)}</span></h2><ul class="rows" data-rows="doctor-${k}">${list.map(doctorRowHtml).join('')}</ul>`
+      )
+      .join('')
+  else if (!doctorIssues().length)
+    body = empty(`No issues found. Doctor checked ${plural(doctor?.checked ?? 0, 'file')}.`)
+  else if (all.length) body = empty('No issues of this type.')
+  else body = nothingMatches()
+  $('p-doctor').innerHTML = chipsHtml('doctor', all, note) + body
+}
+
+function onDoctor(row, e) {
+  const issue = doctorIssues().find((i) => i.id === row.dataset.doc)
+  const act = e.target.closest('[data-doc-act]')?.dataset.docAct
+  if (!issue || !act) return
+  if (act === 'item') {
+    const item = doctorItem(issue.target)
+    if (item) openDrawer(item)
+    return
+  }
+  guarded(`doc-open-${issue.id}`, async () => {
+    try {
+      await send('POST', '/api/open', { path: issue.file, app: 'editor' })
+      toast(`Opened ${tilde(issue.file)}`)
+    } catch (err) {
+      toast(`Could not open: ${err.message}`, true)
+    }
+  })
+}
+
+async function checkAgain() {
+  try {
+    await refresh()
+    toast(`Doctor checked ${plural(doctor?.checked ?? 0, 'file')}`)
+  } catch (err) {
+    toast(`Could not check again: ${err.message}`, true)
   }
 }
 
@@ -1596,6 +1727,12 @@ function renderNav() {
   $('n-hooks').textContent = otherCounts(inv.hooks).total
   $('n-mcp').textContent = otherCounts(inv.mcp).total
   $('n-dups').textContent = duplicateGroups().filter(needsAction).length
+  const docIssues = doctorIssues()
+  $('n-doctor').textContent = docIssues.filter((i) => i.severity !== 'info').length
+  $('n-doctor').classList.toggle(
+    'bad',
+    docIssues.some((i) => i.severity === 'error')
+  )
   $('n-context').textContent = compact(sumTokens(contextItems().filter(visible)))
   $('n-fav').textContent = favoriteEntries().filter((e) => !e.item || visible(e.item)).length
   for (const b of document.querySelectorAll('#nav button')) {
@@ -1678,6 +1815,7 @@ function renderPage() {
   if (page === 'dash') renderDash()
   else if (page === 'fav') renderFav()
   else if (page === 'dups') renderDups()
+  else if (page === 'doctor') renderDoctor()
   else if (page === 'context') renderContext()
   else if (page === 'skills')
     renderCatalog(
@@ -1763,8 +1901,12 @@ async function loadProjectFiles() {
 }
 
 export async function refresh() {
-  const inv = await get('/api/inventory')
+  const [inv, doc] = await Promise.all([
+    get('/api/inventory'),
+    get('/api/doctor').catch((err) => ({ error: err.message }))
+  ])
   state.inventory = inv
+  doctor = doc
   catalog = normalize(inv)
   markStale()
   render()
@@ -4485,6 +4627,9 @@ function wire() {
       groupOpen.set(grp.dataset.group, grp.getAttribute('aria-expanded') !== 'true')
       return render()
     }
+    if (e.target.closest('#doc-again')) return void checkAgain()
+    const docRow = e.target.closest('[data-doc]')
+    if (docRow) return void onDoctor(docRow, e)
     const act = e.target.closest('[data-act]')
     const key = cardKey(e.target)
     if (!key) return
