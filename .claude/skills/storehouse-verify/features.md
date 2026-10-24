@@ -74,3 +74,5 @@ D14 | Activity | open #activity | every action of this test shows; Undo on a swi
 D15 | Toast and banner | any write | toast shows; banner Dismiss hides it and it stays hidden for the session
 D16 | Console | whole session | no errors or warnings in the console
 D17 | Font size | any page | all visible functional text is 14 px or larger
+D18 | Command palette | press ⌘P / Ctrl+P, type "debu", press ⌘↵, then ⇧↵, then Esc | palette opens with focus in it; global `debugging` first; `skillOverrides` on disk changes; Favorites count changes; Esc returns focus
+D19 | Palette shortcut | palette footer Change, press ⌘⇧K, reload, press ⌘⇧K; then Reset | header button shows ⌘⇧K; ⌘P no longer opens it; Reset brings back ⌘P

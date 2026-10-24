@@ -29,7 +29,7 @@ Key rules:
 
 - Skill `storehouse-config-safety`: switch table, write procedure, path allow-list, test rule. Load for any `src/write` or `src/scan` task.
 - Skill `storehouse-ui-structure`: where new code in `public/` goes (layer table), recipes for a page, stylesheet, or shared state, and the test recipe per layer. Load for any `public/` task.
-- Skill `storehouse-verify`: test command, demo home recipe, 10-point Chrome check, the 59-feature checklist, the comparison with `main` for refactors, and the report. Load before you claim a task is done.
+- Skill `storehouse-verify`: test command, demo home recipe, 10-point Chrome check, the 61-feature checklist, the comparison with `main` for refactors, and the report. Load before you claim a task is done.
 - Skill `storehouse-release`: release to GitHub and npm, and the npm page. Load for any release task.
 - Skill `storehouse-website`: website, live demo, screenshots, and README. Load after any user-visible change and for any README or site task.
 - Agent `toggle-reviewer`: read-only reviewer for toggle and scanner code. Run after each `src/write` task.

@@ -193,13 +193,19 @@ claude-storehouse
 
 ## Keyboard shortcuts
 
-| Key                  | Action                        |
-| -------------------- | ----------------------------- |
-| `/`                  | Search names and descriptions |
-| `⌘S` / `Ctrl+S`      | Save the open file            |
-| `⌘B`, `⌘I`           | Bold and italic in the editor |
-| `Esc`                | Close the drawer or a dialog  |
-| `↑` `↓` `Home` `End` | Move between items in a list  |
+| Key                  | Action                                                         |
+| -------------------- | -------------------------------------------------------------- |
+| `⌘P` / `Ctrl+P`      | Open the command palette. Change the key in its footer         |
+| `↵` in the palette   | Open the item in the drawer, go to the page, or run the action |
+| `⌘↵` / `Ctrl+↵`      | Switch the selected item on or off in the palette              |
+| `⇧↵`                 | Star or unstar the selected item in the palette                |
+| `/`                  | Search names and descriptions                                  |
+| `⌘S` / `Ctrl+S`      | Save the open file                                             |
+| `⌘B`, `⌘I`           | Bold and italic in the editor                                  |
+| `Esc`                | Close the drawer, the palette, or a dialog                     |
+| `↑` `↓` `Home` `End` | Move between items in a list                                   |
+
+The **Commands** button at the top of each page shows the palette key. To set your own key, open the palette, select **Change**, and press the new key with `⌘`, `Ctrl`, or `Alt`. The browser keeps it. **Reset** restores `⌘P`.
 
 ## How on/off works
 
