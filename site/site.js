@@ -11,10 +11,12 @@
     skills: 'Skills',
     agents: 'Agents',
     plugins: 'Plugins',
+    mods: 'Mods',
     hooks: 'Hooks',
     mcp: 'MCP servers',
     settings: 'Settings',
-    claudemd: 'CLAUDE.md'
+    claudemd: 'CLAUDE.md',
+    activity: 'Activity'
   }
 
   const frame = $('#demoFrame')

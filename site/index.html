@@ -147,7 +147,7 @@
             only this page. Reload to start again. Things to try:
           </p>
           <ul class="tries">
-            <li>Switch <b>api-design</b> off on Skills, then undo it in <b>Activity</b></li>
+            <li>Switch <b>api-design</b> off on Skills, then undo it on the <b>Activity</b> page</li>
             <li>Drag a favorite into the <b>Review</b> category</li>
             <li>Open <b>CLAUDE.md</b>, edit it, and press <kbd>⌘S</kbd></li>
             <li>Press <kbd>/</kbd> and type <b>review</b></li>
@@ -162,10 +162,14 @@
               <button role="tab" aria-selected="false" data-page="doctor">Doctor</button>
               <button role="tab" aria-selected="false" data-page="context">Context</button>
               <button role="tab" aria-selected="false" data-page="skills">Skills</button>
+              <button role="tab" aria-selected="false" data-page="agents">Agents</button>
               <button role="tab" aria-selected="false" data-page="plugins">Plugins</button>
+              <button role="tab" aria-selected="false" data-page="mods">Mods</button>
               <button role="tab" aria-selected="false" data-page="hooks">Hooks</button>
               <button role="tab" aria-selected="false" data-page="mcp">MCP</button>
               <button role="tab" aria-selected="false" data-page="settings">Settings</button>
+              <button role="tab" aria-selected="false" data-page="claudemd">CLAUDE.md</button>
+              <button role="tab" aria-selected="false" data-page="activity">Activity</button>
             </div>
             <span class="spacer"></span>
             <button class="btn ghost sm" id="demoReset" type="button">Reset demo</button>
@@ -332,10 +336,11 @@
             <h3>Edit in place, undo anything</h3>
             <p>
               Open any file you own in the drawer: a skill, an agent, <code>settings.json</code>, or
-              <code>CLAUDE.md</code>. Edit it and save with <kbd>⌘S</kbd>.
+              <code>CLAUDE.md</code>. Edit it and save with <kbd>⌘S</kbd>. The CLAUDE.md page lists each
+              <code>CLAUDE.md</code> that Claude Code loads in this folder and creates a missing one.
             </p>
             <ul>
-              <li>Every switch, star, and save shows in Activity with Undo</li>
+              <li>Every switch, star, and save shows on the Activity page with Undo</li>
               <li>The latest save of each file can be restored</li>
               <li>Plugin cache files stay read-only</li>
               <li>A JSON file that does not parse is never written</li>
@@ -345,7 +350,7 @@
           <figure class="frame">
             <img
               src="screenshots/editor.png"
-              alt="A skill open in the drawer editor with Save, the file path, and the Activity log with undo buttons"
+              alt="A skill open in the drawer editor with its file path and the Save button"
               loading="lazy"
               width="2880"
               height="1800"
@@ -606,8 +611,16 @@ claude-storehouse</code></pre>
                   <td>Save the open file</td>
                 </tr>
                 <tr>
+                  <td><kbd>⌘B</kbd>, <kbd>⌘I</kbd></td>
+                  <td>Bold and italic in the editor</td>
+                </tr>
+                <tr>
                   <td><kbd>Esc</kbd></td>
                   <td>Close the drawer or a dialog</td>
+                </tr>
+                <tr>
+                  <td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd></td>
+                  <td>Move between items in a list</td>
                 </tr>
               </table>
             </div>
