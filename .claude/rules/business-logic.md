@@ -129,6 +129,34 @@ The Context page estimates the tokens that each item adds to every session. The 
 - "Keep only this" switches off the other items in the group that have their own switch. Plugin items stay on and the page names the plugin.
 - Similar names (shared words, not the same name) are out of scope. A word match gave about 170 false groups on a real setup.
 
+## Doctor
+
+The Doctor page lists config that is broken or that does not do what it says. `GET /api/doctor` returns `{ issues, checked }`. Each issue is `{ id, check, severity, kind, name, file, message, target }`. `checked` is the number of files Doctor looked at. Code: `src/scan/doctor.js`.
+
+Doctor never writes and never runs a command. Check 3 only looks for an executable file in each `PATH` folder.
+
+| #   | Severity | Check                                                                                                                          |
+| --- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Error    | A config file in `inventory.errors` has invalid JSON. The message is generic: a parse error can quote a secret.                |
+| 2   | Warning  | A hook that is on starts with a path that does not exist: `/…`, `~/…`, `$CLAUDE_PROJECT_DIR/…`, `${CLAUDE_PLUGIN_ROOT}/…`.     |
+| 3   | Warning  | The command of an MCP stdio server that is on is not an executable file on `PATH`, or at its absolute path.                    |
+| 4   | Warning  | An MCP server that is on uses `${VAR}`, and `VAR` is not in `process.env` or in settings `env`.                                |
+| 5   | Warning  | `enabledPlugins` names a plugin that is not in `installed_plugins.json`.                                                       |
+| 6   | Warning  | `skillOverrides` names a skill that does not exist.                                                                            |
+| 7   | Warning  | More than one skill, agent, or MCP server with one name is on. The row links to Duplicates.                                    |
+| 8   | Info     | A local or project skill or agent has no `description` in its frontmatter (`hasDescription: false`).                           |
+| 9   | Info     | A link in `skills/` or `agents/` is broken (`inventory.skipped`), or a local item's real path is outside home and the project. |
+| 10  | Info     | A CLAUDE.md file has more than 200 lines.                                                                                      |
+
+- Check 2 reads only the first word. The word stops at a space or a shell operator (`; & | < > ( )`). Quotes and `\ ` escapes are removed. A quoted `~` is not expanded. A first word that is not a path, such as `node`, is skipped.
+- Checks 2, 3, and 4 skip items that are off. `${VAR:-default}` counts as set. `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`, and `CLAUDE_PROJECT_DIR` count as set.
+- Check 5 skips the marketplaces `builtin` and `synced`. Claude Code does not list those plugins in `installed_plugins.json`.
+- Checks 8 and 9 skip plugin items. The user cannot edit plugin files.
+- `PATH` of the Storehouse process can differ from the `PATH` Claude Code uses. The row says "not found on the PATH of this terminal".
+- The browser loads `/api/doctor` with each inventory refresh, so it runs again after each write. "Check again" refreshes both.
+- The nav count is errors plus warnings. It is red when an error exists. The page ignores the scope filter and uses the search box.
+- The live demo serves a static snapshot from build time.
+
 ## Undo, delete, fork
 
 - Toggles and favorites undo with the inverse operation. Two toggles on one file undo independently.

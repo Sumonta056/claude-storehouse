@@ -33,6 +33,11 @@ A switch on a file that does not exist creates it with `{}` first. For `settings
 - Check the lexical path and the real path. A symlink target under the home folder is allowed.
 - Any other path returns 403.
 
+## Doctor
+
+- Doctor responses hold env key names, never values. `readMcpRaw` in `src/scan/mcp.js` returns the command and `${VAR}` names only. The inventory keeps the masked values.
+- Doctor reads files and never writes one or runs a command.
+
 ## Server security
 
 - Bind `127.0.0.1` only. Reject a foreign Host header.
