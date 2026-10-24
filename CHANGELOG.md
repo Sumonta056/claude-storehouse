@@ -6,6 +6,55 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-24
+
+This release helps you see what your Claude Code setup costs and what it really uses. New pages show the tokens each item adds to every session, find config that is broken, and show the settings value that wins in this folder. Skills, agents, and MCP servers now show how often Claude used them in the last 30 days.
+
+### Added
+
+**Use per item**
+
+- Skills, agents, and MCP servers show "Used N× in 30 d" and the time of the last use. The counts come from the tool calls in your session files.
+- An "Unused 30 d" filter and a sort by use: Most used, Least used, or Name.
+- A banner lists the items with no use in 30 days and the tokens they add to every session. "Switch off N" switches them off after a confirm dialog. Each switch gets its own Activity entry with Undo.
+- An item is marked unused only when your session files cover 30 days and the item file is older than 30 days. Skills with `disable-model-invocation: true` are never marked, because Claude cannot call them.
+
+**Context page**
+
+- Estimates the tokens that each CLAUDE.md file, rule file, skill, agent, and MCP server adds to every session, with a bar by type and filter chips.
+- The Off chip shows what each switched-off item saves. Rule files with `paths:` show their cost on use.
+- Skill and agent rows show a small token chip.
+
+**Doctor page**
+
+- Lists config that is broken or does not do what it says: invalid JSON, hook paths and MCP commands that do not exist, unset `${VAR}` values in MCP servers, unknown plugins in `enabledPlugins`, `skillOverrides` that do nothing, duplicate names, missing descriptions, broken links, and long CLAUDE.md files.
+- Rows are grouped by Error, Warning, and Info. The sidebar count shows errors and warnings.
+- Doctor only reads. It never writes a file or runs a command.
+
+**Settings**
+
+- The Settings page has a numbered file list (Global, Project, Project local) and one file at a time, with Form and Raw JSON tabs.
+- The form gives each field a plain name, help text, and its JSON key. It adds `permissions.defaultMode`.
+- The new Effective view shows the value Claude Code uses for each key, the file it comes from, and the values it overrides. A form field that a higher file overrides says so.
+
+**Dashboard**
+
+- A This month / All time switch for the usage band. The browser remembers your choice.
+
+### Changed
+
+- Activity is now its own page after CLAUDE.md, so the sidebar does not scroll. The sidebar has a footer with links.
+- The Settings form no longer has an `autoMode` switch. `autoMode` holds classifier rules, not an on/off value.
+- The usage scanner now also reads the tool name and the skill, agent, or MCP server name of each tool call. It never keeps prompts, arguments, or message text.
+- The website and the live demo show all the new pages, with new screenshots.
+
+### Fixed
+
+- Doctor no longer warns about plugin items that share a name with a local item, or about `skillOverrides` keys for bundled skills.
+- Doctor reads a hook path only up to the first shell operator, and skips the built-in plugin marketplaces.
+- The rule file scan skips links that point outside the home and project folders.
+- The usage scan skips a symlinked `subagents` folder.
+
 ## [1.2.0] - 2026-10-24
 
 This release adds a Duplicates page that finds skills, agents, and MCP servers that use the same name, so you can see which ones Claude Code loads and keep only the one you want.
@@ -103,7 +152,8 @@ First stable release. Claude Storehouse is a local web dashboard for your Claude
 - New README with screenshots, MIT license, and full npm package metadata.
 - Development: ESLint, Prettier, Husky, and commitlint; CI on Node 20 and 22 on Ubuntu and macOS; tag-driven npm publish with provenance.
 
-[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sumonta056/claude-storehouse/releases/tag/v1.0.0
