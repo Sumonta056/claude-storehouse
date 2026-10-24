@@ -6,6 +6,7 @@ import { KIND_WORD, PAGES, counts, favoriteEntries, otherCounts, projectOn, visi
 import { USAGE_PAGES, modelShares } from '../logic/usage.js'
 import { projectOffHtml, render } from '../ui/nav.js'
 import { empty, nothingMatches, rowHtml, rowsHtml } from '../ui/rows.js'
+import { usageSkeletonHtml } from '../ui/skeleton.js'
 
 function navIcon(page) {
   return document.querySelector(`#nav [data-p="${page}"] .ic`)?.outerHTML ?? ''
@@ -31,7 +32,7 @@ function usageHtml() {
   const source = '<code>~/.claude/projects</code>'
   if (state.usageError)
     return `<section class="usage note-only"><p>Could not read usage from ${source}: ${esc(state.usageError)}</p></section>`
-  if (!state.usage) return `<section class="usage note-only"><p>Reading usage from ${source}…</p></section>`
+  if (!state.usage) return usageSkeletonHtml()
   if (!state.usage.all.responses)
     return `<section class="usage note-only"><p>No Claude Code usage found in ${source}.</p></section>`
   const u = state.usage[state.usagePeriod]
@@ -90,8 +91,8 @@ async function loadUsage() {
   if (state.inventory && USAGE_PAGES.has(state.page)) render()
 }
 
-export function needUsage() {
-  state.usageLoad ??= loadUsage()
+export function needUsage(page) {
+  if (USAGE_PAGES.has(page)) state.usageLoad ??= loadUsage()
 }
 
 export function renderDash() {

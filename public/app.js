@@ -5,7 +5,7 @@ import { chipFilter, dr, groupOpen, items, state } from './core/state.js'
 import { PAGES } from './logic/catalog.js'
 import { cfgDirty } from './logic/config.js'
 import { loadActivity, undo } from './pages/activity.js'
-import { setPeriod } from './pages/dash.js'
+import { needUsage, setPeriod } from './pages/dash.js'
 import { checkAgain, onDoctor } from './pages/doctor.js'
 import { keepOnly } from './pages/dups.js'
 import { cancelRename, onFavCat, placeFav, saveOrder, submitNewCat, submitRename } from './pages/fav.js'
@@ -18,6 +18,7 @@ import { closeDrawer, closeDrawerMenu, drawerOpen, isDirty, onDrawerClick, openD
 import { closeFavPop, placeFavPop, starItem } from './ui/fav-popover.js'
 import { closeMenu, menuKeys, openMenu } from './ui/menu.js'
 import { go, render } from './ui/nav.js'
+import { showBoot } from './ui/skeleton.js'
 
 function wire() {
   $('nav').addEventListener('click', (e) => {
@@ -282,12 +283,15 @@ async function start() {
   $('dr').inert = true
   wire()
   state.page = Object.hasOwn(PAGES, location.hash.slice(1)) ? location.hash.slice(1) : 'dash'
+  showBoot(state.page)
+  needUsage(state.page)
   try {
     await refresh()
     loadActivity()
     await loadProjectFiles()
     render()
   } catch (err) {
+    $('p-boot').hidden = true
     const box = $('load-error')
     box.hidden = false
     box.textContent = `Could not load the inventory: ${err.message}. Open the link the CLI printed, which carries the token.`

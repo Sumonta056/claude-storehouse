@@ -282,3 +282,82 @@
 .files .no {
   color: var(--muted);
 }
+
+.sk {
+  display: block;
+  height: 14px;
+  width: 120px;
+  max-width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--panel2) 0%, var(--line) 50%, var(--panel2) 100%);
+  background-size: 200% 100%;
+  animation: sk-shine 1.4s ease-in-out infinite;
+}
+.sk-k {
+  width: 140px;
+}
+.sk-l {
+  width: 90px;
+}
+.sk-line {
+  width: 90%;
+}
+.sk-short {
+  width: 55%;
+}
+.sk-big {
+  width: 220px;
+  height: 46px;
+}
+.sk-mon {
+  width: 160px;
+  height: 28px;
+}
+.sk-bar {
+  width: 100%;
+  height: 10px;
+}
+.sk-b {
+  width: 90px;
+  height: 22px;
+  margin-bottom: 8px;
+}
+.sk-n {
+  width: 64px;
+  height: 30px;
+}
+.usage.is-loading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stat.sk-card {
+  cursor: default;
+}
+.stat.sk-card:hover {
+  border-color: var(--line);
+  background: var(--panel);
+}
+.sk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 8px;
+}
+@keyframes sk-shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+  }
+}

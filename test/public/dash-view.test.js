@@ -12,7 +12,7 @@ globalThis.document = {
   },
   querySelector: () => null
 }
-const { renderDash } = await import('../../public/pages/dash.js')
+const { needUsage, renderDash } = await import('../../public/pages/dash.js')
 
 const DAY = 86400000
 
@@ -92,8 +92,17 @@ function dash(inv, patch = {}) {
   }
 }
 
-test('the usage band says it is reading while usage loads', () => {
-  assert.ok(dash(inventory()).includes('<p>Reading usage from <code>~/.claude/projects</code>…</p>'))
+test('the usage band shows a busy skeleton while usage loads', () => {
+  const html = dash(inventory())
+  assert.ok(html.includes('class="usage is-loading" aria-busy="true"'))
+  assert.ok(html.includes('Reading usage from ~/.claude/projects…'))
+  assert.equal(html.match(/class="sk sk-b"/g).length, 4)
+})
+
+test('the usage band drops the skeleton once usage arrives', () => {
+  const html = dash(inventory(), { usage: usage() })
+  assert.ok(!html.includes('is-loading'))
+  assert.ok(!html.includes('class="sk '))
 })
 
 test('the usage band shows the escaped error when usage could not load', () => {
@@ -247,4 +256,30 @@ test('without a project folder the project column shows the project-off note', (
   const html = dash(inventory({ project: null }))
   assert.ok(html.includes('project scope is off'))
   assert.ok(!html.includes('Project items'))
+})
+
+test('needUsage fetches /api/usage once for a usage page, never for other pages, and waits for the inventory to render', async () => {
+  const before = { usage: state.usage, usageLoad: state.usageLoad, inventory: state.inventory }
+  const realFetch = globalThis.fetch
+  const urls = []
+  globalThis.fetch = async (url) => {
+    urls.push(String(url))
+    return { ok: true, status: 200, json: async () => usage() }
+  }
+  try {
+    Object.assign(state, { usage: null, usageLoad: null, inventory: null })
+    globalThis.document.getElementById('p-dash').innerHTML = 'before'
+    needUsage('doctor')
+    assert.equal(state.usageLoad, null)
+    needUsage('dash')
+    needUsage('skills')
+    await state.usageLoad
+    assert.equal(urls.length, 1)
+    assert.ok(urls[0].includes('/api/usage'))
+    assert.equal(state.usage.all.responses, usage().all.responses)
+    assert.equal(nodes.get('p-dash').innerHTML, 'before')
+  } finally {
+    globalThis.fetch = realFetch
+    Object.assign(state, before)
+  }
 })

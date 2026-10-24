@@ -17,7 +17,7 @@ paths:
   | `core/dom.js`, `core/actions.js`  | `$`, `toast`, `ask`, focus helpers; write actions (`toggle`, `star`, `refresh`)                         | yes                    |
   | `logic/`                          | pure rules: catalog, usage, chips, duplicates, doctor, context, markdown, hooks, mcp, config, effective | no, ESLint enforces it |
   | `pages/`                          | one file per page: render and its `*Html` builders                                                      | yes                    |
-  | `ui/`                             | parts shared by pages: rows, chips, nav, menu, drawer, favorite popover, config panels                  | yes                    |
+  | `ui/`                             | parts shared by pages: rows, chips, nav, menu, drawer, favorite popover, config panels, skeletons       | yes                    |
   | `css/`                            | 13 stylesheets, one per topic, in cascade order                                                         | —                      |
 
 - Mutable values shared by modules are fields of `state`, never a module-level `let`: an ES module cannot reassign an imported binding.
@@ -40,10 +40,11 @@ Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective
 - `/` focuses search.
 - Detail drawer with editor, preview, and files tab.
 - Activity page with undo. Its nav button comes after CLAUDE.md. The sidebar footer "Made by Sumonta" with GitHub and portfolio links sits at the bottom.
+- Until the inventory arrives, `#p-boot` shows a skeleton: the Dashboard shape on the Dashboard, rows on other pages. Until usage arrives, the usage band shows a skeleton. The shimmer stops with `prefers-reduced-motion`.
 - Confirm dialog before delete.
 - A toast after each write names the file that changed.
 - A switch shows the file it writes in a tooltip before the click.
 - After any toggle, a banner says: "Claude Code applies this at the next session."
 - Plugin skills show a "Fork to local" button.
 - MCP secrets are masked.
-- All data comes from `GET /api/inventory`, except usage, which the first page that needs it (Dashboard, Skills, Agents, or MCP) loads from `GET /api/usage` one time per page load, and the Doctor page, which loads `GET /api/doctor` with each inventory refresh. Re-render from the content each write returns.
+- All data comes from `GET /api/inventory`, except usage, which the first page that needs it (Dashboard, Skills, Agents, or MCP) loads from `GET /api/usage` one time per page load, at the same time as the inventory when the page opens on one of them, and the Doctor page, which loads `GET /api/doctor` with each inventory refresh. Re-render from the content each write returns.

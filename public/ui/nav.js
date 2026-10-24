@@ -6,7 +6,6 @@ import { markStale, mdDirtyKey } from '../logic/config.js'
 import { contextItems, sumTokens } from '../logic/context.js'
 import { doctorIssues } from '../logic/doctor.js'
 import { duplicateGroups, needsAction } from '../logic/duplicates.js'
-import { USAGE_PAGES } from '../logic/usage.js'
 import { renderCatalog } from '../pages/catalog.js'
 import { discardMd, renderClaudeMd } from '../pages/claudemd.js'
 import { renderContext } from '../pages/context.js'
@@ -59,7 +58,7 @@ function renderPage() {
   $('title').textContent = PAGES[state.page]
   for (const s of document.querySelectorAll('.page')) s.hidden = s.id !== `p-${state.page}`
   const page = state.page
-  if (USAGE_PAGES.has(page)) needUsage()
+  needUsage(page)
   if (page === 'dash') renderDash()
   else if (page === 'fav') renderFav()
   else if (page === 'dups') renderDups()
