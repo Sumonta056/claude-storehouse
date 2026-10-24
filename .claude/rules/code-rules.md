@@ -12,6 +12,7 @@
 - No comments in code.
 - Scanners in `src/scan/` are read-only. All writes go through `src/write/`.
 - API handlers live in `src/api.js` and `src/api-config.js`. Routes are listed in `src/server.js`.
+- Browser code in `public/logic/` is pure: no DOM globals and no import of `core/dom.js`, `ui/`, `pages/`, `api.js`, or `app.js`. ESLint fails otherwise. Layout of `public/`: `.claude/rules/ui.md`.
 
 ## Tests
 
@@ -20,6 +21,7 @@
 - Every scan module has a unit test against the fixture tree.
 - Every toggle test asserts 3 things: the exact key after the write, the backup file exists, an unrelated key in the same file is unchanged.
 - One API smoke test boots the server on a random port and runs inventory, toggle, inventory.
+- Browser modules have tests in `test/public/`, one file per module. Node imports them directly. Set the `state` fields a test needs and restore them in `finally`. A page module imports `api.js`, which reads `location` on load: set `globalThis.location` first, then `await import()`. Test `render*` functions with a small fake `document` whose `getElementById` returns plain objects.
 
 ## Workflow
 

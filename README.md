@@ -241,7 +241,7 @@ src/api.js             API handlers: inventory, usage, doctor, files, toggles, f
 src/api-config.js      API handlers: hooks, MCP servers, create, fork
 src/scan/*.js          Read-only scanners, one per item type, and the usage reader
 src/write/*.js         Atomic JSON writes with backups, toggles, files, favorites, activity
-public/                The dashboard UI: index.html, app.js, app.css, api.js, icon.svg
+public/                The dashboard UI: index.html, app.js, api.js, core/, logic/, pages/, ui/, css/
 site/                  Website and live demo, deployed to GitHub Pages
   build.js             Builds _site/: records the demo data and copies public/ into demo/
   demo/demo-api.js     In-browser stand-in for the server API, used only by the demo

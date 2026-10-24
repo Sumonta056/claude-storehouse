@@ -54,8 +54,8 @@ src/server.js       http server, route table
 src/api*.js         API handlers
 src/scan/*.js       read-only scanners, one per item type
 src/write/*.js      json-file (atomic + backup), toggles, files, favorites, activity, paths
-public/             UI
-test/               node:test + fixtures
+public/             UI: app.js entry, core/ state and helpers, logic/ pure rules, pages/, ui/, css/
+test/               node:test + fixtures; test/public/ tests the browser modules
 .claude/            project rules, skills, agents, settings
 .github/            CI and release workflows, PR and issue templates, dependabot
 .husky/             git hooks

@@ -5,7 +5,23 @@ paths:
 
 # UI rules
 
-- Files: one `public/index.html`, one `public/app.js`, one `public/app.css`, plus `public/api.js` and the app icon `public/icon.svg`. Vanilla JS, no framework.
+- Vanilla JS as native ES modules, no framework, no build step. `public/index.html` loads `app.js` as the only module entry and the stylesheets in `public/css/` in a fixed order.
+- Layout of `public/`:
+
+  | Folder or file                    | Holds                                                                                                   | May use the DOM        |
+  | --------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------- |
+  | `app.js`                          | `start` and `wire`: the event delegation for the whole page                                             | yes                    |
+  | `api.js`                          | `get` and `send` with the token                                                                         | yes                    |
+  | `core/state.js`                   | the one `state` object and the shared Maps and objects (`items`, `dr`, `cfg`, `eds`)                    | no                     |
+  | `core/format.js`, `core/icons.js` | text helpers (`esc`, `plural`, `tilde`, `ago`) and SVG icons                                            | no                     |
+  | `core/dom.js`, `core/actions.js`  | `$`, `toast`, `ask`, focus helpers; write actions (`toggle`, `star`, `refresh`)                         | yes                    |
+  | `logic/`                          | pure rules: catalog, usage, chips, duplicates, doctor, context, markdown, hooks, mcp, config, effective | no, ESLint enforces it |
+  | `pages/`                          | one file per page: render and its `*Html` builders                                                      | yes                    |
+  | `ui/`                             | parts shared by pages: rows, chips, nav, menu, drawer, favorite popover, config panels                  | yes                    |
+  | `css/`                            | 13 stylesheets, one per topic, in cascade order                                                         | —                      |
+
+- Mutable values shared by modules are fields of `state`, never a module-level `let`: an ES module cannot reassign an imported binding.
+- A new stylesheet needs a `<link>` in `index.html`. `test/public/index-html.test.js` fails otherwise. Add it where its rules must win in the cascade.
 - Font: Figtree from Google Fonts with a system fallback for offline use.
 - All functional text is 14 px or larger.
 - Approved layout: `.superpowers/brainstorm/*/content/dashboard-demo-v2.html`.
