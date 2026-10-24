@@ -169,10 +169,10 @@ async function handleApi(req, res, url, deps) {
   }
 }
 
-export function startServer({ home, projectDir, port = 0, token, runClaude }) {
+export function startServer({ home, projectDir, port = 0, token, runClaude, managedDir }) {
   if (typeof token !== 'string' || token === '') throw new Error('token is required')
   const deps = {
-    ctx: { home, projectDir: projectScope(home, projectDir) },
+    ctx: { home, projectDir: projectScope(home, projectDir), managedDir },
     activity: new Activity(),
     token,
     runClaude

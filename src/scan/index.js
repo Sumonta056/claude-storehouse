@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { readJson } from '../write/json-file.js'
 import { scanSettings } from './settings.js'
+import { effectiveSettings } from './effective.js'
+import { hasManagedSettings, platformManagedDir } from './managed.js'
 import { scanPlugins } from './plugins.js'
 import { scanDevMods } from './mods.js'
 import { scanSkills } from './skills.js'
@@ -35,7 +37,7 @@ function withId(hook, enabled, canToggle, projectDir) {
   }
 }
 
-export function scanAll({ home, projectDir }) {
+export function scanAll({ home, projectDir, managedDir = platformManagedDir() }) {
   const errors = []
   const globalDir = path.join(home, '.claude')
 
@@ -106,7 +108,13 @@ export function scanAll({ home, projectDir }) {
       ...attempt(errors, 'parkedHooks', () => scanParkedHooks({ home, projectDir }), [])
     ],
     mcp,
-    settings: { global: byScope.global, project: byScope.project, projectLocal: byScope.projectLocal },
+    settings: {
+      global: byScope.global,
+      project: byScope.project,
+      projectLocal: byScope.projectLocal,
+      effective: attempt(errors, 'effective', () => effectiveSettings(settings.files), { rows: [], skipped: [] }),
+      managed: hasManagedSettings(managedDir)
+    },
     claudeMd,
     favorites: [],
     skipped,

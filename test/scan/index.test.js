@@ -19,7 +19,7 @@ test('scanAll returns every section and errors array', () => {
       ['abc-session/band-mod']
     )
     assert.ok(inv.mcp.length > 0)
-    assert.deepEqual(Object.keys(inv.settings), ['global', 'project', 'projectLocal'])
+    assert.deepEqual(Object.keys(inv.settings), ['global', 'project', 'projectLocal', 'effective', 'managed'])
     assert.equal(inv.settings.global.exists, true)
     assert.deepEqual(Object.keys(inv.claudeMd), ['global', 'project', 'projectLocal', 'projectClaudeDir', 'rules'])
     assert.deepEqual(inv.favorites, [])
@@ -105,6 +105,22 @@ test('scanAll gives skills, agents, and plugins a numeric mtime from disk', () =
     assert.equal(again.mtime, when.getTime())
     const ghost = inv.plugins.find((p) => p.missing)
     if (ghost) assert.equal(ghost.mtime, null)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('scanAll adds the effective settings and the managed flag', () => {
+  const fx = makeFixture()
+  try {
+    const managedDir = path.join(fx.home, 'managed')
+    const before = scanAll({ home: fx.home, projectDir: fx.projectDir, managedDir })
+    assert.equal(before.settings.managed, false)
+    assert.ok(Array.isArray(before.settings.effective.rows))
+    assert.equal(before.settings.effective.rows.find((r) => r.key === 'model')?.value, 'fable')
+    fs.mkdirSync(managedDir)
+    fs.writeFileSync(path.join(managedDir, 'managed-settings.json'), '{}\n')
+    assert.equal(scanAll({ home: fx.home, projectDir: fx.projectDir, managedDir }).settings.managed, true)
   } finally {
     fx.cleanup()
   }

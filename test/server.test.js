@@ -13,7 +13,8 @@ const SP = 'superpowers@claude-plugins-official'
 
 async function withServer(fn) {
   const fx = makeFixture()
-  const server = await startServer({ home: fx.home, projectDir: fx.projectDir, port: 0, token: TOKEN })
+  const managedDir = path.join(fx.home, 'managed')
+  const server = await startServer({ home: fx.home, projectDir: fx.projectDir, port: 0, token: TOKEN, managedDir })
   const base = `http://127.0.0.1:${server.port}`
   const api = async (method, route, body, headers = {}) => {
     const init = { method, headers: { 'x-storehouse-token': TOKEN, ...headers } }
@@ -96,7 +97,26 @@ test('GET /api/inventory returns sections', async () => {
     for (const key of ['skills', 'agents', 'plugins', 'hooks', 'mcp', 'settings', 'claudeMd', 'favorites']) {
       assert.ok(key in res.json, key)
     }
+    assert.ok(Array.isArray(res.json.settings.effective.rows))
+    assert.equal(res.json.settings.managed, false)
   })
+})
+
+test('the server reads managed settings from the managedDir it gets', async () => {
+  const fx = makeFixture()
+  const managedDir = path.join(fx.home, 'managed')
+  fs.mkdirSync(managedDir)
+  fs.writeFileSync(path.join(managedDir, 'managed-settings.json'), '{}\n')
+  const server = await startServer({ home: fx.home, projectDir: fx.projectDir, port: 0, token: TOKEN, managedDir })
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/inventory`, {
+      headers: { 'x-storehouse-token': TOKEN }
+    })
+    assert.equal((await res.json()).settings.managed, true)
+  } finally {
+    await server.close()
+    fx.cleanup()
+  }
 })
 
 test('GET /api/usage returns totals and requires the token', async () => {

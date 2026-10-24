@@ -38,6 +38,11 @@ A switch on a file that does not exist creates it with `{}` first. For `settings
 - Doctor responses hold env key names, never values. `readMcpRaw` in `src/scan/mcp.js` returns the command and `${VAR}` names only. The inventory keeps the masked values.
 - Doctor reads files and never writes one or runs a command.
 
+## Effective settings
+
+- `effectiveSettings` masks env values whose name looks like a secret (`token`, `secret`, `key`, `password`, `auth`, `credential`, `cookie`, `session`) as `••••` + the last 4 characters, before the response leaves the server. `overridden` and `ignored` values are masked too.
+- `src/scan/managed.js` only checks if the managed settings file exists. Tests and the site build pass `managedDir` to `startServer` or `scanAll`, so they never read the real system folder.
+
 ## Server security
 
 - Bind `127.0.0.1` only. Reject a foreign Host header.
