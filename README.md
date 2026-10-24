@@ -92,8 +92,8 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 - The Doctor page finds config that is broken or that does not do what it says. Claude Code often fails on these without a message.
 - Errors: a config file with invalid JSON.
-- Warnings: a hook script that does not exist, an MCP command not on the PATH of this terminal, an unset `${VAR}`, a stale `enabledPlugins` or `skillOverrides` key, and same-name items that are all on.
-- Info: a skill or agent with no description, a broken symlink, and a CLAUDE.md longer than 200 lines.
+- Warnings: a hook script that does not exist, an MCP command not on the PATH of this terminal, an unset `${VAR}`, a stale `enabledPlugins` key, a `skillOverrides` key for a plugin skill, and local or project items with one name that are all on.
+- Info: a `skillOverrides` key that matches no local skill, a skill or agent with no description, a broken symlink, and a CLAUDE.md longer than 200 lines.
 - Each row has Open file or Open item. Doctor never writes a file or runs a command.
 
 ![Doctor page with Errors, Warnings, and Info filter chips and warning rows, each with an Open button](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/doctor.png)

@@ -142,8 +142,9 @@ Doctor never writes and never runs a command. Check 3 only looks for an executab
 | 3   | Warning  | The command of an MCP stdio server that is on is not an executable file on `PATH`, or at its absolute path.                    |
 | 4   | Warning  | An MCP server that is on uses `${VAR}`, and `VAR` is not in `process.env` or in settings `env`.                                |
 | 5   | Warning  | `enabledPlugins` names a plugin that is not in `installed_plugins.json`.                                                       |
-| 6   | Warning  | `skillOverrides` names a skill that does not exist.                                                                            |
-| 7   | Warning  | More than one skill, agent, or MCP server with one name is on. The row links to Duplicates.                                    |
+| 6   | Warning  | `skillOverrides` names only a plugin skill. Plugin skills ignore `skillOverrides`.                                             |
+| 6   | Info     | `skillOverrides` names no local or project skill. It can still name a bundled skill, which Storehouse does not scan.           |
+| 7   | Warning  | More than one local or project skill, agent, or MCP server with one name is on. The row links to Duplicates.                   |
 | 8   | Info     | A local or project skill or agent has no `description` in its frontmatter (`hasDescription: false`).                           |
 | 9   | Info     | A link in `skills/` or `agents/` is broken (`inventory.skipped`), or a local item's real path is outside home and the project. |
 | 10  | Info     | A CLAUDE.md file has more than 200 lines.                                                                                      |
@@ -152,6 +153,7 @@ Doctor never writes and never runs a command. Check 3 only looks for an executab
 - Checks 2, 3, and 4 skip items that are off. `${VAR:-default}` counts as set. `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`, and `CLAUDE_PROJECT_DIR` count as set.
 - Check 5 skips the marketplaces `builtin` and `synced`. Claude Code does not list those plugins in `installed_plugins.json`.
 - Checks 8 and 9 skip plugin items. The user cannot edit plugin files.
+- Check 7 skips plugin items. Claude Code namespaces them as `/plugin:name`, so they do not clash with a local item. Between local and project items, one wins: personal over project for skills. Source: code.claude.com/docs/en/skills, "Resolve skills that share a name". The Duplicates page still groups plugin items, so its Conflict count can be higher than the Doctor count.
 - `PATH` of the Storehouse process can differ from the `PATH` Claude Code uses. The row says "not found on the PATH of this terminal".
 - The browser loads `/api/doctor` with each inventory refresh, so it runs again after each write. "Check again" refreshes both.
 - The nav count is errors plus warnings. It is red when an error exists. The page ignores the scope filter and uses the search box.

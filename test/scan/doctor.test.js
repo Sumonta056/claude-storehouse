@@ -257,10 +257,26 @@ test('check 6 reports skillOverrides keys for skills that do not exist', () => {
       ['old']
     )
     assert.equal(found[0].file, settingsFile(fx))
+    assert.equal(found[0].severity, 'info')
+    assert.match(found[0].message, /Bundled skills/)
     editJson(settingsFile(fx), (data) => {
       delete data.skillOverrides.old
     })
     assert.deepEqual(issues(fx, 6), [])
+  })
+})
+
+test('check 6 warns when a skillOverrides key names only a plugin skill', () => {
+  withFixture((fx) => {
+    editJson(settingsFile(fx), (data) => {
+      delete data.skillOverrides.old
+      data.skillOverrides.brainstorming = 'off'
+    })
+    const found = issues(fx, 6)
+    assert.equal(found.length, 1)
+    assert.equal(found[0].name, 'brainstorming')
+    assert.equal(found[0].severity, 'warning')
+    assert.match(found[0].message, /Plugin skills ignore skillOverrides/)
   })
 })
 
@@ -273,8 +289,20 @@ test('check 7 reports a name with more than one item on', () => {
     assert.equal(found[0].name, 'html-report')
     assert.equal(found[0].kind, 'skill')
     assert.deepEqual(found[0].target, { page: 'dups' })
+    assert.match(found[0].message, /hides the other/)
     editJson(path.join(fx.projectDir, '.claude', 'settings.local.json'), (data) => {
       data.skillOverrides['html-report'] = 'off'
+    })
+    assert.deepEqual(issues(fx, 7), [])
+  })
+})
+
+test('check 7 ignores plugin items, which Claude Code namespaces', () => {
+  withFixture((fx) => {
+    writeFile(path.join(fx.home, '.claude', 'skills', 'brainstorming', 'SKILL.md'), '---\ndescription: mine\n---\n')
+    writeFile(path.join(fx.home, '.claude', 'agents', 'reviewer.md'), '---\ndescription: mine\n---\n')
+    editJson(path.join(fx.home, '.claude.json'), (data) => {
+      data.mcpServers.context7 = { command: 'npx' }
     })
     assert.deepEqual(issues(fx, 7), [])
   })

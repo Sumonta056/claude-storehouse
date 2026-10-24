@@ -178,7 +178,9 @@ function installedIds(home) {
 
 function checkSettingsKeys(ctx, add) {
   const installed = installedIds(ctx.home)
-  const skills = new Set((ctx.inventory.skills ?? []).map((skill) => skill.name))
+  const all = ctx.inventory.skills ?? []
+  const ownSkills = new Set(all.filter((skill) => skill.scope !== 'plugin').map((skill) => skill.name))
+  const pluginSkills = new Set(all.filter((skill) => skill.scope === 'plugin').map((skill) => skill.name))
   for (const file of settingsFiles(ctx.inventory)) {
     ctx.checked.add(file.path)
     if (isObject(file.data.enabledPlugins)) {
@@ -195,12 +197,15 @@ function checkSettingsKeys(ctx, add) {
     }
     if (isObject(file.data.skillOverrides)) {
       for (const name of Object.keys(file.data.skillOverrides)) {
-        if (skills.has(name)) continue
-        add(6, 'warning', {
+        if (ownSkills.has(name)) continue
+        const pluginOnly = pluginSkills.has(name)
+        add(6, pluginOnly ? 'warning' : 'info', {
           kind: 'skill',
           name,
           file: file.path,
-          message: `skillOverrides names ${name}, but no skill has this name.`,
+          message: pluginOnly
+            ? `skillOverrides names ${name}, but only a plugin skill has this name. Plugin skills ignore skillOverrides. Switch the plugin instead.`
+            : `skillOverrides names ${name}, but no local or project skill has this name. Bundled skills are not scanned, so the key can still be valid.`,
           target: null
         })
       }
@@ -216,7 +221,7 @@ function checkDuplicates(inventory, add) {
   ]) {
     const on = new Map()
     for (const item of list ?? []) {
-      if (item.enabled) on.set(item.name, (on.get(item.name) ?? 0) + 1)
+      if (item.enabled && item.scope !== 'plugin') on.set(item.name, (on.get(item.name) ?? 0) + 1)
     }
     for (const [name, count] of on) {
       if (count < 2) continue
@@ -224,7 +229,7 @@ function checkDuplicates(inventory, add) {
         kind,
         name,
         file: null,
-        message: `${count} ${word} named ${name} are on. Claude Code sees more than one.`,
+        message: `${count} ${word} named ${name} are on. Claude Code runs one, and it hides the others.`,
         target: { page: 'dups' }
       })
     }

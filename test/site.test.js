@@ -36,8 +36,7 @@ test('site build makes the landing page and a live demo from the current public/
   assert.ok(data.usage.all.cost > 0)
   assert.deepEqual(data.doctor.issues.map((i) => `${i.check}:${i.name}`).sort(), [
     '5:old-theme@demo-market',
-    '7:code-reviewer',
-    '7:debugging'
+    '7:code-reviewer'
   ])
   assert.ok(data.files['/Users/demo/.claude/CLAUDE.md'].content.length > 0)
 })
