@@ -53,7 +53,7 @@ function stringList(value) {
   return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []
 }
 
-export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabled: [], disabled: [] } }) {
+function collect({ home, projectDir, plugins = [], mcpJsonLists = { enabled: [], disabled: [] } }, make) {
   const out = []
   const claudeJson = path.join(home, '.claude.json')
   const parsed = readJson(claudeJson)
@@ -65,7 +65,7 @@ export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabl
   const perProject = Boolean(projectDir)
   for (const [name, config] of serversOf(root)) {
     out.push(
-      build({
+      make({
         name,
         config,
         scope: 'global',
@@ -80,7 +80,7 @@ export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabl
 
   for (const [name, config] of serversOf(projectEntry)) {
     out.push(
-      build({
+      make({
         name,
         config,
         scope: 'project',
@@ -100,7 +100,7 @@ export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabl
   if (mcpResult.ok) {
     for (const [name, config] of serversOf(mcpResult.data)) {
       out.push(
-        build({
+        make({
           name,
           config,
           scope: 'project',
@@ -117,7 +117,7 @@ export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabl
     for (const { name, config } of plugin.mcp ?? []) {
       const disabledKey = `plugin:${splitId(plugin.id).name}:${name}`
       out.push(
-        build({
+        make({
           name,
           config,
           scope: 'plugin',
@@ -126,11 +126,46 @@ export function scanMcp({ home, projectDir, plugins = [], mcpJsonLists = { enabl
           file: path.join(plugin.installPath, '.mcp.json'),
           disabledKey,
           enabled: plugin.enabled === true && !disabled.has(disabledKey),
-          canToggle: perProject
+          canToggle: perProject,
+          pluginRoot: plugin.installPath
         })
       )
     }
   }
 
   return out
+}
+
+export function scanMcp(options) {
+  return collect(options, build)
+}
+
+const VAR_REF = /\$\{([A-Za-z_][A-Za-z0-9_]*)(:-[^}]*)?\}/g
+
+function stringsOf(config) {
+  const out = [config.command, config.url]
+  if (Array.isArray(config.args)) out.push(...config.args)
+  for (const key of ['env', 'headers']) if (isObject(config[key])) out.push(...Object.values(config[key]))
+  return out.filter((value) => typeof value === 'string')
+}
+
+function varNames(config) {
+  const names = new Set()
+  for (const text of stringsOf(config)) {
+    for (const match of text.matchAll(VAR_REF)) if (!match[2]) names.add(match[1])
+  }
+  return [...names].sort()
+}
+
+function raw({ name, config, scope, origin, plugin, file, enabled, pluginRoot }) {
+  const { transport } = describe(config)
+  const entry = { name, scope, origin, file, enabled, transport, vars: varNames(config) }
+  if (plugin) entry.plugin = plugin
+  if (pluginRoot) entry.pluginRoot = pluginRoot
+  if (transport === 'stdio' && typeof config.command === 'string') entry.command = config.command
+  return entry
+}
+
+export function readMcpRaw(options) {
+  return collect(options, raw)
 }
