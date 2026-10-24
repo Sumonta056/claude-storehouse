@@ -40,7 +40,6 @@ import {
   plural,
   relTo,
   shortVersion,
-  slug,
   tilde
 } from './core/format.js'
 import { ICON, kindIcon } from './core/icons.js'
@@ -75,7 +74,6 @@ import {
   switchInfo,
   visible
 } from './logic/catalog.js'
-import { keepChip } from './logic/chips.js'
 import {
   ELSEWHERE,
   FORM_FIELDS,
@@ -108,31 +106,21 @@ import { contextItems, sumTokens } from './logic/context.js'
 import { doctorIssues } from './logic/doctor.js'
 import { duplicateGroups, needsAction } from './logic/duplicates.js'
 import { EFF_GROUPS, SCOPE_KEY, SCOPE_TAG, effRow, effRows } from './logic/effective.js'
-import { HOOK_EVENTS, HOOK_INFO, hookLabel, hookRunsFor } from './logic/hooks.js'
+import { HOOK_INFO, hookLabel, hookRunsFor } from './logic/hooks.js'
 import { highlight, isMd, previewHtml } from './logic/markdown.js'
-import { mcpTransport, parseEnv } from './logic/mcp.js'
-import { USAGE_PAGES, sortRows } from './logic/usage.js'
+import { mcpTransport } from './logic/mcp.js'
+import { USAGE_PAGES } from './logic/usage.js'
 import { renderCatalog } from './pages/catalog.js'
 import { renderContext } from './pages/context.js'
 import { needUsage, renderDash, setPeriod } from './pages/dash.js'
 import { checkAgain, onDoctor, renderDoctor } from './pages/doctor.js'
 import { keepOnly, renderDups } from './pages/dups.js'
 import { cancelRename, onFavCat, placeFav, renderFav, saveOrder, submitNewCat, submitRename } from './pages/fav.js'
-import { chipsHtml, setSort, switchOffUnused } from './ui/chips.js'
+import { renderHooks, submitHook } from './pages/hooks.js'
+import { renderMcp, submitMcp } from './pages/mcp.js'
+import { setSort, switchOffUnused } from './ui/chips.js'
 import { closeFavPop, placeFavPop, starItem } from './ui/fav-popover.js'
-import {
-  addButton,
-  cellSwitch,
-  empty,
-  invalidAttr,
-  menuEntries,
-  nothingMatches,
-  pageBar,
-  scopeTag,
-  useChips,
-  useFlag,
-  viaPlugin
-} from './ui/rows.js'
+import { empty, menuEntries } from './ui/rows.js'
 
 function menuButtonFor(key) {
   const page = document.querySelector('.page:not([hidden])')
@@ -1090,255 +1078,6 @@ const SET_ABOUT = {
   sg: 'This file applies to every project on this computer.',
   sp: 'This file is for the team. It goes into git with the project.',
   sl: 'This file is only for you. Git ignores it. Storehouse writes your on/off switches for this folder here.'
-}
-
-function hookSource(h) {
-  if (h.plugin) return viaPlugin(h)
-  const file = h.parked ? '~/.claude/storehouse.json' : (SETTINGS_FILE[h.file] ?? h.file)
-  return `<span class="tags">${scopeTag(h.scope)}${h.parked ? '<span class="tag">parked</span>' : ''}<span class="src">${esc(file)}</span></span>`
-}
-
-function hookRowHtml(h) {
-  const what = hookLabel(h)
-  const label = `${h.event} hook ${what}`
-  const runs = hookRunsFor(h)
-  const off = h.canToggle && !h.enabled
-  const del = h.plugin
-    ? ''
-    : `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
-  const cls = ['lrow', 'hrow', off ? 'off' : '', h.plugin ? 'locked' : ''].filter(Boolean).join(' ')
-  return `<li class="${cls}" data-key="${esc(h.key)}">
-    <div class="lead">${cellSwitch(h, label)}</div>
-    <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(what)}</button>${runs ? `<span class="mchip">${esc(runs)}</span>` : ''}${off ? '<span class="flag">Off</span>' : ''}</div>
-      <div class="meta-row">${hookSource(h)}${h.timeout ? `<span class="src">${esc(`${h.timeout}s timeout`)}</span>` : ''}</div>
-      ${h.command ? `<details class="cmd-box"><summary>Show command</summary><pre>${esc(h.command)}</pre></details>` : ''}
-    </div>
-    <div class="tail">${del}</div>
-  </li>`
-}
-
-function hookGroupsHtml(list) {
-  const byEvent = new Map(HOOK_INFO.map(([e]) => [e, []]))
-  for (const h of list) {
-    if (!byEvent.has(h.event)) byEvent.set(h.event, [])
-    byEvent.get(h.event).push(h)
-  }
-  const info = new Map(HOOK_INFO)
-  const body = [...byEvent]
-    .filter(([, rows]) => rows.length)
-    .map(([event, rows]) => {
-      const gk = `hook:${event}`
-      const open = groupOpen.get(gk) ?? true
-      const panel = `gp-hook-${slug(event)}`
-      return `<div class="pgroup">
-        <h3 class="ghead"><button type="button" class="gbtn" id="gb-hook-${slug(event)}" data-group="${esc(gk)}" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${panel}">${ICON.chev}<span class="gname">${esc(event)}</span><span class="gdesc">${esc(info.get(event) ?? 'Claude Code event.')}</span><span class="gcount">${esc(plural(rows.length, 'hook'))}</span></button></h3>
-        <div class="gbody" id="${panel}"${open ? '' : ' hidden'}>${open ? `<ul class="rows">${rows.map(hookRowHtml).join('')}</ul>` : ''}</div>
-      </div>`
-    })
-    .join('')
-  return `<div class="groups ev-groups">${body}</div>`
-}
-
-function renderHooks() {
-  const list = state.catalog.hook.filter((h) => visible(h) && keepChip('hooks', h))
-  const body = !state.catalog.hook.length
-    ? empty('No hooks in ~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json, or plugins.')
-    : list.length
-      ? hookGroupsHtml(list)
-      : chipFilter.hooks !== 'all' && state.catalog.hook.some(visible)
-        ? empty('No hooks match this filter.')
-        : nothingMatches()
-  const bar = pageBar(
-    'A hook runs a command when an event happens in Claude Code. Hooks are grouped by event, in the order the events happen in a session. Off moves your hook into <code>~/.claude/storehouse.json</code>. Plugin hooks follow their plugin.',
-    `<button type="button" class="btn" data-go="settings">Edit settings files</button>${addButton('hook', 'Add hook')}`
-  )
-  $('p-hooks').innerHTML = `${bar}${hookFormHtml()}${chipsHtml('hooks', state.catalog.hook, '')}${body}`
-}
-
-function hookFormHtml() {
-  const f = cfg.hook
-  if (!f.open) return ''
-  return `<form class="form" id="hook-form" novalidate aria-labelledby="hf-title">
-    <div class="form-head"><h3 id="hf-title">Add hook</h3><p class="note">Writes the hook into the settings file you pick. A backup is made first.</p></div>
-    <label for="hf-scope">Scope</label>
-    <select id="hf-scope" data-f="hook.scope">${opt('global', 'Global · ~/.claude/settings.json', f.scope)}${projectOn() ? opt('project', 'Project · .claude/settings.json', f.scope) : ''}</select>
-    <label for="hf-event">Event</label>
-    <select id="hf-event" data-f="hook.event">${HOOK_EVENTS.map((e) => opt(e, e, f.event)).join('')}</select>
-    <label for="hf-matcher">Matcher</label>
-    <input id="hf-matcher" data-f="hook.matcher" value="${esc(f.matcher)}" placeholder="* or Bash or Edit|Write" autocomplete="off" spellcheck="false">
-    <label for="hf-command">Command (required)</label>
-    <input id="hf-command" data-f="hook.command" value="${esc(f.command)}" placeholder="~/.claude/hooks/my-hook.sh" autocomplete="off" spellcheck="false" aria-required="true" aria-describedby="hf-err"${invalidAttr('hook', 'command')}>
-    <div class="form-actions"><button type="submit" class="btn p" id="hf-save">Save hook</button><button type="button" class="btn" id="hf-cancel" data-c="hf-cancel">Cancel</button></div>
-    <p class="form-err" id="hf-err" role="alert">${esc(f.error)}</p>
-  </form>`
-}
-
-function formFail(form, field, message, focusId) {
-  cfg[form].error = message
-  cfg[form].invalid = field
-  render()
-  $(focusId)?.focus()
-}
-
-function submitHook() {
-  return busy('hook-add', async () => {
-    const f = cfg.hook
-    f.error = ''
-    f.invalid = ''
-    const command = f.command.trim()
-    if (!command) return formFail('hook', 'command', 'Enter the command the hook runs.', 'hf-command')
-    try {
-      const res = await send('POST', '/api/hook', {
-        scope: f.scope,
-        event: f.event,
-        matcher: f.matcher.trim(),
-        command
-      })
-      cfg.hook = freshHookForm()
-      toast(`Added ${f.event} hook · wrote ${tilde(res.file)}`)
-      showBanner()
-      await afterWrite()
-      $('hf-open')?.focus()
-    } catch (err) {
-      formFail('hook', '', `Could not add the hook: ${err.message}`, 'hf-save')
-    }
-  })
-}
-
-function mcpRowHtml(m, counts) {
-  const label = `MCP server ${m.name}`
-  const target = m.command ?? m.url ?? ''
-  const keys = [
-    ...Object.keys(isPlain(m.config?.env) ? m.config.env : {}).map((k) => `env ${k}`),
-    ...Object.keys(isPlain(m.config?.headers) ? m.config.headers : {}).map((k) => `header ${k}`)
-  ]
-  const off = m.canToggle && !m.enabled
-  const canDelete = !m.plugin && ['user', 'local', 'mcpjson'].includes(m.origin)
-  const del = canDelete
-    ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
-    : ''
-  const others = state.catalog.mcp.filter((o) => o.name === m.name && o.key !== m.key).map((o) => o.source)
-  const dup =
-    counts.get(m.name) > 1
-      ? `<span class="flag" title="${esc(`Also from: ${others.join(', ')}`)}">${esc(`Name used ${counts.get(m.name)} times`)}</span>`
-      : ''
-  const source = m.plugin
-    ? `${viaPlugin(m)}<span class="src">${esc(`Claude Code name: plugin:${pluginLabel(m.plugin)}:${m.name}`)}</span>`
-    : `<span class="tags">${scopeTag(m.scope)}<span class="src">${esc(m.source)}</span></span>`
-  const cls = ['lrow', 'mrow', off ? 'off' : '', m.plugin ? 'locked' : ''].filter(Boolean).join(' ')
-  return `<li class="${cls}" data-key="${esc(m.key)}">
-    <div class="lead">${cellSwitch(m, label)}</div>
-    <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open" aria-label="${esc(`Show ${label}`)}">${esc(m.name)}</button><span class="mchip">${esc(mcpTransport(m))}</span>${off ? '<span class="flag">Off</span>' : ''}${useFlag(m)}${dup}</div>
-      ${target ? `<code class="one-line" title="${esc(target)}">${esc(target)}</code>` : ''}
-      <div class="meta-row">${source}${keys.map((k) => `<span class="mchip key">${esc(k)}</span>`).join('')}${useChips(m)}</div>
-    </div>
-    <div class="tail">${del}</div>
-  </li>`
-}
-
-function renderMcp() {
-  const list = state.catalog.mcp.filter((m) => visible(m) && keepChip('mcp', m))
-  const counts = new Map()
-  for (const m of state.catalog.mcp) counts.set(m.name, (counts.get(m.name) ?? 0) + 1)
-  const sections = [
-    ['global', 'Global', 'From ~/.claude.json. Claude Code loads them in every folder.'],
-    ['project', 'Project', 'From ./.mcp.json or this folder in ~/.claude.json.'],
-    ['plugin', 'From plugins', 'They follow their plugin. The switch turns a server off for this folder only.']
-  ]
-  const html = sections
-    .map(([scope, title, hint]) => {
-      const shown = list.filter((m) => (scope === 'plugin' ? m.scope === 'plugin' : m.scope === scope))
-      if (!shown.length) return ''
-      return `<h2>${esc(title)} <span class="pill">${shown.length}</span><span class="hint">${esc(hint)}</span></h2><ul class="rows">${sortRows(
-        shown
-      )
-        .map((m) => mcpRowHtml(m, counts))
-        .join('')}</ul>`
-    })
-    .join('')
-  const body = !state.catalog.mcp.length
-    ? empty('No MCP servers in ~/.claude.json, .mcp.json, or plugins.')
-    : html ||
-      (chipFilter.mcp !== 'all' && state.catalog.mcp.some(visible)
-        ? empty('No MCP servers match this filter.')
-        : nothingMatches())
-  const bar = pageBar(
-    'An MCP server gives Claude extra tools. A local server runs as a process on your computer. A remote server is a URL. Changes apply at the next Claude Code session.',
-    addButton('mcp', 'Add MCP server')
-  )
-  $('p-mcp').innerHTML = `${bar}${mcpFormHtml()}${chipsHtml('mcp', state.catalog.mcp, '')}${body}`
-}
-
-function mcpFormHtml() {
-  const f = cfg.mcp
-  if (!f.open) return ''
-  const stdio = f.transport === 'stdio'
-  const target = stdio
-    ? `<label for="mf-command">Command (required)</label>
-    <input id="mf-command" data-f="mcp.command" value="${esc(f.command)}" placeholder="npx" autocomplete="off" spellcheck="false" aria-required="true" aria-describedby="mf-err"${invalidAttr('mcp', 'command')}>
-    <label for="mf-args">Arguments</label>
-    <input id="mf-args" data-f="mcp.args" value="${esc(f.args)}" placeholder="-y @modelcontextprotocol/server-github" autocomplete="off" spellcheck="false">
-    <label for="mf-env">Env (KEY=VALUE per line)</label>
-    <textarea id="mf-env" data-f="mcp.env" rows="3" spellcheck="false" placeholder="GITHUB_TOKEN=..." aria-describedby="mf-err"${invalidAttr('mcp', 'env')}>\n${esc(f.env)}</textarea>`
-    : `<label for="mf-url">URL (required)</label>
-    <input id="mf-url" data-f="mcp.url" value="${esc(f.url)}" placeholder="https://example.com/mcp" autocomplete="off" spellcheck="false" aria-required="true" aria-describedby="mf-err"${invalidAttr('mcp', 'url')}>`
-  return `<form class="form" id="mcp-form" novalidate aria-labelledby="mf-title">
-    <div class="form-head"><h3 id="mf-title">Add MCP server</h3><p class="note">Global writes <code>~/.claude.json</code>. Project writes <code>./.mcp.json</code>. A backup is made first.</p></div>
-    <label for="mf-scope">Scope</label>
-    <select id="mf-scope" data-f="mcp.scope">${opt('global', 'Global · ~/.claude.json', f.scope)}${projectOn() ? opt('project', 'Project · .mcp.json', f.scope) : ''}</select>
-    <label for="mf-name">Name (required)</label>
-    <input id="mf-name" data-f="mcp.name" value="${esc(f.name)}" placeholder="github" autocomplete="off" spellcheck="false" aria-required="true" aria-describedby="mf-err"${invalidAttr('mcp', 'name')}>
-    <label for="mf-transport">Transport</label>
-    <select id="mf-transport" data-f="mcp.transport">${['stdio', 'http', 'sse'].map((t) => opt(t, t, f.transport)).join('')}</select>
-    ${target}
-    <div class="form-actions"><button type="submit" class="btn p" id="mf-save">Save server</button><button type="button" class="btn" id="mf-cancel" data-c="mf-cancel">Cancel</button></div>
-    <p class="form-err" id="mf-err" role="alert">${esc(f.error)}</p>
-  </form>`
-}
-
-function submitMcp() {
-  return busy('mcp-add', async () => {
-    const f = cfg.mcp
-    f.error = ''
-    f.invalid = ''
-    const name = f.name.trim()
-    if (!name) return formFail('mcp', 'name', 'Enter a server name.', 'mf-name')
-    if (!/^[A-Za-z0-9_.@-]+$/.test(name))
-      return formFail('mcp', 'name', 'Use only letters, digits, dot, dash, at, or underscore in the name.', 'mf-name')
-    let config
-    if (f.transport === 'stdio') {
-      const command = f.command.trim()
-      if (!command) return formFail('mcp', 'command', 'Enter the command that starts the server.', 'mf-command')
-      const parsed = parseEnv(f.env)
-      if (parsed.error) return formFail('mcp', 'env', parsed.error, 'mf-env')
-      config = { type: 'stdio', command }
-      const args = f.args.trim() ? f.args.trim().split(/\s+/) : []
-      if (args.length) config.args = args
-      if (Object.keys(parsed.env).length) config.env = parsed.env
-    } else {
-      const url = f.url.trim()
-      if (!/^https?:\/\/\S+$/.test(url))
-        return formFail('mcp', 'url', 'Enter a URL that starts with http:// or https://.', 'mf-url')
-      config = { type: f.transport, url }
-    }
-    try {
-      const res = await send('POST', '/api/mcp', { scope: f.scope, name, config })
-      cfg.mcp = freshMcpForm()
-      toast(`Added MCP server ${name} · wrote ${tilde(res.file)}`)
-      showBanner()
-      await afterWrite()
-      $('mf-open')?.focus()
-    } catch (err) {
-      formFail(
-        'mcp',
-        err.status === 409 ? 'name' : '',
-        `Could not add the server: ${err.message}`,
-        err.status === 409 ? 'mf-name' : 'mf-save'
-      )
-    }
-  })
 }
 
 function jsonBodyHtml(item) {
