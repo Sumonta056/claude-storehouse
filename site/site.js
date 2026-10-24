@@ -6,6 +6,7 @@
     dash: 'Dashboard',
     fav: 'Favorites',
     dups: 'Duplicates',
+    doctor: 'Doctor',
     context: 'Context',
     skills: 'Skills',
     agents: 'Agents',

@@ -88,6 +88,16 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 ![Duplicates page with two same-name groups marked Conflict and a Keep only this button on each item](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/duplicates.png)
 
+### Check your setup with Doctor
+
+- The Doctor page finds config that is broken or that does not do what it says. Claude Code often fails on these without a message.
+- Errors: a config file with invalid JSON.
+- Warnings: a hook script that does not exist, an MCP command not on the PATH of this terminal, an unset `${VAR}`, a stale `enabledPlugins` or `skillOverrides` key, and same-name items that are all on.
+- Info: a skill or agent with no description, a broken symlink, and a CLAUDE.md longer than 200 lines.
+- Each row has Open file or Open item. Doctor never writes a file or runs a command.
+
+![Doctor page with Errors, Warnings, and Info filter chips and warning rows, each with an Open button](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/doctor.png)
+
 ### See context cost
 
 - The Context page estimates the tokens that each item adds to every session before you type a word.
@@ -202,6 +212,7 @@ Global switches write `~/.claude/settings.json`. Project switches write `./.clau
 | Token         | Every API call needs the random token from the start URL. Without it the server returns 401.                   |
 | Allow-list    | Writes are limited to `~/.claude`, `~/.claude.json`, and the project folder. Plugin cache files are read-only. |
 | Session files | The usage band reads only token counts. It never keeps or returns message text.                                |
+| Doctor        | Reads only. It never writes a file or runs a command, and it returns env key names, never values.              |
 | Dependencies  | The only runtime dependency is [`open`](https://www.npmjs.com/package/open), to launch the browser.            |
 
 ## How it works
@@ -211,7 +222,7 @@ Claude Storehouse is plain JavaScript with ES modules on Node 20 or newer. There
 ```
 bin/storehouse.js      CLI: flags, token, start the server, open the browser
 src/server.js          HTTP server on 127.0.0.1 and the route table
-src/api.js             API handlers: inventory, usage, files, toggles, favorites, undo
+src/api.js             API handlers: inventory, usage, doctor, files, toggles, favorites, undo
 src/api-config.js      API handlers: hooks, MCP servers, create, fork
 src/scan/*.js          Read-only scanners, one per item type, and the usage reader
 src/write/*.js         Atomic JSON writes with backups, toggles, files, favorites, activity

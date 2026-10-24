@@ -158,6 +158,7 @@
               <button role="tab" aria-selected="true" data-page="dash">Dashboard</button>
               <button role="tab" aria-selected="false" data-page="fav">Favorites</button>
               <button role="tab" aria-selected="false" data-page="dups">Duplicates</button>
+              <button role="tab" aria-selected="false" data-page="doctor">Doctor</button>
               <button role="tab" aria-selected="false" data-page="context">Context</button>
               <button role="tab" aria-selected="false" data-page="skills">Skills</button>
               <button role="tab" aria-selected="false" data-page="plugins">Plugins</button>
@@ -401,6 +402,32 @@
             />
           </figure>
         </div>
+        <div class="wrap feature">
+          <div class="txt">
+            <h3>Check your setup with Doctor</h3>
+            <p>
+              Doctor finds config that is broken or that does not do what it says. Claude Code often fails on these
+              without a message.
+            </p>
+            <ul>
+              <li>Invalid JSON, missing hook scripts, MCP commands not on your PATH</li>
+              <li>Unset <code>${VAR}</code> names, stale plugin and skill keys, same-name conflicts</li>
+              <li>Each row opens the file or the item</li>
+              <li>Read-only: it never writes a file or runs a command</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="doctor">Run Doctor in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/doctor.png"
+              alt="Doctor page with Errors, Warnings, and Info filter chips and warning rows, each with an Open button"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
       </section>
 
       <section id="switches" class="envs wrap" aria-labelledby="sw-h">
@@ -577,6 +604,12 @@ claude-storehouse</code></pre>
                 <tr>
                   <td>Token</td>
                   <td>Every API call needs the random token from the start URL.</td>
+                </tr>
+                <tr>
+                  <td>Doctor</td>
+                  <td>
+                    Reads only. It never writes a file or runs a command, and it shows env key names, never values.
+                  </td>
                 </tr>
                 <tr>
                   <td>Allow-list</td>
