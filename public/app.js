@@ -1,4 +1,61 @@
 import { get, send } from './api.js'
+import {
+  $,
+  HOLDER,
+  ask,
+  cardKey,
+  focusMark,
+  focusRestore,
+  holderKey,
+  insertText,
+  showBanner,
+  toast,
+  trapTab,
+  waitFor
+} from './core/dom.js'
+import {
+  MODEL_CLASSES,
+  ago,
+  baseName,
+  compact,
+  esc,
+  fmtSize,
+  isFolderSkill,
+  isPlain,
+  keyOf,
+  lineCount,
+  modelName,
+  money,
+  monthName,
+  opt,
+  parentDir,
+  plural,
+  relTo,
+  shortVersion,
+  slug,
+  tilde,
+  tok,
+  unquote
+} from './core/format.js'
+import { ICON, kindIcon } from './core/icons.js'
+import {
+  PERIOD_KEY,
+  SORTS,
+  SORT_KEY,
+  bks,
+  cfg,
+  chipFilter,
+  dr,
+  eds,
+  favOpen,
+  freshHookForm,
+  freshMcpForm,
+  groupOpen,
+  items,
+  msgs,
+  pending,
+  state
+} from './core/state.js'
 
 const PAGES = {
   dash: 'Dashboard',
@@ -17,7 +74,6 @@ const PAGES = {
   activity: 'Activity'
 }
 
-const HOLDER = '.recent, tr[data-key], .lrow, .pnote'
 const HOOK_EVENTS = [
   'PreToolUse',
   'PostToolUse',
@@ -29,12 +85,15 @@ const HOOK_EVENTS = [
   'SessionEnd',
   'PreCompact'
 ]
+
 const SETTINGS_FILE = {
   global: '~/.claude/settings.json',
   project: '.claude/settings.json',
   projectLocal: '.claude/settings.local.json'
 }
+
 const MCP_ORIGIN = { user: '~/.claude.json', local: '~/.claude.json · this folder', mcpjson: '.mcp.json' }
+
 const HOOK_INFO = [
   ['SessionStart', 'When a session starts, resumes, or clears.'],
   ['InstructionsLoaded', 'When Claude Code loads a CLAUDE.md or rules file.'],
@@ -60,65 +119,22 @@ const HOOK_INFO = [
   ['ElicitationResult', 'After you answer an MCP server request.'],
   ['SessionEnd', 'When the session ends.']
 ]
+
 const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest'])
+
 const SCRIPT_RE = /[\w@.-]+\.(?:sh|bash|zsh|js|mjs|cjs|ts|py|rb|cmd|ps1)\b/g
+
 const INLINE = { node: 'Node', bun: 'Bun', deno: 'Deno', python: 'Python', python3: 'Python', ruby: 'Ruby' }
+
 const SHELLS = new Set(['sh', 'bash', 'zsh'])
+
 const SHELL_WORDS = new Set(['if', 'for', 'while', 'case', '[', '[[', '{', '(', 'test', 'until'])
 
-export const state = { inventory: null, scope: 'all', query: '', page: 'dash' }
-
-const items = new Map()
-let projectFiles = null
-let usage = null
-let usageError = ''
-let doctor = null
-const PERIOD_KEY = 'storehouse.usagePeriod'
-let usagePeriod = readPeriod()
 const USAGE_PAGES = new Set(['dash', 'skills', 'agents', 'mcp'])
+
 const USE_WORD = { skills: 'skill', agents: 'agent', mcp: 'MCP server' }
-const SORT_KEY = 'storehouse.usageSort'
-const SORTS = [
-  ['most', 'Most used'],
-  ['least', 'Least used'],
-  ['name', 'Name']
-]
+
 const DAY = 86400000
-let usageSort = readSort()
-let usageLoad = null
-let bannerDismissed = false
-let bannerShown = false
-let dragKey = null
-const favOpen = new Map()
-let favEditing = null
-let favNewName = ''
-let favRenameValue = ''
-let favPop = null
-const pending = new Set()
-let searchTimer = null
-
-const $ = (id) => document.getElementById(id)
-
-export function esc(value) {
-  return String(value ?? '').replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-  )
-}
-
-function keyOf(kind, source, name) {
-  return `${kind}:${source}:${name}`
-}
-
-function home() {
-  const dir = state.inventory?.global?.dir ?? ''
-  return dir.replace(/[\\/]\.claude$/, '')
-}
-
-function tilde(file) {
-  const h = home()
-  return h && file.startsWith(h) ? `~${file.slice(h.length)}` : file
-}
 
 function pluginById(id) {
   return state.inventory.plugins.find((p) => p.id === id)
@@ -217,8 +233,6 @@ function normalize(inv) {
   }
   return out
 }
-
-let catalog = { skill: [], agent: [], plugin: [], mod: [], hook: [], mcp: [] }
 
 function inScope(scope) {
   if (state.scope === 'all') return true
@@ -340,50 +354,8 @@ function otherCounts(list) {
   return { total: shown.length, on: shown.filter((i) => i.enabled).length }
 }
 
-const MODEL_CLASSES = ['m0', 'm1', 'm2', 'm3']
-
-function money(value) {
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-function compact(value) {
-  return value.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 2 })
-}
-
-function modelName(model) {
-  const parts = model
-    .replace(/^claude-/, '')
-    .split('-')
-    .filter((p) => !/^\d{8}$/.test(p))
-  const words = parts.filter((p) => !/^\d+$/.test(p)).map((p) => p[0].toUpperCase() + p.slice(1))
-  const version = parts.filter((p) => /^\d+$/.test(p)).join('.')
-  return [...words, version].filter(Boolean).join(' ')
-}
-
-function monthName(key) {
-  const [year, month] = key.split('-').map(Number)
-  return new Date(year, month - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })
-}
-
-function readPeriod() {
-  try {
-    return localStorage.getItem(PERIOD_KEY) === 'all' ? 'all' : 'month'
-  } catch {
-    return 'month'
-  }
-}
-
-function readSort() {
-  try {
-    const value = localStorage.getItem(SORT_KEY)
-    return SORTS.some(([k]) => k === value) ? value : 'name'
-  } catch {
-    return 'name'
-  }
-}
-
 function setSort(value) {
-  usageSort = value
+  state.usageSort = value
   try {
     localStorage.setItem(SORT_KEY, value)
   } catch {}
@@ -391,7 +363,7 @@ function setSort(value) {
 }
 
 function setPeriod(period) {
-  usagePeriod = period
+  state.usagePeriod = period
   try {
     localStorage.setItem(PERIOD_KEY, period)
   } catch {}
@@ -408,13 +380,13 @@ function modelShares(u) {
 
 function usageHtml() {
   const source = '<code>~/.claude/projects</code>'
-  if (usageError)
-    return `<section class="usage note-only"><p>Could not read usage from ${source}: ${esc(usageError)}</p></section>`
-  if (!usage) return `<section class="usage note-only"><p>Reading usage from ${source}…</p></section>`
-  if (!usage.all.responses)
+  if (state.usageError)
+    return `<section class="usage note-only"><p>Could not read usage from ${source}: ${esc(state.usageError)}</p></section>`
+  if (!state.usage) return `<section class="usage note-only"><p>Reading usage from ${source}…</p></section>`
+  if (!state.usage.all.responses)
     return `<section class="usage note-only"><p>No Claude Code usage found in ${source}.</p></section>`
-  const u = usage[usagePeriod]
-  const label = usagePeriod === 'month' ? monthName(usage.monthKey) : 'All time'
+  const u = state.usage[state.usagePeriod]
+  const label = state.usagePeriod === 'month' ? monthName(state.usage.monthKey) : 'All time'
   const shares = modelShares(u)
   const pct = (n) => `${n.toFixed(1)}%`
   const unpriced = u.unpriced.length
@@ -427,7 +399,7 @@ function usageHtml() {
   ]
     .map(
       ([k, text]) =>
-        `<button type="button" data-period="${k}" aria-pressed="${k === usagePeriod ? 'true' : 'false'}">${text}</button>`
+        `<button type="button" data-period="${k}" aria-pressed="${k === state.usagePeriod ? 'true' : 'false'}">${text}</button>`
     )
     .join('')
   const legend = shares.length
@@ -461,24 +433,24 @@ function usageHtml() {
 
 async function loadUsage() {
   try {
-    usage = await get('/api/usage')
-    usageError = ''
+    state.usage = await get('/api/usage')
+    state.usageError = ''
   } catch (err) {
-    usageError = err.message
+    state.usageError = err.message
   }
   if (state.inventory && USAGE_PAGES.has(state.page)) render()
 }
 
 function needUsage() {
-  usageLoad ??= loadUsage()
+  state.usageLoad ??= loadUsage()
 }
 
 function renderDash() {
   const inv = state.inventory
   const tiles = [
-    statTile('skills', 'Skills', counts(catalog.skill)),
-    statTile('agents', 'Agents', counts(catalog.agent)),
-    statTile('plugins', 'Plugins', counts(catalog.plugin)),
+    statTile('skills', 'Skills', counts(state.catalog.skill)),
+    statTile('agents', 'Agents', counts(state.catalog.agent)),
+    statTile('plugins', 'Plugins', counts(state.catalog.plugin)),
     statTile('hooks', 'Hooks', otherCounts(inv.hooks)),
     statTile('mcp', 'MCP servers', otherCounts(inv.mcp))
   ].join('')
@@ -492,7 +464,7 @@ function renderDash() {
     inv.favorites.length > favs.length && favs.length
       ? '<button type="button" class="btn-link" data-go="fav">All favorites <span aria-hidden="true">→</span></button>'
       : ''
-  const proj = [...catalog.skill, ...catalog.agent, ...catalog.plugin].filter(
+  const proj = [...state.catalog.skill, ...state.catalog.agent, ...state.catalog.plugin].filter(
     (i) => i.scope === 'project' && visible(i)
   )
   const projHtml = proj.length
@@ -513,17 +485,8 @@ function renderDash() {
     </div>`
 }
 
-function ago(ms) {
-  const s = Math.max(0, Math.round((Date.now() - ms) / 1000))
-  if (s < 60) return 'just now'
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
-  if (s < 86400 * 30) return `${Math.floor(s / 86400)} d ago`
-  return new Date(ms).toLocaleDateString()
-}
-
 function recentHtml() {
-  const all = [...catalog.skill, ...catalog.agent, ...catalog.plugin]
+  const all = [...state.catalog.skill, ...state.catalog.agent, ...state.catalog.plugin]
   if (!all.some((i) => typeof i.mtime === 'number')) return ''
   const recent = all
     .filter((i) => typeof i.mtime === 'number' && visible(i))
@@ -546,7 +509,11 @@ function filesHtml() {
     ['CLAUDE.md', inv.claudeMd?.project?.exists, 'claudemd'],
     ['.claude/settings.json', inv.settings?.project?.exists, 'settings'],
     ['.claude/settings.local.json', inv.settings?.projectLocal?.exists, 'settings'],
-    ['.mcp.json', projectFiles ? projectFiles.has('.mcp.json') : inv.mcp.some((m) => m.origin === 'mcpjson'), 'mcp']
+    [
+      '.mcp.json',
+      state.projectFiles ? state.projectFiles.has('.mcp.json') : inv.mcp.some((m) => m.origin === 'mcpjson'),
+      'mcp'
+    ]
   ]
   return `<ul class="clist files">${rows
     .map(
@@ -572,9 +539,9 @@ function missingFavRowHtml(fav) {
 }
 
 function favHeadHtml(cat, label, count, open, index) {
-  if (cat !== null && favEditing === cat) {
+  if (cat !== null && state.favEditing === cat) {
     return `<form class="fav-edit" data-form="cat-rename" data-cat="${esc(cat)}">
-      <input type="text" id="fav-rename" name="n" value="${esc(favRenameValue)}" maxlength="40" required aria-label="${esc(`New name for ${cat}`)}">
+      <input type="text" id="fav-rename" name="n" value="${esc(state.favRenameValue)}" maxlength="40" required aria-label="${esc(`New name for ${cat}`)}">
       <button type="submit" class="btn p">Rename</button>
       <button type="button" class="btn ghost" data-fc="cancel">Cancel</button>
     </form>`
@@ -612,7 +579,7 @@ function renderFav() {
   const top = `<div class="fav-top">
     <div class="warn">Favorites and categories live in <code>~/.claude/storehouse.json</code>. They do not change Claude Code. Drag a row to reorder it or to move it to another category.</div>
     <form class="fav-new" data-form="cat-new">
-      <input type="text" id="fav-newcat" name="n" value="${esc(favNewName)}" maxlength="40" placeholder="New category" aria-label="New category name">
+      <input type="text" id="fav-newcat" name="n" value="${esc(state.favNewName)}" maxlength="40" placeholder="New category" aria-label="New category name">
       <button type="submit" class="btn p">Add category</button>
     </form>
   </div>`
@@ -649,7 +616,7 @@ function favPopOptions(query) {
 }
 
 function favPopListHtml() {
-  const { options, active, current } = favPop
+  const { options, active, current } = state.favPop
   return options
     .map((o, i) => {
       const cls = ['fp-opt', i === active ? 'active' : '', o.create ? 'create' : ''].filter(Boolean).join(' ')
@@ -672,7 +639,7 @@ function favPopHtml(item, fav) {
 }
 
 function drawFavPopList() {
-  const { el, options, active } = favPop
+  const { el, options, active } = state.favPop
   el.querySelector('.fp-list').innerHTML = favPopListHtml()
   el.querySelector('input[name="newcat"]').setAttribute(
     'aria-activedescendant',
@@ -685,16 +652,16 @@ function filterFavPop(query) {
   const options = favPopOptions(query)
   const q = query.trim().toLowerCase()
   const exact = options.findIndex((o) => !o.create && o.label.toLowerCase() === q)
-  const current = q ? -1 : options.findIndex((o) => o.value === favPop.current)
-  favPop.options = options
-  favPop.active = Math.max(0, exact, current)
-  favPop.el.querySelector('.err').hidden = true
+  const current = q ? -1 : options.findIndex((o) => o.value === state.favPop.current)
+  state.favPop.options = options
+  state.favPop.active = Math.max(0, exact, current)
+  state.favPop.el.querySelector('.err').hidden = true
   drawFavPopList()
 }
 
 function placeFavPop() {
-  if (!favPop) return
-  const { el, trigger } = favPop
+  if (!state.favPop) return
+  const { el, trigger } = state.favPop
   if (!trigger?.isConnected) return closeFavPop(false)
   const r = trigger.getBoundingClientRect()
   const w = el.offsetWidth
@@ -712,7 +679,7 @@ function openFavPop(item, trigger) {
   el.setAttribute('aria-labelledby', 'favpop-t')
   el.innerHTML = favPopHtml(item, fav)
   document.body.append(el)
-  favPop = {
+  state.favPop = {
     el,
     item,
     trigger,
@@ -728,15 +695,15 @@ function openFavPop(item, trigger) {
   input.addEventListener('input', () => filterFavPop(input.value))
   input.addEventListener('keydown', (e) => {
     const step = { ArrowDown: 1, ArrowUp: -1 }[e.key]
-    if (!step || !favPop.options.length) return
+    if (!step || !state.favPop.options.length) return
     e.preventDefault()
-    favPop.active = (favPop.active + step + favPop.options.length) % favPop.options.length
+    state.favPop.active = (state.favPop.active + step + state.favPop.options.length) % state.favPop.options.length
     drawFavPopList()
   })
   el.addEventListener('click', (e) => {
     const opt = e.target.closest('[data-i]')
     if (opt) {
-      favPop.active = Number(opt.dataset.i)
+      state.favPop.active = Number(opt.dataset.i)
       return submitFavPop(el.querySelector('form'))
     }
     const act = e.target.closest('[data-pop]')?.dataset.pop
@@ -753,9 +720,9 @@ function openFavPop(item, trigger) {
 }
 
 function closeFavPop(refocus = true) {
-  if (!favPop) return
-  const { el, item, trigger, inDrawer } = favPop
-  favPop = null
+  if (!state.favPop) return
+  const { el, item, trigger, inDrawer } = state.favPop
+  state.favPop = null
   el.remove()
   if (!refocus) return
   if (trigger?.isConnected) return trigger.focus({ preventScroll: true })
@@ -778,7 +745,7 @@ function favBody(item, favorite, category) {
 }
 
 function submitFavPop(form) {
-  const { item, options, active } = favPop
+  const { item, options, active } = state.favPop
   const choice = options[active]
   const fav = favOf(item)
   const fail = (message) => {
@@ -820,8 +787,8 @@ function focusFavTool(cat, tool) {
 }
 
 function startRename(cat) {
-  favEditing = cat
-  favRenameValue = cat
+  state.favEditing = cat
+  state.favRenameValue = cat
   render()
   const input = $('fav-rename')
   input?.focus()
@@ -829,8 +796,8 @@ function startRename(cat) {
 }
 
 function cancelRename() {
-  const cat = favEditing
-  favEditing = null
+  const cat = state.favEditing
+  state.favEditing = null
   render()
   if (cat !== null) focusFavTool(cat, 'rename')
 }
@@ -860,13 +827,13 @@ async function onFavCat(el) {
 }
 
 async function submitNewCat() {
-  const name = favNewName.trim()
+  const name = state.favNewName.trim()
   const error = favNameError(name)
   if (error) return toast(error, true)
   if (favCats().some((c) => c.toLowerCase() === name.toLowerCase()))
     return toast(`Category ${name} already exists.`, true)
   if (await editFavCategory({ op: 'create', name }, `Added category ${name}`)) {
-    favNewName = ''
+    state.favNewName = ''
     render()
     $('fav-newcat')?.focus()
   }
@@ -874,42 +841,16 @@ async function submitNewCat() {
 
 async function submitRename(form) {
   const old = form.dataset.cat
-  const name = favRenameValue.trim()
+  const name = state.favRenameValue.trim()
   if (name === old) return cancelRename()
   const error = favNameError(name)
   if (error) return toast(error, true)
-  favEditing = null
+  state.favEditing = null
   if (await editFavCategory({ op: 'rename', name: old, newName: name }, `Renamed ${old} to ${name}`))
     return focusFavTool(name, 'rename')
-  favEditing = old
+  state.favEditing = old
   render()
   $('fav-rename')?.focus()
-}
-
-const ICON = {
-  pen: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
-  bin: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
-  lock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
-  warn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5"/><path d="M12 18h.01"/></svg>',
-  error:
-    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>',
-  info: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>',
-  dots: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
-  copy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
-  chev: '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>'
-}
-
-const KIND_PATH = {
-  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
-  skill: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
-  agent: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/>',
-  plugin: '<path d="M9 3v4M15 3v4M6 7h12v5a6 6 0 0 1-12 0zM12 18v3"/>',
-  hook: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
-  mcp: '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/>'
-}
-
-function kindIcon(kind, size = 24) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_PATH[kind] ?? ''}</svg>`
 }
 
 const CHIPS = {
@@ -993,35 +934,12 @@ const SECTIONS = {
   ]
 }
 
-const chipFilter = {
-  context: 'all',
-  dups: 'all',
-  doctor: 'all',
-  plugins: 'all',
-  mods: 'all',
-  skills: 'all',
-  agents: 'all',
-  hooks: 'all',
-  mcp: 'all'
-}
-const groupOpen = new Map()
-let menuKey = null
-let menuCtx = ''
-
-function slug(value) {
-  return String(value).replace(/[^a-zA-Z0-9_-]/g, '_')
-}
-
-function plural(n, word) {
-  return `${n} ${word}${n === 1 ? '' : 's'}`
-}
-
 function useReady() {
-  return Boolean(usage?.items && usage.all?.responses)
+  return Boolean(state.usage?.items && state.usage.all?.responses)
 }
 
 function useCovered() {
-  return useReady() && typeof usage.since === 'number' && usage.since <= Date.now() - 30 * DAY
+  return useReady() && typeof state.usage.since === 'number' && state.usage.since <= Date.now() - 30 * DAY
 }
 
 function toolName(value) {
@@ -1034,7 +952,7 @@ function useKeys(item) {
     return [p ? `mcp:plugin:${toolName(p)}:${toolName(item.name)}` : `mcp:${toolName(item.name)}`]
   const bare = `${item.kind}:${item.name}`
   if (!p) return [bare]
-  const local = catalog[item.kind].some((o) => !o.plugin && o.name === item.name)
+  const local = state.catalog[item.kind].some((o) => !o.plugin && o.name === item.name)
   return local ? [`${item.kind}:${p}:${item.name}`] : [`${item.kind}:${p}:${item.name}`, bare]
 }
 
@@ -1043,7 +961,7 @@ function useOf(item) {
   let count30 = 0
   let last = 0
   for (const key of useKeys(item)) {
-    const u = usage.items[key]
+    const u = state.usage.items[key]
     if (!u) continue
     count30 += u.count30
     last = Math.max(last, u.last)
@@ -1059,7 +977,7 @@ function isUnused(item) {
 
 function sharedWith(item) {
   const mine = useKeys(item)
-  return catalog[item.kind].filter((o) => o !== item && useKeys(o).some((k) => mine.includes(k))).length
+  return state.catalog[item.kind].filter((o) => o !== item && useKeys(o).some((k) => mine.includes(k))).length
 }
 
 function lastText(ms) {
@@ -1091,8 +1009,8 @@ function useFlag(item) {
 function sortRows(list) {
   if (!useReady() || !USAGE_PAGES.has(state.page)) return list
   const out = [...list]
-  if (usageSort === 'name') return out.sort((a, b) => a.name.localeCompare(b.name))
-  const dir = usageSort === 'most' ? -1 : 1
+  if (state.usageSort === 'name') return out.sort((a, b) => a.name.localeCompare(b.name))
+  const dir = state.usageSort === 'most' ? -1 : 1
   const val = (i) => useOf(i) ?? { count30: 0, last: 0 }
   return out.sort((a, b) => {
     const ua = val(a)
@@ -1105,7 +1023,7 @@ function sortHtml() {
   if (!useReady()) return ''
   const buttons = SORTS.map(
     ([k, text]) =>
-      `<button type="button" data-usort="${k}" aria-pressed="${k === usageSort ? 'true' : 'false'}">${text}</button>`
+      `<button type="button" data-usort="${k}" aria-pressed="${k === state.usageSort ? 'true' : 'false'}">${text}</button>`
   ).join('')
   return `<div class="usort"><span>Sort</span><div class="scope" role="group" aria-label="Sort by use">${buttons}</div></div>`
 }
@@ -1126,7 +1044,7 @@ function unusedBanner(page, list) {
 
 async function switchOffUnused() {
   const page = state.page
-  const list = { skills: catalog.skill, agents: catalog.agent, mcp: catalog.mcp }[page]
+  const list = { skills: state.catalog.skill, agents: state.catalog.agent, mcp: state.catalog.mcp }[page]
   if (!list) return
   const targets = list.filter((i) => visible(i) && isUnused(i) && i.canToggle && switchable(page, i))
   if (!targets.length) return
@@ -1140,13 +1058,6 @@ async function switchOffUnused() {
     const item = items.get(t.key)
     if (item?.enabled) await toggle(item)
   }
-}
-
-function shortVersion(v) {
-  const s = String(v ?? '').trim()
-  if (!s) return ''
-  if (/^[0-9a-f]{8,}$/i.test(s)) return s.slice(0, 7)
-  return /^v\d/i.test(s) ? s : /^\d/.test(s) ? `v${s}` : s
 }
 
 function pluginParts(id) {
@@ -1247,7 +1158,7 @@ function tokChip(item) {
 }
 
 function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, right = '', note = '' } = {}) {
-  const open = menuKey === item.key && menuCtx === ctx
+  const open = state.menuKey === item.key && state.menuCtx === ctx
   const src =
     ctx === 'dups'
       ? dupSource(item)
@@ -1364,7 +1275,7 @@ function pluginGroupsHtml(page, list) {
   }
   const body = [...byPlugin]
     .map(([id, rows]) => {
-      const plugin = catalog.plugin.find((p) => p.id === id)
+      const plugin = state.catalog.plugin.find((p) => p.id === id)
       const gk = `${kind}:${id}`
       const open = groupOpen.has(gk) ? groupOpen.get(gk) : Boolean(state.query.trim())
       const name = plugin?.name ?? id
@@ -1391,7 +1302,7 @@ const DUP_KINDS = [
 function duplicateGroups() {
   const groups = new Map()
   for (const [kind] of DUP_KINDS)
-    for (const item of catalog[kind]) {
+    for (const item of state.catalog[kind]) {
       const key = `${kind}:${item.name}`
       if (!groups.has(key)) groups.set(key, { key, kind, name: item.name, items: [] })
       groups.get(key).items.push(item)
@@ -1467,6 +1378,7 @@ const DOC_SEVERITY = [
   ['warning', 'Warnings', 'These items do not work as the file says.'],
   ['info', 'Info', 'These items work, but can be better.']
 ]
+
 const DOC_KIND = {
   file: 'Config file',
   hook: 'Hook',
@@ -1478,15 +1390,15 @@ const DOC_KIND = {
 }
 
 function doctorIssues() {
-  return doctor?.issues ?? []
+  return state.doctor?.issues ?? []
 }
 
 function doctorItem(target) {
   if (!target?.kind) return null
-  if (target.kind === 'hook') return catalog.hook.find((h) => h.id === target.id) ?? null
+  if (target.kind === 'hook') return state.catalog.hook.find((h) => h.id === target.id) ?? null
   if (target.kind === 'mcp') return items.get(`mcp:${target.origin}:${target.plugin ?? ''}:${target.name}`) ?? null
   return (
-    (catalog[target.kind] ?? []).find(
+    (state.catalog[target.kind] ?? []).find(
       (i) => i.name === target.name && i.scope === target.scope && (i.plugin ?? null) === (target.plugin ?? null)
     ) ?? null
   )
@@ -1525,8 +1437,8 @@ function doctorRowHtml(issue) {
 
 function renderDoctor() {
   const note = `Doctor reads your config and finds files and items that are broken or that do not do what they say. It never changes a file. <button type="button" class="btn" id="doc-again">Check again</button>`
-  if (doctor?.error) {
-    $('p-doctor').innerHTML = empty(`Doctor could not run: ${doctor.error}`)
+  if (state.doctor?.error) {
+    $('p-doctor').innerHTML = empty(`Doctor could not run: ${state.doctor.error}`)
     return
   }
   const all = doctorIssues().filter(doctorMatches)
@@ -1543,7 +1455,7 @@ function renderDoctor() {
       )
       .join('')
   else if (!doctorIssues().length)
-    body = empty(`No issues found. Doctor checked ${plural(doctor?.checked ?? 0, 'file')}.`)
+    body = empty(`No issues found. Doctor checked ${plural(state.doctor?.checked ?? 0, 'file')}.`)
   else if (all.length) body = empty('No issues of this type.')
   else body = nothingMatches()
   $('p-doctor').innerHTML = chipsHtml('doctor', all, note) + body
@@ -1571,26 +1483,30 @@ function onDoctor(row, e) {
 async function checkAgain() {
   try {
     await refresh()
-    toast(`Doctor checked ${plural(doctor?.checked ?? 0, 'file')}`)
+    toast(`Doctor checked ${plural(state.doctor?.checked ?? 0, 'file')}`)
   } catch (err) {
     toast(`Could not check again: ${err.message}`, true)
   }
 }
 
 const TOKEN_BYTES = 4
+
 const DESC_CAP = 1536
+
 const CTX_TYPES = [
   ['claudemd', 'CLAUDE.md', 'm0'],
   ['skills', 'Skills', 'm1'],
   ['rules', 'Rules', 'm2'],
   ['agents', 'Agents', 'm3']
 ]
+
 const CTX_FILES = [
   ['global', '~/.claude/CLAUDE.md'],
   ['project', 'CLAUDE.md'],
   ['projectLocal', 'CLAUDE.local.md'],
   ['projectClaudeDir', '.claude/CLAUDE.md']
 ]
+
 const utf8 = new TextEncoder()
 
 function tokensOf(bytes) {
@@ -1603,10 +1519,6 @@ function listingTokens(item) {
 
 function sumTokens(list) {
   return list.reduce((sum, e) => sum + e.always, 0)
-}
-
-function tok(n) {
-  return `${n.toLocaleString('en-US')} tok`
 }
 
 function contextItems() {
@@ -1648,8 +1560,8 @@ function contextItems() {
     })
   }
   for (const [type, list] of [
-    ['skills', catalog.skill],
-    ['agents', catalog.agent]
+    ['skills', state.catalog.skill],
+    ['agents', state.catalog.agent]
   ])
     for (const item of list) {
       const cost = listingTokens(item)
@@ -1669,7 +1581,7 @@ function contextItems() {
         enabled: item.enabled
       })
     }
-  for (const item of catalog.mcp)
+  for (const item of state.catalog.mcp)
     out.push({
       type: 'mcp',
       kind: 'mcp',
@@ -1810,24 +1722,25 @@ function menuButtonFor(key) {
   const page = document.querySelector('.page:not([hidden])')
   return page
     ? ([...page.querySelectorAll('[data-act="menu"]')].find(
-        (b) => holderKey(b.closest(HOLDER)) === key && (b.closest('[data-rows]')?.dataset.rows ?? '') === menuCtx
+        (b) => holderKey(b.closest(HOLDER)) === key && (b.closest('[data-rows]')?.dataset.rows ?? '') === state.menuCtx
       ) ?? null)
     : null
 }
 
 function closeMenu(refocus = true) {
-  if (!menuKey) return
-  const btn = refocus ? menuButtonFor(menuKey) : null
-  menuKey = null
+  if (!state.menuKey) return
+  const btn = refocus ? menuButtonFor(state.menuKey) : null
+  state.menuKey = null
   if (btn) btn.focus({ preventScroll: true })
   render()
 }
 
 function openMenu(key, ctx = '') {
-  menuKey = menuKey === key && menuCtx === ctx ? null : key
-  menuCtx = ctx
+  state.menuKey = state.menuKey === key && state.menuCtx === ctx ? null : key
+  state.menuCtx = ctx
   render()
-  if (menuKey) document.querySelector('.page:not([hidden]) .menu [role="menuitem"]')?.focus({ preventScroll: true })
+  if (state.menuKey)
+    document.querySelector('.page:not([hidden]) .menu [role="menuitem"]')?.focus({ preventScroll: true })
 }
 
 function menuKeys(e) {
@@ -1888,10 +1801,10 @@ async function uninstallPlugin(item) {
 
 function renderNav() {
   const inv = state.inventory
-  $('n-skills').textContent = counts(catalog.skill).total
-  $('n-agents').textContent = counts(catalog.agent).total
-  $('n-plugins').textContent = counts(catalog.plugin).total
-  $('n-mods').textContent = counts(catalog.mod).total
+  $('n-skills').textContent = counts(state.catalog.skill).total
+  $('n-agents').textContent = counts(state.catalog.agent).total
+  $('n-plugins').textContent = counts(state.catalog.plugin).total
+  $('n-mods').textContent = counts(state.catalog.mod).total
   $('n-hooks').textContent = otherCounts(inv.hooks).total
   $('n-mcp').textContent = otherCounts(inv.mcp).total
   $('n-dups').textContent = duplicateGroups().filter(needsAction).length
@@ -1913,61 +1826,7 @@ function renderNav() {
   $('ctx').innerHTML = `Project: ${project} · Global: <code>${esc(tilde(inv.global.dir))}</code>`
 }
 
-function holderKey(h) {
-  return h ? (h.dataset.key ?? h.dataset.fav ?? null) : null
-}
-
-function focusMark() {
-  const el = document.activeElement
-  const page = el?.closest?.('.page')
-  if (!el || !page) return null
-  const holder = el.dataset?.act ? el.closest(HOLDER) : null
-  if (holder) {
-    const key = holderKey(holder)
-    const same = [...page.querySelectorAll(`[data-act="${el.dataset.act}"]`)].filter(
-      (b) => holderKey(b.closest(HOLDER)) === key
-    )
-    return {
-      key,
-      act: el.dataset.act,
-      index: Math.max(0, same.indexOf(el)),
-      pos: [...page.querySelectorAll(HOLDER)].indexOf(holder)
-    }
-  }
-  if (el.id) return { id: el.id, start: el.selectionStart ?? null, end: el.selectionEnd ?? null, scroll: el.scrollTop }
-  return null
-}
-
-function focusRestore(mark) {
-  if (!mark) return
-  const page = document.querySelector('.page:not([hidden])')
-  if (!page) return
-  if (mark.id) {
-    const el = $(mark.id)
-    if (!el || el.disabled || !page.contains(el)) return
-    el.focus({ preventScroll: true })
-    if (mark.start !== null && typeof el.setSelectionRange === 'function') {
-      try {
-        el.setSelectionRange(mark.start, mark.end)
-      } catch {}
-    }
-    if (mark.scroll) el.scrollTop = mark.scroll
-    return
-  }
-  const same = [...page.querySelectorAll(`[data-act="${mark.act}"]`)].filter(
-    (b) => holderKey(b.closest(HOLDER)) === mark.key
-  )
-  let target = same[mark.index] ?? same[0]
-  if (!target && mark.pos >= 0) {
-    const holders = [...page.querySelectorAll(HOLDER)]
-    const h = holders[Math.min(mark.pos, holders.length - 1)]
-    target =
-      h?.querySelector(`[data-act="${mark.act}"]:not([disabled])`) ?? h?.querySelector('[data-act="open"]') ?? null
-  }
-  if (target) target.focus({ preventScroll: true })
-}
-
-export function render() {
+function render() {
   if (!state.inventory) return
   const mark = focusMark()
   renderPage()
@@ -1989,25 +1848,25 @@ function renderPage() {
   else if (page === 'skills')
     renderCatalog(
       'skills',
-      catalog.skill,
+      state.catalog.skill,
       'Off writes <code>"skillOverrides": {"name": "off"}</code> to <code>~/.claude/settings.json</code> (global) or <code>.claude/settings.local.json</code> (project). Plugin skills follow their plugin.'
     )
   else if (page === 'agents')
     renderCatalog(
       'agents',
-      catalog.agent,
+      state.catalog.agent,
       'Claude Code has no off switch for agents. Off renames <code>name.md</code> to <code>name.md.disabled</code>. Plugin agents follow their plugin.'
     )
   else if (page === 'plugins')
     renderCatalog(
       'plugins',
-      catalog.plugin,
+      state.catalog.plugin,
       'The switch writes <code>enabledPlugins["name@marketplace"]</code>, the same as the <code>/plugin</code> menu.'
     )
   else if (page === 'mods')
     renderCatalog(
       'mods',
-      catalog.mod,
+      state.catalog.mod,
       'A mod is a plugin with <code>"modules"</code> in <code>hooks/hooks.json</code>. The switch writes <code>enabledPlugins["name@marketplace"]</code>. Mods load only when <code>CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1</code> is set in your shell or settings <code>env</code>.'
     )
   else if (page === 'hooks') renderHooks()
@@ -2016,7 +1875,7 @@ function renderPage() {
   else if (page === 'claudemd') renderClaudeMd()
 }
 
-export function go(page) {
+function go(page) {
   if (!Object.hasOwn(PAGES, page)) page = 'dash'
   const dirty = state.page === 'claudemd' && page !== 'claudemd' ? mdDirtyKey() : null
   if (dirty) {
@@ -2058,43 +1917,27 @@ function askReload(file) {
 
 async function loadProjectFiles() {
   if (!state.inventory?.project?.dir) {
-    projectFiles = null
+    state.projectFiles = null
     return
   }
   try {
     const res = await get(`/api/file?path=${encodeURIComponent(state.inventory.project.dir)}`)
-    projectFiles = new Set((res.entries ?? []).map((e) => e.name))
+    state.projectFiles = new Set((res.entries ?? []).map((e) => e.name))
   } catch {
-    projectFiles = null
+    state.projectFiles = null
   }
 }
 
-export async function refresh() {
+async function refresh() {
   const [inv, doc] = await Promise.all([
     get('/api/inventory'),
     get('/api/doctor').catch((err) => ({ error: err.message }))
   ])
   state.inventory = inv
-  doctor = doc
-  catalog = normalize(inv)
+  state.doctor = doc
+  state.catalog = normalize(inv)
   markStale()
   render()
-}
-
-let toastTimer = null
-function toast(message, isError = false) {
-  const t = $('toast')
-  t.textContent = message
-  t.classList.toggle('err', isError)
-  t.classList.add('show')
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => t.classList.remove('show'), isError ? 5000 : 3000)
-}
-
-function showBanner() {
-  if (bannerDismissed || bannerShown) return
-  bannerShown = true
-  $('banner').hidden = false
 }
 
 function toggleBody(item, enabled) {
@@ -2133,7 +1976,7 @@ async function toggle(item) {
     showBanner()
     await refresh()
     if (item.kind === 'hook' && !drawerOpen()) {
-      const moved = catalog.hook.find(
+      const moved = state.catalog.hook.find(
         (h) => h.event === item.event && h.command === item.command && h.file === item.file && h.enabled === enabled
       )
       const row = moved
@@ -2168,45 +2011,13 @@ async function star(body, message) {
 }
 
 function starItem(item, trigger) {
-  if (favPop && favPop.item.key === item.key && favPop.trigger === trigger) return closeFavPop()
+  if (state.favPop && state.favPop.item.key === item.key && state.favPop.trigger === trigger) return closeFavPop()
   openFavPop(item, trigger)
-}
-
-const dr = {
-  key: null,
-  kind: null,
-  mainFile: null,
-  root: null,
-  dir: null,
-  file: null,
-  loaded: '',
-  stamp: null,
-  editable: false,
-  tab: 'file',
-  seq: 0,
-  opener: null,
-  menu: false
 }
 
 const TEXT_EXT = /\.(md|json|txt)$/i
 
-function isFolderSkill(item) {
-  return item.kind === 'skill' && baseName(item.path) === 'SKILL.md'
-}
-
-function parentDir(file) {
-  return file.replace(/[\\/][^\\/]*$/, '')
-}
-
-function baseName(file) {
-  return file.split(/[\\/]/).pop()
-}
-
-function relTo(root, file) {
-  return root && file.startsWith(root) ? file.slice(root.length).replace(/^[\\/]/, '') : baseName(file)
-}
-
-function drawerOpen() {
+export function drawerOpen() {
   return $('dr').classList.contains('open')
 }
 
@@ -2219,62 +2030,8 @@ function isDirty() {
   return Boolean(drawerOpen() && txt && dr.editable && txt.value !== dr.loaded)
 }
 
-function fmtSize(n) {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
-
-let confirmState = null
-
-function ask({ title, message, ok = 'OK', danger = false, command = '' }) {
-  if (confirmState) confirmState.done(false)
-  return new Promise((resolve) => {
-    const box = $('cf')
-    $('cf-title').textContent = title
-    $('cf-msg').textContent = message
-    $('cf-cmd').textContent = command
-    $('cf-cmd-box').hidden = !command
-    const yes = $('cf-yes')
-    yes.textContent = ok
-    yes.classList.toggle('danger', danger)
-    const back = document.activeElement
-    const layer = drawerOpen() ? $('dr') : document.querySelector('.app')
-    layer.inert = true
-    box.hidden = false
-    confirmState = {
-      done(answer) {
-        confirmState = null
-        box.hidden = true
-        layer.inert = false
-        if (back && document.contains(back)) back.focus()
-        resolve(answer)
-      }
-    }
-    $('cf-no').focus()
-  })
-}
-
-function trapTab(e, container) {
-  const nodes = [
-    ...container.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])')
-  ].filter((el) => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0)
-  if (!nodes.length) return
-  const first = nodes[0]
-  const last = nodes[nodes.length - 1]
-  if (!container.contains(document.activeElement)) {
-    e.preventDefault()
-    first.focus()
-  } else if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault()
-    last.focus()
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault()
-    first.focus()
-  }
-}
-
 const KIND_WORD = { skill: 'Skill', agent: 'Agent', plugin: 'Plugin', hook: 'Hook', mcp: 'MCP server' }
+
 const LOCK_WORD = { skill: 'skill', agent: 'agent', hook: 'hook', mcp: 'MCP server' }
 
 function isPluginOwned(item) {
@@ -2286,7 +2043,7 @@ function ownerId(item) {
 }
 
 function ownerPlugin(item) {
-  return isPluginOwned(item) ? (catalog.plugin.find((p) => p.id === ownerId(item)) ?? null) : null
+  return isPluginOwned(item) ? (state.catalog.plugin.find((p) => p.id === ownerId(item)) ?? null) : null
 }
 
 function drawerMetaHtml(item) {
@@ -2571,10 +2328,10 @@ function ovHooksHtml(hooks) {
 
 function pluginBodyHtml(item) {
   const mine = (list) => list.filter((x) => x.plugin === item.id)
-  const skills = mine(catalog.skill)
-  const agents = mine(catalog.agent)
-  const hooks = mine(catalog.hook)
-  const mcp = mine(catalog.mcp)
+  const skills = mine(state.catalog.skill)
+  const agents = mine(state.catalog.agent)
+  const hooks = mine(state.catalog.hook)
+  const mcp = mine(state.catalog.mcp)
   const tabs = item.missing
     ? [['overview', 'Overview']]
     : [
@@ -2707,14 +2464,6 @@ function paintEditor() {
   hl.scrollTop = txt.scrollTop
   const fmt = $('dr-fmt')
   if (fmt) fmt.hidden = !dr.editable || !isMd(dr.file)
-}
-
-function insertText(txt, text) {
-  txt.focus()
-  if (!document.execCommand('insertText', false, text)) {
-    txt.setRangeText(text, txt.selectionStart, txt.selectionEnd, 'end')
-    txt.dispatchEvent(new Event('input'))
-  }
 }
 
 function formatText(kind) {
@@ -2991,7 +2740,7 @@ function openerKey(item) {
   return { key: (usable && cardKey(el)) || item.key, el: usable ? el : null }
 }
 
-export function openDrawer(item) {
+function openDrawer(item) {
   dr.opener = openerKey(item)
   dr.key = item.key
   dr.kind = item.kind
@@ -3061,7 +2810,7 @@ function forceClose() {
   ;(target ?? $('title')).focus()
 }
 
-export async function closeDrawer() {
+async function closeDrawer() {
   if (!drawerOpen()) return
   if (isDirty()) {
     const discard = await ask({
@@ -3282,11 +3031,14 @@ async function onDrawerClick(e) {
 }
 
 const EFFORT = ['low', 'medium', 'high']
+
 const MODES = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']
+
 const FORM_GROUPS = [
   ['model', 'Model and output'],
   ['perm', 'Permissions']
 ]
+
 const FORM_FIELDS = [
   {
     key: 'model',
@@ -3322,51 +3074,22 @@ const FORM_FIELDS = [
     help: 'Skip the confirm dialog before a session enters <code>bypassPermissions</code> mode.'
   }
 ]
+
 const ELSEWHERE = [
   ['enabledPlugins', 'plugins', 'Plugins'],
   ['skillOverrides', 'skills', 'Skills'],
   ['hooks', 'hooks', 'Hooks']
 ]
+
 const SET_ORDER = ['sg', 'sp', 'sl']
+
 const SET_WHERE = { sg: 'every project', sp: 'this folder · in git', sl: 'this folder · only you' }
+
 const SET_ABOUT = {
   sg: 'This file applies to every project on this computer.',
   sp: 'This file is for the team. It goes into git with the project.',
   sl: 'This file is only for you. Git ignores it. Storehouse writes your on/off switches for this folder here.'
 }
-
-function freshHookForm() {
-  return { open: false, scope: 'global', event: 'PreToolUse', matcher: '*', command: '', error: '', invalid: '' }
-}
-
-function freshMcpForm() {
-  return {
-    open: false,
-    scope: 'global',
-    name: '',
-    transport: 'stdio',
-    command: '',
-    args: '',
-    url: '',
-    env: '',
-    error: '',
-    invalid: ''
-  }
-}
-
-const cfg = {
-  hook: freshHookForm(),
-  mcp: freshMcpForm(),
-  sview: 'files',
-  efilter: 'all',
-  ssel: null,
-  stab: 'form',
-  sforms: {},
-  sformMsg: ''
-}
-const eds = {}
-const bks = {}
-const msgs = {}
 
 async function busy(name, fn) {
   if (pending.has(name)) return
@@ -3386,14 +3109,6 @@ async function afterWrite() {
     render()
   }
   loadActivity()
-}
-
-function isPlain(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-function opt(value, label, current) {
-  return `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(label)}</option>`
 }
 
 function invalidAttr(form, field) {
@@ -3427,10 +3142,6 @@ function addButton(name, label) {
   const open = cfg[name].open
   const id = name === 'hook' ? 'hf' : 'mf'
   return `<button type="button" class="btn${open ? '' : ' p'}" id="${id}-open" data-c="${id}-open" aria-expanded="${open}" aria-controls="${name}-form">${open ? 'Close form' : label}</button>`
-}
-
-function unquote(token) {
-  return token.replace(/^(['"])(.*)\1$/, '$2')
 }
 
 function hookLabel(h) {
@@ -3505,19 +3216,19 @@ function hookGroupsHtml(list) {
 }
 
 function renderHooks() {
-  const list = catalog.hook.filter((h) => visible(h) && keepChip('hooks', h))
-  const body = !catalog.hook.length
+  const list = state.catalog.hook.filter((h) => visible(h) && keepChip('hooks', h))
+  const body = !state.catalog.hook.length
     ? empty('No hooks in ~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json, or plugins.')
     : list.length
       ? hookGroupsHtml(list)
-      : chipFilter.hooks !== 'all' && catalog.hook.some(visible)
+      : chipFilter.hooks !== 'all' && state.catalog.hook.some(visible)
         ? empty('No hooks match this filter.')
         : nothingMatches()
   const bar = pageBar(
     'A hook runs a command when an event happens in Claude Code. Hooks are grouped by event, in the order the events happen in a session. Off moves your hook into <code>~/.claude/storehouse.json</code>. Plugin hooks follow their plugin.',
     `<button type="button" class="btn" data-go="settings">Edit settings files</button>${addButton('hook', 'Add hook')}`
   )
-  $('p-hooks').innerHTML = `${bar}${hookFormHtml()}${chipsHtml('hooks', catalog.hook, '')}${body}`
+  $('p-hooks').innerHTML = `${bar}${hookFormHtml()}${chipsHtml('hooks', state.catalog.hook, '')}${body}`
 }
 
 function hookFormHtml() {
@@ -3586,7 +3297,7 @@ function mcpRowHtml(m, counts) {
   const del = canDelete
     ? `<button type="button" class="btn danger ghost" data-act="del" aria-label="${esc(`Delete ${label}`)}">Delete</button>`
     : ''
-  const others = catalog.mcp.filter((o) => o.name === m.name && o.key !== m.key).map((o) => o.source)
+  const others = state.catalog.mcp.filter((o) => o.name === m.name && o.key !== m.key).map((o) => o.source)
   const dup =
     counts.get(m.name) > 1
       ? `<span class="flag" title="${esc(`Also from: ${others.join(', ')}`)}">${esc(`Name used ${counts.get(m.name)} times`)}</span>`
@@ -3607,9 +3318,9 @@ function mcpRowHtml(m, counts) {
 }
 
 function renderMcp() {
-  const list = catalog.mcp.filter((m) => visible(m) && keepChip('mcp', m))
+  const list = state.catalog.mcp.filter((m) => visible(m) && keepChip('mcp', m))
   const counts = new Map()
-  for (const m of catalog.mcp) counts.set(m.name, (counts.get(m.name) ?? 0) + 1)
+  for (const m of state.catalog.mcp) counts.set(m.name, (counts.get(m.name) ?? 0) + 1)
   const sections = [
     ['global', 'Global', 'From ~/.claude.json. Claude Code loads them in every folder.'],
     ['project', 'Project', 'From ./.mcp.json or this folder in ~/.claude.json.'],
@@ -3626,17 +3337,17 @@ function renderMcp() {
         .join('')}</ul>`
     })
     .join('')
-  const body = !catalog.mcp.length
+  const body = !state.catalog.mcp.length
     ? empty('No MCP servers in ~/.claude.json, .mcp.json, or plugins.')
     : html ||
-      (chipFilter.mcp !== 'all' && catalog.mcp.some(visible)
+      (chipFilter.mcp !== 'all' && state.catalog.mcp.some(visible)
         ? empty('No MCP servers match this filter.')
         : nothingMatches())
   const bar = pageBar(
     'An MCP server gives Claude extra tools. A local server runs as a process on your computer. A remote server is a URL. Changes apply at the next Claude Code session.',
     addButton('mcp', 'Add MCP server')
   )
-  $('p-mcp').innerHTML = `${bar}${mcpFormHtml()}${chipsHtml('mcp', catalog.mcp, '')}${body}`
+  $('p-mcp').innerHTML = `${bar}${mcpFormHtml()}${chipsHtml('mcp', state.catalog.mcp, '')}${body}`
 }
 
 function mcpFormHtml() {
@@ -4251,7 +3962,9 @@ function renderSettings() {
 }
 
 const SCOPE_KEY = { global: 'sg', project: 'sp', projectLocal: 'sl' }
+
 const SCOPE_TAG = { global: ['global', 'global'], project: ['project', 'project'], projectLocal: ['local', 'local'] }
+
 const EFF_GROUPS = [
   ['model', 'Model and output', ''],
   ['rules', 'Permissions', 'Lists add up from all files. An allow rule does not outrank a deny or ask rule.'],
@@ -4382,12 +4095,14 @@ async function pickSet(k) {
 }
 
 const MD_ORDER = ['mg', 'mp', 'mc', 'ml']
+
 const MD_WHERE = {
   mg: 'every project',
   mp: 'this folder · in git',
   mc: 'this folder · in git',
   ml: 'this folder · only you'
 }
+
 const cmd = { sel: null }
 
 function mdKeys() {
@@ -4398,10 +4113,6 @@ function mdSelected(panels) {
   const keys = mdKeys()
   if (!cmd.sel || !keys.includes(cmd.sel)) cmd.sel = keys.find((k) => panels[k].info?.exists) ?? keys[0]
   return cmd.sel
-}
-
-function lineCount(text) {
-  return text ? text.replace(/\r?\n$/, '').split(/\r?\n/).length : 0
 }
 
 function mdMeta(k, p) {
@@ -4720,10 +4431,6 @@ function createPanel(k, template) {
   })
 }
 
-async function waitFor(check) {
-  for (let i = 0; i < 20 && !check(); i++) await new Promise((r) => setTimeout(r, 50))
-}
-
 function deletePanel(k) {
   return busy(`delete:${k}`, async () => {
     const p = cfgPanels()[k]
@@ -4965,7 +4672,7 @@ function renderActivity(entries) {
   list.innerHTML = entries.map(actRowHtml).join('')
 }
 
-export async function loadActivity() {
+async function loadActivity() {
   try {
     const res = await get('/api/activity')
     renderActivity(res.entries ?? [])
@@ -4992,10 +4699,6 @@ async function undo(id) {
   }
 }
 
-function cardKey(el) {
-  return holderKey(el.closest(HOLDER))
-}
-
 function wire() {
   $('nav').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-p]')
@@ -5008,9 +4711,9 @@ function wire() {
     render()
   })
   $('q').addEventListener('input', (e) => {
-    clearTimeout(searchTimer)
+    clearTimeout(state.searchTimer)
     const value = e.target.value
-    searchTimer = setTimeout(() => {
+    state.searchTimer = setTimeout(() => {
       state.query = value
       render()
     }, 120)
@@ -5026,30 +4729,30 @@ function wire() {
     }
   }, 30000)
   $('banner-x').addEventListener('click', () => {
-    bannerDismissed = true
+    state.bannerDismissed = true
     $('banner').hidden = true
   })
   $('dr-close').addEventListener('click', () => closeDrawer())
   $('dr-scrim').addEventListener('click', () => closeDrawer())
   $('dr').addEventListener('click', onDrawerClick)
-  $('cf-no').addEventListener('click', () => confirmState?.done(false))
-  $('cf-yes').addEventListener('click', () => confirmState?.done(true))
+  $('cf-no').addEventListener('click', () => state.confirmState?.done(false))
+  $('cf-yes').addEventListener('click', () => state.confirmState?.done(true))
   document.addEventListener('keydown', (e) => {
-    if (confirmState) {
+    if (state.confirmState) {
       if (e.key === 'Escape') {
         e.preventDefault()
-        confirmState.done(false)
+        state.confirmState.done(false)
       } else if (e.key === 'Tab') trapTab(e, $('cf'))
       return
     }
-    if (favPop) {
+    if (state.favPop) {
       if (e.key === 'Escape') {
         e.preventDefault()
         closeFavPop()
-      } else if (e.key === 'Tab') trapTab(e, favPop.el)
+      } else if (e.key === 'Tab') trapTab(e, state.favPop.el)
       return
     }
-    if (favEditing !== null && e.key === 'Escape' && document.activeElement?.id === 'fav-rename') {
+    if (state.favEditing !== null && e.key === 'Escape' && document.activeElement?.id === 'fav-rename') {
       e.preventDefault()
       cancelRename()
       return
@@ -5081,7 +4784,7 @@ function wire() {
       saveEd(panelKey)
       return
     }
-    if (menuKey) {
+    if (state.menuKey) {
       if (e.key === 'Escape') {
         e.preventDefault()
         closeMenu()
@@ -5100,7 +4803,11 @@ function wire() {
   document.addEventListener(
     'mousedown',
     (e) => {
-      if (favPop && !favPop.el.contains(e.target) && !e.target.closest('[data-act="star"], [data-dact="star"]'))
+      if (
+        state.favPop &&
+        !state.favPop.el.contains(e.target) &&
+        !e.target.closest('[data-act="star"], [data-dact="star"]')
+      )
         closeFavPop(false)
     },
     true
@@ -5123,7 +4830,7 @@ function wire() {
     if (unusedEl) {
       if (unusedEl.dataset.unused === 'off') return void switchOffUnused()
       chipFilter[state.page] = 'unused'
-      menuKey = null
+      state.menuKey = null
       return render()
     }
     const cfgEl = e.target.closest('[data-c]')
@@ -5134,7 +4841,7 @@ function wire() {
     const chip = e.target.closest('[data-chip]')
     if (chip) {
       chipFilter[state.page] = chip.dataset.chip
-      menuKey = null
+      state.menuKey = null
       return render()
     }
     const fc = e.target.closest('[data-fc]')
@@ -5175,18 +4882,18 @@ function wire() {
     if (act?.dataset.act === 'open' || !e.target.closest('button, a, input, details, .menu, .pnote')) openDrawer(item)
   })
   document.addEventListener('click', (e) => {
-    if (menuKey && !e.target.closest('.menu, [data-act="menu"]')) closeMenu(false)
+    if (state.menuKey && !e.target.closest('.menu, [data-act="menu"]')) closeMenu(false)
   })
   main.addEventListener('focusout', (e) => {
-    if (!menuKey || !e.relatedTarget) return
+    if (!state.menuKey || !e.relatedTarget) return
     const holder = e.relatedTarget.closest?.(HOLDER)
-    if (holder && holderKey(holder) === menuKey && e.relatedTarget.closest('.menu, [data-act="menu"]')) return
+    if (holder && holderKey(holder) === state.menuKey && e.relatedTarget.closest('.menu, [data-act="menu"]')) return
     setTimeout(() => closeMenu(false), 0)
   })
 
   main.addEventListener('input', (e) => {
-    if (e.target.id === 'fav-newcat') favNewName = e.target.value
-    else if (e.target.id === 'fav-rename') favRenameValue = e.target.value
+    if (e.target.id === 'fav-newcat') state.favNewName = e.target.value
+    else if (e.target.id === 'fav-rename') state.favRenameValue = e.target.value
     else onCfgInput(e)
   })
   main.addEventListener('submit', (e) => {
@@ -5208,13 +4915,13 @@ function wire() {
   main.addEventListener('dragstart', (e) => {
     const row = e.target.closest?.('.fav-sec .lrow[draggable="true"]')
     if (!row) return
-    dragKey = holderKey(row)
+    state.dragKey = holderKey(row)
     row.classList.add('dragging')
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', dragKey)
+    e.dataTransfer.setData('text/plain', state.dragKey)
   })
   main.addEventListener('dragover', (e) => {
-    if (!dragKey) return
+    if (!state.dragKey) return
     const sec = e.target.closest('.fav-sec')
     if (!sec) return
     e.preventDefault()
@@ -5222,25 +4929,30 @@ function wire() {
     clearDrop()
     sec.classList.add('drop-over')
     const row = e.target.closest('.fav-sec .lrow')
-    if (row && holderKey(row) !== dragKey) row.classList.add(isAfter(e, row) ? 'drop-after' : 'drop-before')
+    if (row && holderKey(row) !== state.dragKey) row.classList.add(isAfter(e, row) ? 'drop-after' : 'drop-before')
   })
   main.addEventListener('dragleave', (e) => {
     const sec = e.target.closest?.('.fav-sec')
     if (sec && !sec.contains(e.relatedTarget)) clearDrop()
   })
   main.addEventListener('drop', (e) => {
-    if (!dragKey) return
+    if (!state.dragKey) return
     const sec = e.target.closest('.fav-sec')
     if (!sec) return
     e.preventDefault()
     const row = e.target.closest('.fav-sec .lrow')
-    const plan = placeFav(dragKey, sec.dataset.cat || null, row ? holderKey(row) : null, row ? isAfter(e, row) : true)
-    dragKey = null
+    const plan = placeFav(
+      state.dragKey,
+      sec.dataset.cat || null,
+      row ? holderKey(row) : null,
+      row ? isAfter(e, row) : true
+    )
+    state.dragKey = null
     clearDrop()
     if (plan) saveOrder(plan)
   })
   main.addEventListener('dragend', () => {
-    dragKey = null
+    state.dragKey = null
     clearDrop()
     for (const c of document.querySelectorAll('.dragging')) c.classList.remove('dragging')
   })

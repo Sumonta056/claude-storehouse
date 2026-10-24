@@ -23,10 +23,15 @@ test('site build makes the landing page and a live demo from the current public/
   const demo = fs.readFileSync(path.join(out, 'demo', 'index.html'), 'utf8')
   assert.match(demo, /<script src="demo-api.js"><\/script>\s*<script type="module" src="app.js">/)
   assert.match(demo, /noindex/)
-  assert.equal(
-    fs.readFileSync(path.join(out, 'demo', 'app.js'), 'utf8'),
-    fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8')
-  )
+  const scripts = fs.readdirSync(path.join(root, 'public'), { recursive: true }).filter((f) => f.endsWith('.js'))
+  assert.ok(scripts.length > 1)
+  for (const file of scripts) {
+    assert.equal(
+      fs.readFileSync(path.join(out, 'demo', file), 'utf8'),
+      fs.readFileSync(path.join(root, 'public', file), 'utf8'),
+      `demo ${file} differs from public/${file}`
+    )
+  }
 
   const raw = fs.readFileSync(path.join(out, 'demo', 'demo-data.json'), 'utf8')
   assert.ok(!raw.includes(os.tmpdir()), 'demo data leaks a temp path')
