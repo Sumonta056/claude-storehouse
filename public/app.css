@@ -109,7 +109,7 @@ code {
 .side {
   background: var(--side);
   border-right: 1px solid var(--line);
-  padding: 20px 12px;
+  padding: 16px 12px 12px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -121,7 +121,7 @@ code {
   gap: 10px;
   font-weight: 700;
   font-size: 17px;
-  padding: 4px 10px 18px;
+  padding: 4px 10px 14px;
 }
 .brand svg {
   flex: none;
@@ -136,7 +136,7 @@ code {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 40px;
+  min-height: 36px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -192,43 +192,43 @@ code {
   display: flex;
   flex-direction: column;
 }
-.act-toggle {
-  display: none;
+.nav {
+  flex: 1;
 }
-.act {
-  margin-top: 16px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-  min-height: 0;
-}
-.act h2 {
+.side-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 10px;
-  padding: 0 2px;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px 2px 0 12px;
+  border-top: 1px solid var(--line);
   font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
   color: var(--muted);
 }
-.act-count:not(:empty) {
-  margin-left: auto;
-  min-width: 22px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--panel2);
-  color: var(--text2);
-  font-size: 14px;
-  letter-spacing: 0;
-  text-align: center;
+.side-foot span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.act ul {
+.side-foot a {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.side-foot a:hover {
+  background: var(--panel2);
+  color: var(--text);
+}
+.act {
   list-style: none;
-  margin: 0;
-  padding: 0 2px 0 0;
-  max-height: 360px;
-  overflow: auto;
+  max-width: 760px;
+  margin: 16px 0 0;
+  padding: 0;
 }
 .act-row {
   position: relative;
@@ -2524,6 +2524,7 @@ select {
 @media (max-width: 720px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
   }
   .side {
     position: sticky;
@@ -2560,23 +2561,8 @@ select {
   .nav {
     flex: 1 1 0;
   }
-  .act {
-    flex: 1 0 100%;
-    margin: 0;
-    padding-top: 6px;
-  }
-  .act h2 {
+  .side-foot {
     display: none;
-  }
-  .act-toggle {
-    display: inline-block;
-  }
-  .act:not(.open) ul {
-    display: none;
-  }
-  .act ul {
-    max-height: 40vh;
-    margin-top: 6px;
   }
   .dr-top {
     padding: 16px 16px 14px;

@@ -13,7 +13,8 @@ const PAGES = {
   hooks: 'Hooks',
   mcp: 'MCP servers',
   settings: 'Settings',
-  claudemd: 'CLAUDE.md'
+  claudemd: 'CLAUDE.md',
+  activity: 'Activity'
 }
 
 const HOLDER = '.recent, tr[data-key], .lrow, .pnote'
@@ -1844,7 +1845,7 @@ function renderPage() {
   else if (page === 'hooks') renderHooks()
   else if (page === 'mcp') renderMcp()
   else if (page === 'settings') renderSettings()
-  else renderClaudeMd()
+  else if (page === 'claudemd') renderClaudeMd()
 }
 
 export function go(page) {
@@ -4783,8 +4784,7 @@ function actRowHtml(e) {
 }
 
 function renderActivity(entries) {
-  $('act-toggle').textContent = `Activity (${entries.length})`
-  $('act-count').textContent = entries.length ? String(entries.length) : ''
+  $('n-activity').textContent = entries.length ? String(entries.length) : ''
   const list = $('act')
   if (!entries.length) {
     list.innerHTML = `<li class="act-empty"><span class="act-empty-ic">${actIcon('undo', 22)}</span><b>No changes yet</b><span>Switches, saves, and stars show here. You can undo them.</span></li>`
@@ -4816,9 +4816,7 @@ async function undo(id) {
   } finally {
     pending.delete(busy)
     await loadActivity()
-    const title = $('act-title')
-    if (title.getClientRects().length) title.focus()
-    else $('act-toggle').focus()
+    $('title').focus()
   }
 }
 
@@ -4864,10 +4862,6 @@ function wire() {
   $('dr').addEventListener('click', onDrawerClick)
   $('cf-no').addEventListener('click', () => confirmState?.done(false))
   $('cf-yes').addEventListener('click', () => confirmState?.done(true))
-  $('act-toggle').addEventListener('click', () => {
-    const open = $('act-box').classList.toggle('open')
-    $('act-toggle').setAttribute('aria-expanded', String(open))
-  })
   document.addEventListener('keydown', (e) => {
     if (confirmState) {
       if (e.key === 'Escape') {

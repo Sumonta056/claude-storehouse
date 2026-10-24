@@ -12,7 +12,7 @@ paths:
 
 ## Pages
 
-Dashboard, Favorites, Duplicates, Doctor, Context, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUDE.md.
+Dashboard, Favorites, Duplicates, Doctor, Context, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUDE.md, Activity.
 
 Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective switch at the top. Details: `business-logic.md` › Settings page.
 
@@ -21,7 +21,7 @@ Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective
 - Scope filter: All, Global, Project.
 - `/` focuses search.
 - Detail drawer with editor, preview, and files tab.
-- Activity log with undo in the sidebar.
+- Activity page with undo. Its nav button comes after CLAUDE.md. The sidebar footer "Made by Sumonta" with GitHub and portfolio links sits at the bottom.
 - Confirm dialog before delete.
 - A toast after each write names the file that changed.
 - A switch shows the file it writes in a tooltip before the click.
