@@ -1,4 +1,8 @@
+import { DEFAULT_COMBO, comboProblem } from '../logic/shortcut.js'
+
 export const items = new Map()
+
+export const PALETTE_KEY = 'storehouse.paletteKey'
 
 export const PERIOD_KEY = 'storehouse.usagePeriod'
 
@@ -28,6 +32,15 @@ function readSort() {
     return SORTS.some(([k]) => k === value) ? value : 'name'
   } catch {
     return 'name'
+  }
+}
+
+function readPaletteKey() {
+  try {
+    const value = localStorage.getItem(PALETTE_KEY)
+    return comboProblem(value) ? DEFAULT_COMBO : value
+  } catch {
+    return DEFAULT_COMBO
   }
 }
 
@@ -121,5 +134,8 @@ export const state = {
   menuKey: null,
   menuCtx: '',
   toastTimer: null,
-  confirmState: null
+  confirmState: null,
+  paletteKey: readPaletteKey(),
+  paletteRecent: [],
+  palette: null
 }

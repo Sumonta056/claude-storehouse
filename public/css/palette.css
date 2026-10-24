@@ -1,0 +1,205 @@
+.kbd {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0 5px;
+  color: var(--muted);
+  background: var(--panel2);
+}
+
+.pal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pal-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.cmdk-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+}
+.cmdk-scrim {
+  position: absolute;
+  inset: 0;
+  background: #0007;
+}
+.cmdk {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.cmdk .in {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.cmdk .in:focus-within {
+  box-shadow: inset 0 -2px 0 var(--focus);
+}
+.cmdk .in input {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  font-size: 16px;
+  outline: none;
+}
+.cmdk-list {
+  flex: 1 1 auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.cmdk-list .grp-h {
+  margin: 10px 8px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cmdk-list .it {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cmdk-list .it:hover {
+  background: var(--panel2);
+}
+.cmdk-list .it.sel {
+  background: var(--accent-soft);
+}
+.cmdk-list .ki {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--panel2);
+  color: var(--accent-text);
+}
+.cmdk-list .nm {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.cmdk-list .sb {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmdk-list .rt {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmdk-list .tag.on {
+  color: var(--green);
+  border-color: var(--green);
+}
+.pal-star {
+  color: var(--accent-text);
+}
+.cmdk-none {
+  padding: 18px 10px;
+  text-align: center;
+  color: var(--muted);
+}
+.cmdk-msg {
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--accent-text);
+}
+.cmdk-msg:empty {
+  display: none;
+}
+.cmdk-ft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+.ft-keys,
+.ft-short {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.ft-short {
+  gap: 4px;
+}
+.ft-short .btn-link {
+  min-height: 32px;
+  padding: 0 6px;
+}
+.ft-short .btn-link:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+.pal-rec {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .cmdk-wrap {
+    padding-top: 16px;
+  }
+  .ft-keys {
+    display: none;
+  }
+}

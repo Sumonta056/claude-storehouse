@@ -3,7 +3,8 @@ import { askReload, deleteRow, guarded, refresh, reveal, toggle, uninstallPlugin
 import { $, HOLDER, ask, cardKey, holderKey, toast } from '../core/dom.js'
 import { ago, baseName, esc, isFolderSkill, parentDir, plural, shortVersion, tilde } from '../core/format.js'
 import { ICON, kindIcon } from '../core/icons.js'
-import { dr, items } from '../core/state.js'
+import { dr, items, state } from '../core/state.js'
+import { pushRecent } from '../logic/palette.js'
 import {
   KIND_WORD,
   hasSwitch,
@@ -219,6 +220,7 @@ function openerKey(item) {
 
 export function openDrawer(item) {
   dr.opener = openerKey(item)
+  state.paletteRecent = pushRecent(state.paletteRecent, item.key)
   dr.key = item.key
   dr.kind = item.kind
   dr.seq++

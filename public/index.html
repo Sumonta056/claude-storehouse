@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="css/forms.css" />
     <link rel="stylesheet" href="css/claudemd.css" />
     <link rel="stylesheet" href="css/lists.css" />
+    <link rel="stylesheet" href="css/palette.css" />
     <link rel="stylesheet" href="css/responsive.css" />
     <link rel="stylesheet" href="css/favorites.css" />
     <link rel="stylesheet" href="css/settings.css" />
@@ -320,6 +321,14 @@
         <div class="top">
           <h1 id="title" tabindex="-1">Dashboard</h1>
           <div class="controls">
+            <button
+              type="button"
+              class="pal-chip"
+              id="pal-open"
+              title="Command palette: open, switch, or star any item"
+            >
+              <kbd class="kbd" id="pal-key">⌘P</kbd><span>Commands</span>
+            </button>
             <input
               class="search"
               id="q"
@@ -406,6 +415,30 @@
           <button type="button" class="btn" id="cf-no">Cancel</button>
           <button type="button" class="btn" id="cf-yes">OK</button>
         </div>
+      </div>
+    </div>
+
+    <div class="cmdk-wrap" id="pal" hidden>
+      <div class="cmdk-scrim" id="pal-scrim"></div>
+      <div class="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="in">
+          <input
+            id="pal-q"
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="pal-list"
+            aria-autocomplete="list"
+            aria-label="Search items, pages, and actions"
+            placeholder="Search items, pages, and actions"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <kbd class="kbd">esc</kbd>
+        </div>
+        <ul class="cmdk-list" id="pal-list" role="listbox" aria-label="Results"></ul>
+        <p class="cmdk-msg" id="pal-msg" role="status" aria-live="polite"></p>
+        <div class="cmdk-ft" id="pal-ft"></div>
       </div>
     </div>
 

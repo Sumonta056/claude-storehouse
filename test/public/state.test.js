@@ -50,3 +50,22 @@ test('state uses the defaults when the browser blocks storage', async () => {
   assert.equal(state.usagePeriod, 'month')
   assert.equal(state.usageSort, 'name')
 })
+
+test('state reads the palette shortcut that the browser saved', async () => {
+  const state = await loadState(storage({ 'storehouse.paletteKey': 'mod+shift+k' }))
+  assert.equal(state.paletteKey, 'mod+shift+k')
+  assert.deepEqual(state.paletteRecent, [])
+})
+
+test('state falls back to mod+p for a missing, bad, or browser-reserved palette shortcut', async () => {
+  for (const saved of [undefined, 'k', 'mod+w', 'super+p']) {
+    const state = await loadState(storage({ 'storehouse.paletteKey': saved }))
+    assert.equal(state.paletteKey, 'mod+p', String(saved))
+  }
+  const blocked = await loadState({
+    getItem() {
+      throw new Error('SecurityError')
+    }
+  })
+  assert.equal(blocked.paletteKey, 'mod+p')
+})

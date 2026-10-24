@@ -18,9 +18,11 @@ import { closeDrawer, closeDrawerMenu, drawerOpen, isDirty, onDrawerClick, openD
 import { closeFavPop, placeFavPop, starItem } from './ui/fav-popover.js'
 import { closeMenu, menuKeys, openMenu } from './ui/menu.js'
 import { go, render } from './ui/nav.js'
+import { onPaletteKey, wirePalette } from './ui/palette.js'
 import { showBoot } from './ui/skeleton.js'
 
 function wire() {
+  wirePalette()
   $('nav').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-p]')
     if (b) go(b.dataset.p)
@@ -73,6 +75,7 @@ function wire() {
       } else if (e.key === 'Tab') trapTab(e, state.favPop.el)
       return
     }
+    if (onPaletteKey(e)) return
     if (state.favEditing !== null && e.key === 'Escape' && document.activeElement?.id === 'fav-rename') {
       e.preventDefault()
       cancelRename()
