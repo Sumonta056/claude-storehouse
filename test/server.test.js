@@ -115,6 +115,20 @@ test('GET /api/usage returns totals and requires the token', async () => {
   })
 })
 
+test('GET /api/doctor returns issues without secrets and requires the token', async () => {
+  await withServer(async ({ api }) => {
+    const res = await api('GET', '/api/doctor')
+    assert.equal(res.status, 200)
+    assert.ok(Array.isArray(res.json.issues))
+    assert.ok(res.json.checked > 0)
+    assert.ok(res.json.issues.some((i) => i.check === 6 && i.name === 'old'))
+    assert.ok(!res.text.includes('secret-value'))
+    assert.ok(!res.text.includes('secret-token'))
+    const denied = await api('GET', '/api/doctor', undefined, { 'x-storehouse-token': 'wrong' })
+    assert.equal(denied.status, 401)
+  })
+})
+
 test('POST /api/toggle then inventory shows change', async () => {
   await withServer(async ({ fx, api }) => {
     const res = await api('POST', '/api/toggle', {

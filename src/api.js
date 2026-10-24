@@ -3,6 +3,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { scanAll } from './scan/index.js'
 import { scanUsage } from './scan/usage.js'
+import { scanDoctor } from './scan/doctor.js'
 import { storehousePath } from './scan/hooks.js'
 import { toggle, mutateJson, Refusal } from './write/toggles.js'
 import { setFavorite, reorderFavorites, editCategory } from './write/favorites.js'
@@ -87,6 +88,11 @@ function pick(source, fields) {
 
 export function getInventory(_req, { ctx }) {
   return ok(scanAll(ctx))
+}
+
+export function getDoctor(_req, { ctx }) {
+  const pathDirs = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)
+  return ok(scanDoctor({ ...ctx, inventory: scanAll(ctx), env: process.env, pathDirs }))
 }
 
 export async function getUsage(_req, { ctx }) {

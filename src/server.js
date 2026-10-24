@@ -13,6 +13,7 @@ const { HttpError } = api
 const ROUTES = {
   'GET /api/inventory': api.getInventory,
   'GET /api/usage': api.getUsage,
+  'GET /api/doctor': api.getDoctor,
   'GET /api/file': api.getFile,
   'PUT /api/file': api.putFile,
   'DELETE /api/file': api.deleteFile,
