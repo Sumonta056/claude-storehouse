@@ -225,6 +225,7 @@ export async function scanUsage({ home, now = new Date() }) {
     monthKey,
     all: summarize(records),
     month: summarize(records.filter((r) => r.month === monthKey)),
-    items: summarizeUses(uses, new Date(now).getTime())
+    items: summarizeUses(uses, new Date(now).getTime()),
+    since: uses.reduce((min, u) => (min === null || u.time < min ? u.time : min), null)
   }
 }

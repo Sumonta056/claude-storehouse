@@ -1020,10 +1020,22 @@ function useReady() {
   return Boolean(usage?.items && usage.all?.responses)
 }
 
+function useCovered() {
+  return useReady() && typeof usage.since === 'number' && usage.since <= Date.now() - 30 * DAY
+}
+
+function toolName(value) {
+  return String(value).replace(/[^A-Za-z0-9_-]/g, '_')
+}
+
 function useKeys(item) {
   const p = item.plugin ? String(pluginLabel(item.plugin)).replace(/@.*/, '') : ''
-  if (item.kind === 'mcp') return [p ? `mcp:plugin:${p}:${item.name}` : `mcp:${item.name}`]
-  return p ? [`${item.kind}:${p}:${item.name}`, `${item.kind}:${item.name}`] : [`${item.kind}:${item.name}`]
+  if (item.kind === 'mcp')
+    return [p ? `mcp:plugin:${toolName(p)}:${toolName(item.name)}` : `mcp:${toolName(item.name)}`]
+  const bare = `${item.kind}:${item.name}`
+  if (!p) return [bare]
+  const local = catalog[item.kind].some((o) => !o.plugin && o.name === item.name)
+  return local ? [`${item.kind}:${p}:${item.name}`] : [`${item.kind}:${p}:${item.name}`, bare]
 }
 
 function useOf(item) {
@@ -1041,7 +1053,7 @@ function useOf(item) {
 
 function isUnused(item) {
   const u = useOf(item)
-  if (!u || u.count30 || !item.enabled) return false
+  if (!u || u.count30 || !item.enabled || item.disableModelInvocation || !useCovered()) return false
   return typeof item.mtime !== 'number' || item.mtime < Date.now() - 30 * DAY
 }
 
@@ -1108,7 +1120,8 @@ function unusedBanner(page, list) {
   const off = can.length
     ? `<button type="button" class="btn p" data-unused="off">Switch off ${can.length}</button>`
     : ''
-  return `<div class="ubanner" role="note"><p><b>${esc(`${plural(unused.length, USE_WORD[page])} had no use in 30 days.`)}</b>${cost ? ` Together they add ${esc(tok(cost))} to every session.` : ''}</p><div class="acts">${show}${off}</div></div>`
+  const typed = page === 'skills' ? ' Skills you start by typing /name do not count as use.' : ''
+  return `<div class="ubanner" role="note"><p><b>${esc(`${plural(unused.length, USE_WORD[page])} had no use in 30 days.`)}</b>${cost ? ` Together they add ${esc(tok(cost))} to every session.` : ''}${typed}</p><div class="acts">${show}${off}</div></div>`
 }
 
 async function switchOffUnused() {
@@ -1119,7 +1132,7 @@ async function switchOffUnused() {
   if (!targets.length) return
   const yes = await ask({
     title: `Switch off ${plural(targets.length, USE_WORD[page])}?`,
-    message: `${targets.map((i) => i.name).join(', ')}. Each switch gets its own Activity entry that you can undo.`,
+    message: `${targets.map((i) => i.name).join(', ')}. Claude did not call these in 30 days.${page === 'skills' ? ' Skills you start by typing /name do not count as use.' : ''} Each switch gets its own Activity entry that you can undo.`,
     ok: `Switch off ${targets.length}`
   })
   if (!yes) return

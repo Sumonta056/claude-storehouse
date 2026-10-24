@@ -127,7 +127,8 @@ write(path.join(claude, 'storehouse.json'), {
 write(path.join(home, '.claude.json'), {
   mcpServers: {
     github: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], env: { LOG_LEVEL: 'info' } },
-    postgres: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres', 'postgres://localhost/demo'] }
+    postgres: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres', 'postgres://localhost/demo'] },
+    'docs.search': { type: 'http', url: 'https://docs-search.example/mcp' }
   },
   projects: { [project]: { disabledMcpServers: ['postgres'] } }
 })
@@ -175,7 +176,8 @@ const tools = [
   ['Skill', { skill: 'git-message' }],
   ['Skill', { skill: 'api-design' }],
   ['Agent', { subagent_type: 'toolkit:planner' }],
-  ['Skill', { skill: 'debugging' }]
+  ['Skill', { skill: 'debugging' }],
+  ['mcp__docs_search__find', {}]
 ]
 sessions.forEach(([dir, model, turns], s) => {
   const lines = []
@@ -232,6 +234,10 @@ write(
       usage: { input_tokens: 800, output_tokens: 400 }
     }
   }) + '\n'
+)
+write(
+  path.join(claude, 'skills', 'security-review', 'SKILL.md'),
+  '---\nname: security-review\ndescription: Check a diff for injection, leaked keys, and unsafe input handling.\ndisable-model-invocation: true\n---\n\n# security-review\n\nRun it by hand with /security-review.\n'
 )
 const stale = new Date(today.getTime() - 60 * 86400000)
 for (const name of ['release-notes', 'sql-explain', 'security-review'])

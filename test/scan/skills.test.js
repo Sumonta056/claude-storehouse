@@ -167,3 +167,17 @@ test('broken skill symlinks go to the skipped list', () => {
     ])
   })
 })
+
+test('marks a skill with disable-model-invocation true', () => {
+  withFixture((fx) => {
+    const dir = path.join(fx.home, '.claude', 'skills')
+    fs.mkdirSync(path.join(dir, 'by-hand'), { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, 'by-hand', 'SKILL.md'),
+      '---\nname: by-hand\ndescription: Typed only.\ndisable-model-invocation: true\n---\nBody\n'
+    )
+    const skills = run(fx)
+    assert.equal(skills.find((s) => s.name === 'by-hand').disableModelInvocation, true)
+    assert.ok(skills.filter((s) => s.name !== 'by-hand').every((s) => s.disableModelInvocation === false))
+  })
+})

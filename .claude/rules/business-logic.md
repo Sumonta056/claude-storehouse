@@ -102,9 +102,11 @@ Target file per scope:
 - Count each `tool_use` `id` one time across all files. A call stamped after now does not count.
 - `count30` counts calls in the 30 days before now. `last` is the newest call.
 - Slash commands typed by the user and hooks are not counted. Counts are for all projects together.
-- The browser matches a local or project item by `<kind>:<name>`, and a plugin item by `<kind>:<plugin>:<name>` plus `<kind>:<name>`. Items whose keys overlap share one count, and the row says "Shared with N items of this name".
-- "Unused 30 d" = the item is on, has no call in 30 days, and its file is older than 30 days. MCP servers have no file time, so only the call count applies.
-- "Switch off N" toggles each switchable unused item one at a time after a confirm dialog. Each toggle gets its own Activity entry with undo.
+- `since` is the time of the oldest tool call, or `null`. The Unused flag and banner show only when `since` is 30 days or more ago.
+- The browser matches a skill or agent by `<kind>:<name>`, and a plugin skill or agent by `<kind>:<plugin>:<name>`. A plugin item also takes the bare `<kind>:<name>` only when no local or project item of that kind has the name. MCP keys use `mcp:<server>` and `mcp:plugin:<plugin>:<server>`, with each character outside `[A-Za-z0-9_-]` changed to `_`, as Claude Code does in tool names.
+- Items with the same key (a global and a project item, or 2 plugins) each show the full count, and the row says "Shared with N items of this name".
+- "Unused 30 d" = usage has at least one response, `since` covers 30 days, the item is a skill, agent, or MCP server that is on, it has no call in 30 days, and its file is older than 30 days. MCP servers have no file time, so only the call count applies. A skill with `disable-model-invocation: true` is never Unused: Claude cannot call it. Typed `/name` use does not count, and the banner and confirm dialog say so.
+- "Switch off N" toggles each switchable unused item that the scope filter and search show, one at a time, after a confirm dialog. Each toggle gets its own Activity entry with undo.
 - The sort (Most used, Least used, Name) is kept in `localStorage` key `storehouse.usageSort`. The default is Name.
 
 ## Favorites

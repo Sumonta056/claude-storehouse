@@ -38,6 +38,7 @@ function describe(file, fallbackName) {
     name: meta.name || fallbackName,
     description: meta.description || firstBodyLine(meta.body),
     hasDescription: hasText(meta.description),
+    disableModelInvocation: meta['disable-model-invocation'] === 'true',
     size: Buffer.byteLength(text)
   }
 }
@@ -67,6 +68,7 @@ function buildItem(file, fallback, scope, source, pluginId, enabledFor) {
     name: info.name,
     description: info.description,
     hasDescription: info.hasDescription,
+    disableModelInvocation: info.disableModelInvocation,
     size: info.size,
     scope,
     source,

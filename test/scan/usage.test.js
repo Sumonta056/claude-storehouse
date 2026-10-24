@@ -433,3 +433,17 @@ test('does not count a call stamped after now', async () => {
     fx.cleanup()
   }
 })
+
+test('returns the time of the oldest tool call as since', async () => {
+  const fx = makeFixture()
+  try {
+    assert.equal((await scanUsage({ home: fx.home, now: NOW })).since, null)
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      toolLine({ id: 'a', at: '2026-10-20T10:00:00Z', tools: [['t1', 'Skill', { skill: 'x' }]] }),
+      toolLine({ id: 'b', at: '2026-08-02T10:00:00Z', tools: [['t2', 'Agent', {}]] })
+    ])
+    assert.equal((await scanUsage({ home: fx.home, now: NOW })).since, Date.parse('2026-08-02T10:00:00Z'))
+  } finally {
+    fx.cleanup()
+  }
+})

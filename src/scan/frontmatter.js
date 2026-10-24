@@ -7,7 +7,7 @@ function unquote(value) {
 }
 
 const BLOCK = /^([>|])[+-]?$/
-const KEEP = new Set(['name', 'description', 'model', 'tools', 'paths'])
+const KEEP = new Set(['name', 'description', 'model', 'tools', 'paths', 'disable-model-invocation'])
 const LISTS = new Set(['tools', 'paths'])
 
 function indentOf(line) {
