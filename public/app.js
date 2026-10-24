@@ -1,5 +1,19 @@
 import { get, send } from './api.js'
 import {
+  afterWrite,
+  askReload,
+  busy,
+  deleteRow,
+  editFavCategory,
+  guarded,
+  loadProjectFiles,
+  refresh,
+  reveal,
+  star,
+  toggle,
+  uninstallPlugin
+} from './core/actions.js'
+import {
   $,
   HOLDER,
   ask,
@@ -36,8 +50,6 @@ import {
 import { ICON, kindIcon } from './core/icons.js'
 import {
   PERIOD_KEY,
-  SORTS,
-  SORT_KEY,
   bks,
   cfg,
   chipFilter,
@@ -67,7 +79,6 @@ import {
   isPluginOwned,
   itemLabel,
   matches,
-  normalize,
   otherCounts,
   ownerId,
   ownerPlugin,
@@ -75,10 +86,9 @@ import {
   pluginLabel,
   projectOn,
   switchInfo,
-  switchable,
   visible
 } from './logic/catalog.js'
-import { CHIPS, chipCounts, keepChip } from './logic/chips.js'
+import { keepChip } from './logic/chips.js'
 import {
   ELSEWHERE,
   FORM_FIELDS,
@@ -107,36 +117,30 @@ import {
   sformValues,
   shortValue
 } from './logic/config.js'
-import { CTX_TYPES, TOKEN_BYTES, contextItems, keepCtx, listingTokens, sumTokens, tokensOf } from './logic/context.js'
+import { CTX_TYPES, TOKEN_BYTES, contextItems, keepCtx, sumTokens } from './logic/context.js'
 import { DOC_KIND, DOC_SEVERITY, doctorIssues, doctorItem, doctorMatches } from './logic/doctor.js'
-import { DUP_KINDS, dupSource, duplicateGroups, needsAction, onCount } from './logic/duplicates.js'
+import { DUP_KINDS, duplicateGroups, needsAction, onCount } from './logic/duplicates.js'
 import { EFF_GROUPS, SCOPE_KEY, SCOPE_TAG, effRow, effRows } from './logic/effective.js'
 import { HOOK_EVENTS, HOOK_INFO, hookLabel, hookRunsFor } from './logic/hooks.js'
 import { highlight, isMd, previewHtml } from './logic/markdown.js'
 import { mcpTransport, parseEnv } from './logic/mcp.js'
+import { USAGE_PAGES, modelShares, sortRows } from './logic/usage.js'
+import { chipsHtml, setSort, switchOffUnused } from './ui/chips.js'
 import {
-  USAGE_PAGES,
-  USE_WORD,
-  isUnused,
-  lastText,
-  modelShares,
-  sharedWith,
-  sortRows,
-  useOf,
-  useReady
-} from './logic/usage.js'
-
-function scopeTag(scope) {
-  return `<span class="tag ${esc(scope)}">${esc(scope)}</span>`
-}
-
-function empty(text) {
-  return `<div class="empty">${esc(text)}</div>`
-}
-
-function nothingMatches() {
-  return empty(state.query ? `Nothing matches "${state.query}" in this scope.` : 'Nothing in this scope.')
-}
+  addButton,
+  cellSwitch,
+  empty,
+  invalidAttr,
+  menuEntries,
+  nothingMatches,
+  pageBar,
+  rowHtml,
+  rowsHtml,
+  scopeTag,
+  useChips,
+  useFlag,
+  viaPlugin
+} from './ui/rows.js'
 
 function navIcon(page) {
   return document.querySelector(`#nav [data-p="${page}"] .ic`)?.outerHTML ?? ''
@@ -148,14 +152,6 @@ function statTile(page, label, c) {
     <span class="n">${c.total}</span>
     <span class="s"><span class="on">${c.on} on</span><span class="off">${c.total - c.on} off</span></span>
   </button>`
-}
-
-function setSort(value) {
-  state.usageSort = value
-  try {
-    localStorage.setItem(SORT_KEY, value)
-  } catch {}
-  render()
 }
 
 function setPeriod(period) {
@@ -515,23 +511,6 @@ function submitFavPop(form) {
   star(favBody(item, true, category), fav ? `Moved ${item.name} to ${label}` : `Starred ${item.name} in ${label}`)
 }
 
-async function editFavCategory(body, message) {
-  if (pending.has('favcat')) return false
-  pending.add('favcat')
-  try {
-    await send('POST', '/api/favorites/category', body)
-    toast(`${message} · ~/.claude/storehouse.json`)
-    await refresh()
-    return true
-  } catch (err) {
-    toast(`Could not update categories: ${err.message}`, true)
-    return false
-  } finally {
-    pending.delete('favcat')
-    loadActivity()
-  }
-}
-
 function focusFavTool(cat, tool) {
   document.querySelector(`#p-fav [data-fc="${tool}"][data-cat="${CSS.escape(cat)}"]`)?.focus({ preventScroll: true })
 }
@@ -621,213 +600,6 @@ const SECTIONS = {
     ['global', 'Global · ~/.claude/agents', 'Off renames name.md to name.md.disabled'],
     ['project', 'Project · ./.claude/agents', 'Off renames name.md to name.md.disabled']
   ]
-}
-
-function useChips(item) {
-  if (!USAGE_PAGES.has(state.page)) return ''
-  const u = useOf(item)
-  if (!u) return ''
-  const unused = isUnused(item)
-  const bits = []
-  if (u.count30) bits.push(`<span class="mchip">Used ${u.count30}× in 30 d</span>`)
-  if (u.last)
-    bits.push(
-      `<span class="mchip${unused ? ' warnc' : ''}" title="${esc(new Date(u.last).toLocaleString())}">last: ${esc(lastText(u.last))}</span>`
-    )
-  else if (unused) bits.push('<span class="mchip warnc">Never used</span>')
-  const shared = u.last ? sharedWith(item) : 0
-  if (shared) bits.push(`<span class="mchip">${esc(`Shared with ${plural(shared, 'item')} of this name`)}</span>`)
-  return bits.join('')
-}
-
-function useFlag(item) {
-  return USAGE_PAGES.has(state.page) && isUnused(item) ? '<span class="flag bad">Unused 30 d</span>' : ''
-}
-
-function sortHtml() {
-  if (!useReady()) return ''
-  const buttons = SORTS.map(
-    ([k, text]) =>
-      `<button type="button" data-usort="${k}" aria-pressed="${k === state.usageSort ? 'true' : 'false'}">${text}</button>`
-  ).join('')
-  return `<div class="usort"><span>Sort</span><div class="scope" role="group" aria-label="Sort by use">${buttons}</div></div>`
-}
-
-function unusedBanner(page, list) {
-  const unused = list.filter((i) => visible(i) && isUnused(i))
-  if (!unused.length) return ''
-  const can = unused.filter((i) => i.canToggle && switchable(page, i))
-  const cost = page === 'mcp' ? 0 : unused.reduce((sum, i) => sum + listingTokens(i), 0)
-  const show =
-    chipFilter[page] === 'unused' ? '' : '<button type="button" class="btn" data-unused="show">Show them</button>'
-  const off = can.length
-    ? `<button type="button" class="btn p" data-unused="off">Switch off ${can.length}</button>`
-    : ''
-  const typed = page === 'skills' ? ' Skills you start by typing /name do not count as use.' : ''
-  return `<div class="ubanner" role="note"><p><b>${esc(`${plural(unused.length, USE_WORD[page])} had no use in 30 days.`)}</b>${cost ? ` Together they add ${esc(tok(cost))} to every session.` : ''}${typed}</p><div class="acts">${show}${off}</div></div>`
-}
-
-async function switchOffUnused() {
-  const page = state.page
-  const list = { skills: state.catalog.skill, agents: state.catalog.agent, mcp: state.catalog.mcp }[page]
-  if (!list) return
-  const targets = list.filter((i) => visible(i) && isUnused(i) && i.canToggle && switchable(page, i))
-  if (!targets.length) return
-  const yes = await ask({
-    title: `Switch off ${plural(targets.length, USE_WORD[page])}?`,
-    message: `${targets.map((i) => i.name).join(', ')}. Claude did not call these in 30 days.${page === 'skills' ? ' Skills you start by typing /name do not count as use.' : ''} Each switch gets its own Activity entry that you can undo.`,
-    ok: `Switch off ${targets.length}`
-  })
-  if (!yes) return
-  for (const t of targets) {
-    const item = items.get(t.key)
-    if (item?.enabled) await toggle(item)
-  }
-}
-
-function pluginParts(id) {
-  const p = pluginById(id)
-  if (!p) return []
-  const parts = [
-    [p.skills.length, 'skill'],
-    [p.agents.length, 'agent'],
-    [p.hooks.length, 'hook']
-  ]
-    .filter(([n]) => n)
-    .map(([n, w]) => plural(n, w))
-  if (p.mcp.length) parts.push(`${p.mcp.length} MCP`)
-  return parts
-}
-
-function cliScope(id) {
-  const s = pluginById(id)?.installScope
-  return ['user', 'project', 'local'].includes(s) ? s : 'user'
-}
-
-function rowSource(item) {
-  if (item.kind === 'plugin') return item.source === 'plugin' ? '' : item.source
-  if (item.plugin) return ''
-  return item.source === 'local' || item.source === 'project' ? '' : item.source
-}
-
-function leadHtml(item) {
-  const sw = switchInfo(item)
-  if (item.kind === 'plugin' && item.missing) {
-    return `<span class="lead-ic bad" role="img" aria-label="Plugin folder missing" title="${esc(sw.title)}">${ICON.warn}</span>`
-  }
-  if (!item.canToggle) {
-    return `<span class="lead-ic" role="img" aria-label="${esc(sw.title)}" title="${esc(sw.title)}">${ICON.lock}</span>`
-  }
-  const label = `${item.enabled ? 'Switch off' : 'Switch on'} ${item.kind} ${item.name}`
-  return `<button type="button" class="sw" role="switch" data-act="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(label)}" title="${esc(sw.title)}"></button>`
-}
-
-function menuEntries(item) {
-  if (item.kind === 'plugin' && item.missing)
-    return [
-      ['m-open', 'Open details'],
-      ['m-uninstall', 'Remove entry', true]
-    ]
-  const list = [['m-open', 'Open details']]
-  if (item.canToggle) list.push(['m-toggle', item.enabled ? 'Switch off' : 'Switch on'])
-  if (item.path) list.push(['m-finder', 'Reveal in Finder'])
-  if (item.kind === 'plugin' && !item.dev) list.push(['m-uninstall', 'Uninstall plugin…', true])
-  return list
-}
-
-function menuHtml(item) {
-  const entries = menuEntries(item)
-  const html = entries
-    .map(
-      ([act, text, danger]) =>
-        `${danger ? '<div class="menu-sep" role="separator"></div>' : ''}<button type="button" role="menuitem" class="menu-item${danger ? ' danger' : ''}" data-act="${act}">${esc(text)}</button>`
-    )
-    .join('')
-  return `<div class="menu" role="menu" id="menu-${slug(item.key)}" aria-label="${esc(`More actions for ${item.name}`)}">${html}</div>`
-}
-
-function metaHtml(item) {
-  if (item.kind === 'plugin' && item.modules?.length && (item.dev || state.page === 'mods')) {
-    const bits = item.modules.map((m) => `<span class="mchip">${esc(m)}</span>`)
-    if (item.dev) bits.push(`<span class="mchip">session ${esc(item.session.slice(0, 8))}</span>`)
-    return `<p class="meta chips-s">${bits.join('')}</p>`
-  }
-  if (item.kind === 'plugin') {
-    if (item.missing) return '<p class="meta muted">Use “Remove entry” to clean up installed_plugins.json.</p>'
-    const parts = pluginParts(item.id)
-    return `<p class="meta${parts.length ? '' : ' muted'}">${esc(parts.length ? parts.join(' · ') : 'No skills, agents, hooks, or MCP servers found')}</p>`
-  }
-  const bits = []
-  if (item.kind === 'agent') {
-    if (item.model) bits.push(`<span class="mchip">model: ${esc(item.model)}</span>`)
-    if (item.tools?.length) bits.push(`<span class="mchip">${esc(item.tools.join(' · '))}</span>`)
-  }
-  const use = useChips(item)
-  if (use) bits.push(use)
-  return bits.length ? `<p class="meta chips-s">${bits.join('')}</p>` : ''
-}
-
-const FAV_KINDS = new Set(['skill', 'agent', 'plugin'])
-
-function tokChip(item) {
-  if (!['skills', 'agents'].includes(state.page) || (item.kind !== 'skill' && item.kind !== 'agent')) return ''
-  const n = listingTokens(item)
-  const title = `About ${tok(n)} in every session for the name and description. The full file, about ${tok(tokensOf(item.size ?? 0))}, loads on use.`
-  return `<span class="tokc" title="${esc(title)}">${esc(tok(n))}</span>`
-}
-
-function rowHtml(item, ctx = '', { draggable = false, cat = null, keep = false, right = '', note = '' } = {}) {
-  const open = state.menuKey === item.key && state.menuCtx === ctx
-  const src =
-    ctx === 'dups'
-      ? dupSource(item)
-      : ctx === 'fav' && item.plugin
-        ? `via plugin ${pluginLabel(item.plugin)}`
-        : rowSource(item)
-  const off = item.canToggle && !item.enabled
-  const desc = item.missing
-    ? 'Listed in installed_plugins.json, but the plugin folder is gone.'
-    : item.description || 'No description'
-  const fullVer = item.kind === 'plugin' ? (pluginById(item.id)?.version ?? item.version ?? '') : ''
-  const ver = shortVersion(fullVer)
-  const cls = ['lrow', off ? 'off' : '', item.missing ? 'missing' : '', item.canToggle ? '' : 'locked']
-    .filter(Boolean)
-    .join(' ')
-  return `<li class="${cls}" data-key="${esc(item.key)}"${draggable ? ' draggable="true"' : ''}>
-    <div class="lead">${leadHtml(item)}</div>
-    <div class="body">
-      <div class="l1"><button type="button" class="name btn-plain" data-act="open">${esc(item.name)}</button>${src ? `<span class="src">${esc(src)}</span>` : ''}${cat ? `<span class="cat-tag">${esc(cat)}</span>` : ''}${item.isMod && state.page !== 'mods' ? '<span class="flag">Mod</span>' : ''}${item.missing ? '<span class="flag bad">Folder missing</span>' : ''}${off ? '<span class="flag">Off</span>' : ''}${useFlag(item)}${tokChip(item)}</div>
-      <p class="desc">${esc(desc)}</p>
-      ${metaHtml(item)}${note}
-    </div>
-    ${right}${ver ? `<span class="ver" title="${esc(fullVer)}">${esc(ver)}</span>` : ''}
-    <div class="tail">
-      ${item.missing ? '<button type="button" class="btn danger" data-act="uninstall">Remove entry</button>' : ''}
-      ${keep ? '<button type="button" class="btn" data-act="keep">Keep only this</button>' : ''}
-      ${item.dev || !FAV_KINDS.has(item.kind) ? '' : `<button type="button" class="star" data-act="star" aria-haspopup="dialog" aria-pressed="${item.favorite ? 'true' : 'false'}" aria-label="Favorite ${esc(item.name)}">★</button>`}
-      <button type="button" class="icon-btn" data-act="menu" aria-haspopup="menu" aria-expanded="${open ? 'true' : 'false'}"${open ? ` aria-controls="menu-${slug(item.key)}"` : ''} aria-label="${esc(`More actions for ${item.name}`)}">${ICON.dots}</button>
-    </div>
-    ${open ? menuHtml(item) : ''}
-  </li>`
-}
-
-function rowsHtml(list, ctx = '') {
-  return `<ul class="rows" data-rows="${ctx}">${list.map((i) => rowHtml(i, ctx)).join('')}</ul>`
-}
-
-function chipsHtml(page, list, note) {
-  const n = chipCounts(page, list)
-  const buttons = CHIPS[page]
-    .filter(([k]) => k !== 'unused' || useReady())
-    .map(([k, label]) => {
-      const on = chipFilter[page] === k
-      const bad = (k === 'broken' || k === 'error' || k === 'unused') && n[k] ? ' bad' : ''
-      return `<button type="button" class="chip${bad}" id="chip-${page}-${k}" data-chip="${k}" aria-pressed="${on ? 'true' : 'false'}">${esc(label)} <span class="n">${n[k]}</span></button>`
-    })
-    .join('')
-  const extra = USE_WORD[page] ? sortHtml() : ''
-  const banner = USE_WORD[page] ? unusedBanner(page, list) : ''
-  return `<div class="chipbar"><div class="chips" role="group" aria-label="${esc(`Filter ${PAGES[page].toLowerCase()}`)}">${buttons}</div>${extra}<p class="note">${note}</p></div>${banner}`
 }
 
 function pluginGroupsHtml(page, list) {
@@ -1142,46 +914,6 @@ function menuKeys(e) {
   return true
 }
 
-function reveal(item) {
-  const file = item.path
-  return guarded(`reveal-${item.key}`, async () => {
-    try {
-      await send('POST', '/api/open', { path: file, app: 'finder' })
-      toast(`Revealed ${tilde(file)} in Finder`)
-    } catch (err) {
-      toast(`Could not open: ${err.message}`, true)
-    }
-  })
-}
-
-async function uninstallPlugin(item) {
-  const busy = `${item.key}:uninstall`
-  if (pending.has(busy)) return
-  const parts = pluginParts(item.id)
-  const command = `claude plugin uninstall ${item.id} --scope ${cliScope(item.id)}`
-  const yes = await ask({
-    title: item.missing ? `Remove entry ${item.name}?` : `Uninstall ${item.name}?`,
-    message: item.missing
-      ? 'The plugin folder is gone. This removes its entry from installed_plugins.json.'
-      : `Claude Code stops loading ${parts.length ? `its ${parts.join(', ')}` : 'this plugin'}. You can install it again with /plugin.`,
-    ok: item.missing ? 'Remove entry' : 'Uninstall',
-    danger: true,
-    command
-  })
-  if (!yes) return
-  pending.add(busy)
-  try {
-    await send('POST', '/api/plugin/uninstall', { id: item.id })
-    toast(item.missing ? `Removed entry ${item.id}` : `Uninstalled ${item.id}`)
-    await refresh()
-  } catch (err) {
-    toast(`Could not uninstall ${item.name}: ${err.message}`, true)
-  } finally {
-    pending.delete(busy)
-    loadActivity()
-  }
-}
-
 function renderNav() {
   const inv = state.inventory
   $('n-skills').textContent = counts(state.catalog.skill).total
@@ -1209,7 +941,7 @@ function renderNav() {
   $('ctx').innerHTML = `Project: ${project} · Global: <code>${esc(tilde(inv.global.dir))}</code>`
 }
 
-function render() {
+export function render() {
   if (!state.inventory) return
   const mark = focusMark()
   renderPage()
@@ -1283,110 +1015,6 @@ const PROJECT_OFF_NOTE = 'Started from your home folder — project scope is off
 
 function projectOffHtml() {
   return `<div class="warn" role="note">${esc(PROJECT_OFF_NOTE)}</div>`
-}
-
-function askReload(file) {
-  return ask({
-    title: `${baseName(file)} changed on disk`,
-    message: 'This file changed on disk. Reload it before you save. Reload discards your unsaved edits.',
-    ok: 'Reload (discard mine)',
-    danger: true
-  })
-}
-
-async function loadProjectFiles() {
-  if (!state.inventory?.project?.dir) {
-    state.projectFiles = null
-    return
-  }
-  try {
-    const res = await get(`/api/file?path=${encodeURIComponent(state.inventory.project.dir)}`)
-    state.projectFiles = new Set((res.entries ?? []).map((e) => e.name))
-  } catch {
-    state.projectFiles = null
-  }
-}
-
-async function refresh() {
-  const [inv, doc] = await Promise.all([
-    get('/api/inventory'),
-    get('/api/doctor').catch((err) => ({ error: err.message }))
-  ])
-  state.inventory = inv
-  state.doctor = doc
-  state.catalog = normalize(inv)
-  markStale()
-  render()
-}
-
-function toggleBody(item, enabled) {
-  if (item.kind === 'plugin') return { kind: 'plugin', name: item.id, scope: item.scope, enabled }
-  if (item.kind === 'hook') {
-    if (enabled) return { kind: 'hook', name: item.id, scope: item.scope, enabled }
-    return {
-      kind: 'hook',
-      name: item.command,
-      scope: item.scope,
-      file: item.file,
-      event: item.event,
-      index: item.index,
-      enabled
-    }
-  }
-  if (item.kind === 'mcp') {
-    const body = { kind: 'mcp', name: item.name, scope: item.scope, origin: item.origin, enabled }
-    if (item.plugin) body.plugin = item.plugin
-    return body
-  }
-  return { kind: item.kind, name: item.name, scope: item.scope, enabled, plugin: item.plugin }
-}
-
-async function toggle(item) {
-  const busy = `${item.key}:toggle`
-  if (!item.canToggle || pending.has(busy)) return
-  pending.add(busy)
-  const enabled = !item.enabled
-  const body = toggleBody(item, enabled)
-  item.enabled = enabled
-  render()
-  try {
-    const res = await send('POST', '/api/toggle', body)
-    toast(`Wrote ${tilde(res.file)}${res.backup ? ' · backup saved' : ''}`)
-    showBanner()
-    await refresh()
-    if (item.kind === 'hook' && !drawerOpen()) {
-      const moved = state.catalog.hook.find(
-        (h) => h.event === item.event && h.command === item.command && h.file === item.file && h.enabled === enabled
-      )
-      const row = moved
-        ? [...document.querySelectorAll('#p-hooks [data-key]')].find((r) => r.dataset.key === moved.key)
-        : null
-      row?.querySelector('[data-act="toggle"]')?.focus()
-    }
-  } catch (err) {
-    item.enabled = !enabled
-    render()
-    toast(`Could not switch ${item.name}: ${err.message}`, true)
-  } finally {
-    pending.delete(busy)
-    loadActivity()
-  }
-}
-
-async function star(body, message) {
-  const busy = `${body.kind}:${body.source}:${body.name}:star`
-  if (pending.has(busy)) return
-  pending.add(busy)
-  try {
-    await send('POST', '/api/favorite', body)
-    toast(`${message} · ~/.claude/storehouse.json`)
-    await refresh()
-  } catch (err) {
-    toast(`Could not update favorites: ${err.message}`, true)
-  } finally {
-    pending.delete(busy)
-    loadActivity()
-  }
 }
 
 function starItem(item, trigger) {
@@ -2015,17 +1643,6 @@ async function confirmLeaveFile() {
   })
 }
 
-async function guarded(name, fn) {
-  const busy = `${dr.key}:${name}`
-  if (pending.has(busy)) return
-  pending.add(busy)
-  try {
-    await fn()
-  } finally {
-    pending.delete(busy)
-  }
-}
-
 function saveFile() {
   return guarded('save', async () => {
     if (!dr.editable || !isDirty()) return
@@ -2217,59 +1834,6 @@ const SET_ABOUT = {
   sg: 'This file applies to every project on this computer.',
   sp: 'This file is for the team. It goes into git with the project.',
   sl: 'This file is only for you. Git ignores it. Storehouse writes your on/off switches for this folder here.'
-}
-
-async function busy(name, fn) {
-  if (pending.has(name)) return
-  pending.add(name)
-  try {
-    await fn()
-  } finally {
-    pending.delete(name)
-  }
-}
-
-async function afterWrite() {
-  await loadProjectFiles()
-  try {
-    await refresh()
-  } catch {
-    render()
-  }
-  loadActivity()
-}
-
-function invalidAttr(form, field) {
-  return cfg[form].invalid === field ? ' aria-invalid="true"' : ''
-}
-
-function rowSwitch(item, label) {
-  const sw = switchInfo(item)
-  const text = item.enabled ? 'Switch off' : 'Switch on'
-  return `<span class="sw-wrap">${sw.text ? `<span class="via" title="${esc(sw.title)}">${esc(sw.text)}</span>` : ''}<button type="button" class="sw" role="switch" data-act="toggle" aria-checked="${item.enabled ? 'true' : 'false'}" aria-label="${esc(`${text} ${label}`)}" title="${esc(sw.title)}"${sw.disabled ? ' disabled' : ''}></button></span>`
-}
-
-function cellSwitch(item, label) {
-  if (item.plugin && !item.canToggle) {
-    const sw = switchInfo(item)
-    return `<span class="lead-ic" role="img" aria-label="${esc(sw.title)}" title="${esc(sw.title)}">${ICON.lock}</span>`
-  }
-  return rowSwitch(item, label)
-}
-
-function viaPlugin(item) {
-  const name = pluginLabel(item.plugin)
-  return `<span class="via-lock" title="${esc(`Follows the plugin ${name}. Switch or uninstall it on the Plugins page.`)}">${ICON.lock}<span>via plugin ${esc(name)}</span></span>`
-}
-
-function pageBar(note, actions) {
-  return `<div class="pagebar"><p class="note">${note}</p><div class="pb-a">${actions}</div></div>`
-}
-
-function addButton(name, label) {
-  const open = cfg[name].open
-  const id = name === 'hook' ? 'hf' : 'mf'
-  return `<button type="button" class="btn${open ? '' : ' p'}" id="${id}-open" data-c="${id}-open" aria-expanded="${open}" aria-controls="${name}-form">${open ? 'Close form' : label}</button>`
 }
 
 function hookSource(h) {
@@ -2517,31 +2081,6 @@ function submitMcp() {
         `Could not add the server: ${err.message}`,
         err.status === 409 ? 'mf-name' : 'mf-save'
       )
-    }
-  })
-}
-
-function deleteRow(item) {
-  if (item.kind !== 'hook' && item.kind !== 'mcp') return
-  return busy(`del:${item.key}`, async () => {
-    const hook = item.kind === 'hook'
-    const where = hook && item.parked ? '~/.claude/storehouse.json' : tilde(item.path)
-    const yes = await ask({
-      title: hook ? `Delete ${item.event} hook?` : `Delete MCP server ${item.name}?`,
-      message: `${hook ? item.command : item.name} is removed from ${where}. A backup of the file is written first.`,
-      ok: 'Delete',
-      danger: true
-    })
-    if (!yes) return
-    try {
-      const res = hook
-        ? await send('DELETE', '/api/hook', { id: item.id })
-        : await send('DELETE', '/api/mcp', { scope: item.scope, name: item.name, origin: item.origin })
-      toast(`Deleted ${hook ? `${item.event} hook` : `MCP server ${item.name}`} · wrote ${tilde(res.file)}`)
-      showBanner()
-      await afterWrite()
-    } catch (err) {
-      toast(`Could not delete: ${err.message}`, true)
     }
   })
 }
@@ -3574,7 +3113,7 @@ function renderActivity(entries) {
   list.innerHTML = entries.map(actRowHtml).join('')
 }
 
-async function loadActivity() {
+export async function loadActivity() {
   try {
     const res = await get('/api/activity')
     renderActivity(res.entries ?? [])
