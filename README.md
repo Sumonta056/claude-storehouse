@@ -149,11 +149,12 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 ### Edit in place, undo anything
 
 - Open any file you own in the drawer, edit it, and save with `⌘S`. Plugin cache files stay read-only.
-- Every switch, star, and save shows in the Activity log with Undo.
+- Every switch, star, and save shows on the Activity page with Undo.
 - The latest save of each file can be restored from its backup.
+- The CLAUDE.md page lists each `CLAUDE.md` that Claude Code loads in this folder, with an editor for each.
 - Create a missing `CLAUDE.md`, `.claude/settings.json`, `.claude/settings.local.json`, or `.mcp.json`.
 
-![A skill open in the drawer editor, with the Activity log and its undo button in the sidebar](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/editor.png)
+![A skill open in the drawer editor with its file path and the Save button](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/editor.png)
 
 ## Live demo
 
