@@ -3,9 +3,11 @@ import path from 'node:path'
 import { readJson } from '../write/json-file.js'
 import { readMcpRaw } from './mcp.js'
 import { scanSettings } from './settings.js'
+import { splitId } from './plugins.js'
 
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 }
 const PROVIDED_VARS = new Set(['CLAUDE_PLUGIN_ROOT', 'CLAUDE_PLUGIN_DATA', 'CLAUDE_PROJECT_DIR'])
+const UNLISTED_MARKETPLACES = new Set(['builtin', 'synced'])
 const MAX_CLAUDE_MD_LINES = 200
 const SETTINGS_SCOPES = ['global', 'project', 'projectLocal']
 const CLAUDE_MD_KEYS = ['global', 'project', 'projectLocal', 'projectClaudeDir']
@@ -33,13 +35,17 @@ function isExecutable(file) {
 }
 
 function firstWord(command) {
-  const match = /^\s*((?:"[^"]*"|'[^']*'|[^\s"'])+)/.exec(command)
+  const match = /^[\s(]*((?:"[^"]*"|'[^']*'|\\.|[^\s"'\\;&|<>()])+)/.exec(command)
   return match ? match[1] : ''
 }
 
+function unquote(word) {
+  return word.replace(/"([^"]*)"|'([^']*)'|\\(.)/g, (_m, a, b, c) => a ?? b ?? c)
+}
+
 function expandPath(word, { home, projectDir, pluginRoot }) {
-  let text = word.replace(/["']/g, '')
-  if (text.startsWith('~/')) text = path.join(home, text.slice(2))
+  let text = unquote(word)
+  if (word.startsWith('~/')) text = path.join(home, text.slice(2))
   const project = /^\$\{?CLAUDE_PROJECT_DIR\}?(?=\/)/
   if (project.test(text)) {
     if (!projectDir) return null
@@ -92,7 +98,7 @@ function checkJson(inventory, add) {
       kind: 'file',
       name: path.basename(error.path),
       file: error.path,
-      message: 'This file is not valid JSON. Claude Code cannot read it.',
+      message: 'This file is not valid JSON. The tools that read it cannot use it.',
       target: null
     })
   }
@@ -177,7 +183,7 @@ function checkSettingsKeys(ctx, add) {
     ctx.checked.add(file.path)
     if (isObject(file.data.enabledPlugins)) {
       for (const id of Object.keys(file.data.enabledPlugins)) {
-        if (installed.has(id)) continue
+        if (installed.has(id) || UNLISTED_MARKETPLACES.has(splitId(id).marketplace)) continue
         add(5, 'warning', {
           kind: 'plugin',
           name: id,

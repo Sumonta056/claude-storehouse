@@ -131,6 +131,29 @@ test('check 2 ignores hooks that are off', () => {
   })
 })
 
+test('check 2 stops the path at shell operators and reads escaped spaces', () => {
+  withFixture((fx) => {
+    const dir = path.join(fx.home, 'My Scripts')
+    const run = path.join(dir, 'run.sh')
+    writeFile(run, '')
+    const escaped = run.replace(/ /g, '\\ ')
+    const commands = [
+      `${escaped};echo done`,
+      `${escaped}&&exit 0`,
+      `${escaped}>/dev/null 2>&1`,
+      `${escaped}|jq .`,
+      `(${escaped})`,
+      `"${run}"`
+    ]
+    editJson(settingsFile(fx), (data) => {
+      data.hooks = { Stop: [{ hooks: commands.map((command) => ({ type: 'command', command })) }] }
+    })
+    assert.deepEqual(issues(fx, 2), [])
+    fs.rmSync(run)
+    assert.equal(issues(fx, 2).length, commands.length)
+  })
+})
+
 test('check 3 reports a stdio MCP command that is not on PATH', () => {
   withFixture((fx) => {
     const names = issues(fx, 3)
@@ -213,6 +236,16 @@ test('check 5 reports enabledPlugins keys for plugins that are not installed', (
     assert.equal(found.length, 1)
     assert.equal(found[0].name, 'gone@nowhere')
     assert.equal(found[0].file, settingsFile(fx))
+  })
+})
+
+test('check 5 skips builtin and synced plugins, which installed_plugins.json does not list', () => {
+  withFixture((fx) => {
+    editJson(settingsFile(fx), (data) => {
+      data.enabledPlugins['tips@builtin'] = true
+      data.enabledPlugins['data@synced'] = false
+    })
+    assert.deepEqual(issues(fx, 5), [])
   })
 })
 
