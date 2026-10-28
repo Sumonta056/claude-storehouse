@@ -66,7 +66,7 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 ### Dashboard and usage
 
 - Counts for skills, agents, plugins, hooks, and MCP servers, with how many are on and off.
-- API-equal cost of your Claude Code use, by model, from the session files in `~/.claude/projects`.
+- API-equal cost of your Claude Code use, by model, from the session files in `~/.claude/projects`. A tier card ranks your last 30 days from Bronze ($0) to Legend ($7,500), just for fun.
 - Tokens, sessions, prompt-cache savings, the current 5-hour block, the cost per day, and your top 3 projects by tokens.
 - Session files give only token counts, tool names, and the skill, agent, or MCP server name of each call. Never prompts or message text.
 - Your favorites, recent changes, and which Claude Code files this project has.
