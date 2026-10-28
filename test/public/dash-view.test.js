@@ -414,3 +414,35 @@ test('a failed refresh keeps the loaded usage and shows the error in a toast', a
     Object.assign(state, before)
   }
 })
+
+test('the block card says there is no active block once the block end has passed', () => {
+  const now = Date.now()
+  const block = { start: now - 6 * 3600000, end: now - 3600000, cost: 1, tokens: 1, burnPerHour: 0.2, projected: 1 }
+  const html = dash(inventory(), { usage: extras({ block }) })
+  assert.ok(html.includes('No active block'))
+  assert.ok(!html.includes('Burn rate'))
+})
+
+test('refreshUsage does not take focus from a field the user moved to', async () => {
+  const before = { usage: state.usage, usageLoad: state.usageLoad, inventory: state.inventory }
+  const realFetch = globalThis.fetch
+  const realQuery = globalThis.document.querySelector
+  const search = { id: 'search' }
+  let focused = 0
+  globalThis.document.activeElement = search
+  globalThis.document.querySelector = (sel) => (sel === '[data-urefresh]' ? { focus: () => focused++ } : null)
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => usage() })
+  try {
+    Object.assign(state, { usage: usage(), usageLoad: null, inventory: null })
+    await refreshUsage()
+    assert.equal(focused, 0)
+    globalThis.document.activeElement = null
+    await refreshUsage()
+    assert.equal(focused, 1)
+  } finally {
+    globalThis.fetch = realFetch
+    globalThis.document.querySelector = realQuery
+    delete globalThis.document.activeElement
+    Object.assign(state, before)
+  }
+})

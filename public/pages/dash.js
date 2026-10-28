@@ -89,7 +89,7 @@ function dayLabel(date) {
 
 function blockHtml(block) {
   const head = '<div class="k">Current 5-hour block <span class="hint">estimate</span></div>'
-  if (!block)
+  if (!block || Date.now() >= block.end)
     return `<div class="ucard">${head}<p class="note">No active block. A block starts with the next Claude Code response and lasts 5 hours.</p></div>`
   const { pct, left } = blockProgress(block, Date.now())
   return `<div class="ucard">${head}
@@ -173,7 +173,8 @@ export async function refreshUsage() {
   } finally {
     state.usageBusy = false
     if (state.inventory && USAGE_PAGES.has(state.page)) render()
-    document.querySelector('[data-urefresh]')?.focus()
+    const active = document.activeElement
+    if (!active || active === document.body) document.querySelector('[data-urefresh]')?.focus()
   }
 }
 
