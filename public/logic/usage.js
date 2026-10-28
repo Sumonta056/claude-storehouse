@@ -16,6 +16,29 @@ export function modelShares(u) {
   return top.map((m, i) => ({ ...m, share: (m.cost / u.cost) * 100, cls: MODEL_CLASSES[i] }))
 }
 
+export function blockProgress(block, now) {
+  const span = block.end - block.start
+  const passed = Math.min(Math.max(now - block.start, 0), span)
+  return { pct: Math.round((passed / span) * 100), left: span - passed }
+}
+
+export function niceMax(value) {
+  if (!(value > 0)) return 1
+  const power = 10 ** Math.floor(Math.log10(value))
+  return [1, 2, 5, 10].find((step) => step * power >= value - 1e-9) * power
+}
+
+export function duration(ms) {
+  const minutes = Math.max(0, Math.round(ms / 60000))
+  const hours = Math.floor(minutes / 60)
+  return hours ? `${hours} h ${minutes % 60} min` : `${minutes} min`
+}
+
+export function clock(ms) {
+  const date = new Date(ms)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
 export function useReady() {
   return Boolean(state.usage?.items && state.usage.all?.responses)
 }

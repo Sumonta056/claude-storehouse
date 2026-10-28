@@ -122,6 +122,7 @@ export const state = {
   usagePeriod: readPeriod(),
   usageSort: readSort(),
   usageLoad: null,
+  usageBusy: false,
   bannerDismissed: false,
   bannerShown: false,
   dragKey: null,

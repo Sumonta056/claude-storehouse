@@ -55,6 +55,7 @@ async function record() {
     }
     const data = {
       home,
+      builtAt: Date.now(),
       inventory: await get('/api/inventory'),
       usage: await get('/api/usage'),
       doctor: await get('/api/doctor'),

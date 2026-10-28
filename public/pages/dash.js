@@ -1,9 +1,9 @@
 import { get } from '../api.js'
-import { $ } from '../core/dom.js'
+import { $, toast } from '../core/dom.js'
 import { ago, compact, esc, money, monthName, tilde } from '../core/format.js'
 import { PERIOD_KEY, state } from '../core/state.js'
 import { KIND_WORD, PAGES, counts, favoriteEntries, otherCounts, projectOn, visible } from '../logic/catalog.js'
-import { USAGE_PAGES, modelShares } from '../logic/usage.js'
+import { USAGE_PAGES, blockProgress, clock, duration, modelShares, niceMax } from '../logic/usage.js'
 import { projectOffHtml, render } from '../ui/nav.js'
 import { empty, nothingMatches, rowHtml, rowsHtml } from '../ui/rows.js'
 import { usageSkeletonHtml } from '../ui/skeleton.js'
@@ -68,6 +68,7 @@ function usageHtml() {
         <div class="rhead">
           <div class="k">Cost by model</div>
           <div class="scope period" role="group" aria-label="Usage period">${periods}</div>
+          <button type="button" class="btn-link" data-urefresh${state.usageBusy ? ' disabled aria-busy="true"' : ''}>${state.usageBusy ? 'Refreshing…' : 'Refresh'}</button>
         </div>
         <div class="mon">${compact(u.tokens)}<span>tokens · ${u.responses.toLocaleString('en-US')} responses</span></div>
         ${legend}
@@ -81,14 +82,99 @@ function usageHtml() {
     </div>`
 }
 
+function dayLabel(date) {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function blockHtml(block) {
+  const head = '<div class="k">Current 5-hour block <span class="hint">estimate</span></div>'
+  if (!block)
+    return `<div class="ucard">${head}<p class="note">No active block. A block starts with the next Claude Code response and lasts 5 hours.</p></div>`
+  const { pct, left } = blockProgress(block, Date.now())
+  return `<div class="ucard">${head}
+      <div class="v">${money(block.cost)}<small>since ${clock(block.start)}</small></div>
+      <div class="prog" role="img" aria-label="${pct} percent of the block has passed"><span style="width:${pct}%"></span></div>
+      <div class="row2"><span>Resets at ${clock(block.end)} · in ${duration(left)}</span><span>Burn rate: ${money(block.burnPerHour)} / h</span></div>
+      <div class="row2"><span>Tokens in this block: ${compact(block.tokens)}</span><span>At this rate: ${money(block.projected)} by ${clock(block.end)}</span></div>
+    </div>`
+}
+
+function dailyHtml(days) {
+  const W = 560
+  const H = 120
+  const top = niceMax(Math.max(...days.map((d) => d.cost)))
+  const y = (v) => H - (v / top) * H
+  const bw = W / days.length
+  const dollars = (v) => `$${+v.toFixed(2)}`
+  const marks = [top, top / 2, 0]
+  const grid = marks
+    .map((v) => `<line x1="0" x2="${W}" y1="${y(v)}" y2="${y(v)}" vector-effect="non-scaling-stroke"/>`)
+    .join('')
+  const bars = days
+    .map((d, i) => {
+      const h = Math.max(H - y(d.cost), 1)
+      const cls = i === days.length - 1 ? ' class="today"' : ''
+      return `<rect${cls} x="${i * bw + 3}" y="${H - h}" width="${bw - 6}" height="${h}" vector-effect="non-scaling-stroke"><title>${dayLabel(d.date)}: ${money(d.cost)}</title></rect>`
+    })
+    .join('')
+  const high = days.reduce((a, b) => (b.cost > a.cost ? b : a))
+  const label = `Cost per day for the last 14 days. Today ${money(days.at(-1).cost)}. Highest ${money(high.cost)} on ${dayLabel(high.date)}.`
+  return `<div class="ucard daily">
+      <div class="k">Cost per day · last 14 days</div>
+      <div class="chart">
+        <div class="yax" aria-hidden="true">${marks.map((v) => `<span>${dollars(v)}</span>`).join('')}</div>
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${label}">${grid}${bars}</svg>
+        <div class="xax" aria-hidden="true"><span>${dayLabel(days[0].date)}</span><span>Today</span></div>
+      </div>
+    </div>`
+}
+
+function projectsHtml(rows) {
+  const head = `<h2>Cost by project <span class="pill">${rows.length}</span><span class="hint">This month</span></h2>`
+  if (!rows.length) return `${head}<p class="empty">No use this month.</p>`
+  const max = Math.max(...rows.map((r) => r.cost)) || 1
+  const body = rows
+    .map(
+      (r) =>
+        `<tr><td><code>${esc(r.project)}</code><div class="pbar"><span style="width:${((r.cost / max) * 100).toFixed(1)}%"></span></div></td><td class="num">${r.sessions.toLocaleString('en-US')}</td><td class="num">${compact(r.tokens)}</td><td class="num">${money(r.cost)}</td></tr>`
+    )
+    .join('')
+  return `${head}<div class="eff-wrap pwrap"><table class="eff ptable">
+      <thead><tr><th>Project</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>`
+}
+
+function usageExtrasHtml() {
+  const u = state.usage
+  if (state.usageError || !u?.all?.responses || !u.days?.length || !Array.isArray(u.byProject)) return ''
+  return `<div class="blk">${blockHtml(u.block)}${dailyHtml(u.days)}</div>${projectsHtml(u.byProject)}`
+}
+
 async function loadUsage() {
   try {
     state.usage = await get('/api/usage')
     state.usageError = ''
   } catch (err) {
-    state.usageError = err.message
+    if (state.usage) toast(`Could not refresh usage: ${err.message}`, true)
+    else state.usageError = err.message
   }
   if (state.inventory && USAGE_PAGES.has(state.page)) render()
+}
+
+export async function refreshUsage() {
+  if (state.usageBusy) return
+  state.usageBusy = true
+  render()
+  try {
+    state.usageLoad = loadUsage()
+    await state.usageLoad
+  } finally {
+    state.usageBusy = false
+    if (state.inventory && USAGE_PAGES.has(state.page)) render()
+    document.querySelector('[data-urefresh]')?.focus()
+  }
 }
 
 export function needUsage(page) {
@@ -124,7 +210,7 @@ export function renderDash() {
     ? `<div class="warn"><b>${inv.errors.length} file${inv.errors.length > 1 ? 's' : ''} could not be read.</b> ${inv.errors.map((e) => `<code>${esc(tilde(e.path))}</code>: ${esc(e.error)}`).join('; ')}</div>`
     : ''
   $('p-dash').innerHTML = `${errors}
-    ${usageHtml()}
+    ${usageHtml()}${usageExtrasHtml()}
     <div class="stats">${tiles}</div>
     <div class="two">
       <div><h2>Favorites ${more}</h2>${favHtml}${recentHtml()}</div>

@@ -50,4 +50,4 @@ Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective
 - After any toggle, a banner says: "Claude Code applies this at the next session."
 - Plugin skills show a "Fork to local" button.
 - MCP secrets are masked.
-- All data comes from `GET /api/inventory`, except usage, which the first page that needs it (Dashboard, Skills, Agents, or MCP) loads from `GET /api/usage` one time per page load, at the same time as the inventory when the page opens on one of them, and the Doctor page, which loads `GET /api/doctor` with each inventory refresh. Re-render from the content each write returns.
+- All data comes from `GET /api/inventory`, except usage, which the first page that needs it (Dashboard, Skills, Agents, or MCP) loads from `GET /api/usage` one time per page load, and again when the user clicks Refresh on the usage band, at the same time as the inventory when the page opens on one of them, and the Doctor page, which loads `GET /api/doctor` with each inventory refresh. Re-render from the content each write returns.

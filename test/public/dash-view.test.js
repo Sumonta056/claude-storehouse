@@ -12,7 +12,7 @@ globalThis.document = {
   },
   querySelector: () => null
 }
-const { needUsage, renderDash } = await import('../../public/pages/dash.js')
+const { needUsage, refreshUsage, renderDash } = await import('../../public/pages/dash.js')
 
 const DAY = 86400000
 
@@ -64,6 +64,30 @@ function period(over = {}) {
 
 function usage(over = {}) {
   return { monthKey: '2026-10', all: period({ cost: 100, sessions: 20, projects: 3 }), month: period(), ...over }
+}
+
+function days(costs) {
+  return costs.map((cost, i) => ({ date: `2026-10-${String(10 + i).padStart(2, '0')}`, cost, tokens: cost * 1e6 }))
+}
+
+function extras(over = {}) {
+  const now = Date.now()
+  return usage({
+    days: days([0.1, 0, 0.4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, 1.86]),
+    byProject: [
+      { project: '~/acme-api', sessions: 3, tokens: 8020000, cost: 5.1 },
+      { project: '~/<script>x</script>', sessions: 1, tokens: 1260000, cost: 0.86 }
+    ],
+    block: {
+      start: now - 2 * 3600000,
+      end: now + 3 * 3600000,
+      cost: 1.86,
+      tokens: 2900000,
+      burnPerHour: 0.93,
+      projected: 4.65
+    },
+    ...over
+  })
 }
 
 function dash(inv, patch = {}) {
@@ -280,6 +304,113 @@ test('needUsage fetches /api/usage once for a usage page, never for other pages,
     assert.equal(nodes.get('p-dash').innerHTML, 'before')
   } finally {
     globalThis.fetch = realFetch
+    Object.assign(state, before)
+  }
+})
+
+test('the block card shows cost, start, reset, burn rate, tokens, and projection', () => {
+  const html = dash(inventory(), { usage: extras() })
+  assert.ok(html.includes('Current 5-hour block'))
+  assert.ok(html.includes('estimate'))
+  assert.ok(html.includes('$1.86<small>since '))
+  assert.match(html, /Resets at \d\d:\d\d · in (2 h 59 min|3 h 0 min)/)
+  assert.ok(html.includes('Burn rate: $0.93 / h'))
+  assert.ok(html.includes('Tokens in this block: 2.9M'))
+  assert.match(html, /At this rate: \$4\.65 by \d\d:\d\d/)
+  assert.match(html, /class="prog" role="img" aria-label="40 percent of the block has passed"><span style="width:40%">/)
+})
+
+test('the block card says there is no active block when block is null', () => {
+  const html = dash(inventory(), { usage: extras({ block: null }) })
+  assert.ok(html.includes('No active block'))
+  assert.ok(!html.includes('Burn rate'))
+})
+
+test('the daily chart draws 14 bars, marks today, and labels $0, the middle, and the top', () => {
+  const html = dash(inventory(), { usage: extras() })
+  assert.ok(html.includes('Cost per day · last 14 days'))
+  assert.equal(html.match(/<rect /g).length, 14)
+  assert.equal(html.match(/class="today"/g).length, 1)
+  assert.ok(html.includes('>$0<') && html.includes('>$1<') && html.includes('>$2<'))
+  assert.ok(html.includes('aria-label="Cost per day for the last 14 days. Today $1.86. Highest $1.86 on 23 Oct."'))
+  assert.ok(html.includes('<title>23 Oct: $1.86</title>'))
+  assert.ok(!html.includes('<text'), 'axis text stays in HTML so it does not shrink below 14 px')
+})
+
+test('the project table lists each project with sessions, tokens, and cost, escaped', () => {
+  const html = dash(inventory(), { usage: extras() })
+  assert.ok(html.includes('Cost by project'))
+  assert.ok(html.includes('<code>~/acme-api</code>'))
+  assert.ok(html.includes('~/&lt;script&gt;x&lt;/script&gt;'))
+  assert.ok(!html.includes('<script>x'))
+  assert.ok(html.includes('<td class="num">3</td><td class="num">8.02M</td><td class="num">$5.10</td>'))
+  assert.ok(html.indexOf('acme-api') < html.indexOf('&lt;script'))
+})
+
+test('the project table says so when this month has no use', () => {
+  const html = dash(inventory(), { usage: extras({ byProject: [] }) })
+  assert.ok(html.includes('No use this month.'))
+})
+
+test('the usage band has a Refresh button and hides the extras when the server sends none', () => {
+  const html = dash(inventory(), { usage: usage() })
+  assert.ok(html.includes('data-urefresh'))
+  assert.ok(!html.includes('Current 5-hour block'))
+})
+
+test('refreshUsage fetches /api/usage again after the first load', async () => {
+  const before = { usage: state.usage, usageLoad: state.usageLoad, inventory: state.inventory }
+  const realFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls++
+    return { ok: true, status: 200, json: async () => usage() }
+  }
+  try {
+    Object.assign(state, { usage: null, usageLoad: null, inventory: null })
+    needUsage('dash')
+    await state.usageLoad
+    await refreshUsage()
+    assert.equal(calls, 2)
+  } finally {
+    globalThis.fetch = realFetch
+    Object.assign(state, before)
+  }
+})
+
+test('the usage band hides the extras when days is empty instead of failing', () => {
+  const html = dash(inventory(), { usage: extras({ days: [] }) })
+  assert.ok(html.includes('API-equal value'))
+  assert.ok(!html.includes('Cost per day'))
+})
+
+test('a failed refresh keeps the loaded usage and shows the error in a toast', async () => {
+  const before = {
+    usage: state.usage,
+    usageLoad: state.usageLoad,
+    inventory: state.inventory,
+    usageError: state.usageError
+  }
+  const realFetch = globalThis.fetch
+  const toastEl = { textContent: '', classList: { toggle() {}, add() {}, remove() {} } }
+  nodes.set('toast', toastEl)
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls++
+    if (calls === 1) return { ok: true, status: 200, json: async () => usage() }
+    return { ok: false, status: 500, json: async () => ({ error: 'disk <busy>' }) }
+  }
+  try {
+    Object.assign(state, { usage: null, usageLoad: null, inventory: null, usageError: '' })
+    needUsage('dash')
+    await state.usageLoad
+    await refreshUsage()
+    assert.equal(state.usage.all.responses, usage().all.responses)
+    assert.equal(state.usageError, '')
+    assert.ok(toastEl.textContent.includes('disk <busy>'))
+  } finally {
+    globalThis.fetch = realFetch
+    nodes.delete('toast')
     Object.assign(state, before)
   }
 })

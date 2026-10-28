@@ -1,6 +1,18 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { modelShares, useReady, useOf, isUnused, sharedWith, lastText, sortRows } from '../../public/logic/usage.js'
+import {
+  blockProgress,
+  clock,
+  duration,
+  niceMax,
+  modelShares,
+  useReady,
+  useOf,
+  isUnused,
+  sharedWith,
+  lastText,
+  sortRows
+} from '../../public/logic/usage.js'
 import { state } from '../../public/core/state.js'
 
 const DAY = 86400000
@@ -263,4 +275,31 @@ test('sortRows puts items without use counts as zero', () => {
       ['a', 'z']
     )
   )
+})
+
+test('blockProgress returns the share of the block that passed and the time left', () => {
+  const HOUR = 3600000
+  assert.deepEqual(blockProgress({ start: 0, end: 5 * HOUR }, 2 * HOUR), { pct: 40, left: 3 * HOUR })
+  assert.deepEqual(blockProgress({ start: 0, end: 5 * HOUR }, 6 * HOUR), { pct: 100, left: 0 })
+})
+
+test('niceMax rounds the top of the chart up to 1, 2, or 5 times a power of ten', () => {
+  assert.equal(niceMax(0), 1)
+  assert.equal(niceMax(1.86), 2)
+  assert.equal(niceMax(0.3), 0.5)
+  assert.equal(niceMax(13), 20)
+  assert.equal(niceMax(120), 200)
+  assert.equal(niceMax(5), 5)
+})
+
+test('duration writes hours and minutes', () => {
+  assert.equal(duration(114 * 60000), '1 h 54 min')
+  assert.equal(duration(45 * 60000), '45 min')
+  assert.equal(duration(2 * 3600000), '2 h 0 min')
+  assert.equal(duration(-5), '0 min')
+})
+
+test('clock writes the local time as HH:MM', () => {
+  assert.equal(clock(new Date(2026, 9, 23, 9, 5).getTime()), '09:05')
+  assert.equal(clock(new Date(2026, 9, 23, 18, 0).getTime()), '18:00')
 })

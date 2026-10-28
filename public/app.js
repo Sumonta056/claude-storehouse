@@ -5,7 +5,7 @@ import { chipFilter, dr, groupOpen, items, state } from './core/state.js'
 import { PAGES } from './logic/catalog.js'
 import { cfgDirty } from './logic/config.js'
 import { loadActivity, undo } from './pages/activity.js'
-import { needUsage, setPeriod } from './pages/dash.js'
+import { needUsage, refreshUsage, setPeriod } from './pages/dash.js'
 import { checkAgain, onDoctor } from './pages/doctor.js'
 import { keepOnly } from './pages/dups.js'
 import { cancelRename, onFavCat, placeFav, saveOrder, submitNewCat, submitRename } from './pages/fav.js'
@@ -148,6 +148,7 @@ function wire() {
     if (goEl) return go(goEl.dataset.go)
     const periodEl = e.target.closest('[data-period]')
     if (periodEl) return setPeriod(periodEl.dataset.period)
+    if (e.target.closest('[data-urefresh]')) return void refreshUsage()
     const sortEl = e.target.closest('[data-usort]')
     if (sortEl) return setSort(sortEl.dataset.usort)
     const unusedEl = e.target.closest('[data-unused]')

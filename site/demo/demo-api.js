@@ -306,8 +306,15 @@
     switch (key) {
       case 'GET /api/inventory':
         return inventory()
-      case 'GET /api/usage':
-        return clone(db.usage)
+      case 'GET /api/usage': {
+        const usage = clone(db.usage)
+        const shift = Date.now() - (db.builtAt ?? Date.now())
+        if (usage.block) {
+          usage.block.start += shift
+          usage.block.end += shift
+        }
+        return usage
+      }
       case 'GET /api/doctor':
         return clone(db.doctor)
       case 'GET /api/file':

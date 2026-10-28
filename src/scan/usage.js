@@ -4,6 +4,9 @@ import { priceOf } from './prices.js'
 
 const FIELDS = ['input', 'output', 'cacheWrite5m', 'cacheWrite1h', 'cacheRead']
 const WINDOW = 30 * 24 * 60 * 60 * 1000
+const HOUR = 60 * 60 * 1000
+const BLOCK = 5 * HOUR
+const DAYS = 14
 const NEEDLE = Buffer.from('"usage"')
 const PARALLEL = 8
 const cache = new Map()
@@ -14,6 +17,16 @@ function monthOf(timestamp) {
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return ''
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function dayOf(time) {
+  const date = new Date(time)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function tilde(dir, home) {
+  if (dir === home) return '~'
+  return dir.startsWith(home + path.sep) ? `~${dir.slice(home.length)}` : dir
 }
 
 function keyOf(name, input) {
@@ -60,6 +73,8 @@ function recordOf(line, fallbackId) {
     model: message.model,
     session: entry.sessionId ?? '',
     month: monthOf(entry.timestamp),
+    time: Date.parse(entry.timestamp),
+    cwd: typeof entry.cwd === 'string' ? entry.cwd : '',
     input: usage.input_tokens || 0,
     output: usage.output_tokens || 0,
     cacheWrite5m: cacheWrite - cacheWrite1h,
@@ -183,6 +198,70 @@ function summarizeUses(uses, now) {
   return items
 }
 
+function tokensOf(record) {
+  return record.input + record.output + record.cacheWrite5m + record.cacheWrite1h + record.cacheRead
+}
+
+function priced(record) {
+  const price = priceOf(record.model)
+  return price ? costOf(record, price) : 0
+}
+
+function summarizeDays(records, now) {
+  const today = new Date(now)
+  const days = []
+  for (let back = DAYS - 1; back >= 0; back--) {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back)
+    days.push({ date: dayOf(date), cost: 0, tokens: 0 })
+  }
+  const byDate = new Map(days.map((day) => [day.date, day]))
+  for (const record of records) {
+    if (Number.isNaN(record.time)) continue
+    const day = byDate.get(dayOf(record.time))
+    if (!day) continue
+    day.cost += priced(record)
+    day.tokens += tokensOf(record)
+  }
+  return days
+}
+
+function summarizeProjects(records, home) {
+  const first = new Map()
+  for (const record of records) {
+    if (!record.cwd || !record.session) continue
+    const seen = first.get(record.session)
+    if (!seen || record.time < seen.time) first.set(record.session, record)
+  }
+  const rows = new Map()
+  for (const record of records) {
+    const cwd = first.get(record.session)?.cwd || record.cwd
+    const project = cwd ? tilde(cwd, home) : record.project
+    const row = rows.get(project) ?? { project, sessions: new Set(), tokens: 0, cost: 0 }
+    rows.set(project, row)
+    if (record.session) row.sessions.add(record.session)
+    row.tokens += tokensOf(record)
+    row.cost += priced(record)
+  }
+  return [...rows.values()].map((row) => ({ ...row, sessions: row.sessions.size })).sort((a, b) => b.cost - a.cost)
+}
+
+function currentBlock(records, now) {
+  const times = records.filter((r) => !Number.isNaN(r.time) && r.time <= now).sort((a, b) => a.time - b.time)
+  let block = null
+  for (const record of times) {
+    if (!block || record.time > block.end) {
+      const start = Math.floor(record.time / HOUR) * HOUR
+      block = { start, end: start + BLOCK, cost: 0, tokens: 0 }
+    }
+    block.cost += priced(record)
+    block.tokens += tokensOf(record)
+  }
+  if (!block || now >= block.end) return null
+  const hours = (now - block.start) / HOUR
+  const burnPerHour = hours > 0 ? block.cost / hours : 0
+  return { ...block, burnPerHour, projected: block.cost + (burnPerHour * (block.end - now)) / HOUR }
+}
+
 function summarize(records) {
   const total = { cost: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, saved: 0 }
   const sessions = new Set()
@@ -228,11 +307,16 @@ export async function scanUsage({ home, now = new Date() }) {
     )
   const { records, uses } = await running.get(root)
   const monthKey = monthOf(now)
+  const time = new Date(now).getTime()
+  const month = records.filter((r) => r.month === monthKey)
   return {
     monthKey,
     all: summarize(records),
-    month: summarize(records.filter((r) => r.month === monthKey)),
-    items: summarizeUses(uses, new Date(now).getTime()),
+    month: summarize(month),
+    days: summarizeDays(records, time),
+    byProject: summarizeProjects(month, home),
+    block: currentBlock(records, time),
+    items: summarizeUses(uses, time),
     since: uses.reduce((min, u) => (min === null || u.time < min ? u.time : min), null)
   }
 }

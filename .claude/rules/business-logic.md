@@ -87,6 +87,16 @@ Target file per scope:
 - "Saved by prompt cache" is cache-read tokens × (input price − cache-read price).
 - A project is one folder under `~/.claude/projects`. "This month" uses local time.
 
+### Block, days, and projects
+
+`GET /api/usage` also returns `days`, `byProject`, and `block`. The Dashboard shows them under the band, with a Refresh button that loads `/api/usage` again.
+
+- `days`: the last 14 local days, oldest first, with `{ date, cost, tokens }`. Days with no use have zero.
+- `byProject`: this month, `{ project, sessions, tokens, cost }`, sorted by cost. The project is the first `cwd` of the session, with `~` for the home folder, else the folder name under `~/.claude/projects`. A `cd` inside a session does not split it. The costs add up to the month cost.
+- `block`: the current 5-hour block, the same rule as ccusage. Sort records by time. A block starts at the first record, rounded down to the full UTC hour, and lasts 5 hours. A record after the block end starts a new block. `block` is the last block while now is before its end, else `null` ("No active block").
+- `burnPerHour = cost / hours since block start`. `projected = cost + burnPerHour × hours left`. The card says "estimate": Anthropic does not write the real limit to disk.
+- The scanner reads each transcript as one buffer, 8 files at a time, and decodes only the lines that contain `"usage"`. `bin/storehouse.js` starts a scan when the server starts, so the first `/api/usage` call joins it. A cold scan of 3.7 GB took 13.7 s with `readline` and takes about 5 s now.
+
 ### Use per item
 
 `GET /api/usage` also returns `items`: `{ "<key>": { count30, last } }`, where `last` is epoch ms. The scanner reads `tool_use` blocks on the same lines that hold `"usage"` and keeps only these fields:

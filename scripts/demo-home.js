@@ -182,17 +182,15 @@ const tools = [
 sessions.forEach(([dir, model, turns], s) => {
   const lines = []
   for (let t = 0; t < turns; t++) {
-    const day = new Date(
-      today.getFullYear(),
-      today.getMonth() - (s >= 3 ? 1 : 0),
-      Math.max(1, today.getDate() - ((s + t) % 9)),
-      10,
-      t
-    )
+    const day =
+      s === 0 && t >= turns - 6
+        ? new Date(today.getTime() - (turns - t) * 7 * 60000)
+        : new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((s + t) % 14) - (s >= 3 ? 30 : 0), 10, t)
     lines.push(
       JSON.stringify({
         type: 'assistant',
         sessionId: `demo-session-${s + 1}`,
+        cwd: path.join(home, dir.replace(/^-home-/, '')),
         timestamp: day.toISOString(),
         requestId: `req_${s}_${t}`,
         message: {

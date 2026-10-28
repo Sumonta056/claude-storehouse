@@ -130,6 +130,10 @@ test('GET /api/usage returns totals and requires the token', async () => {
         assert.ok(key in res.json[period], `${period}.${key}`)
       }
     }
+    assert.equal(res.json.days.length, 14)
+    assert.deepEqual(Object.keys(res.json.days[0]), ['date', 'cost', 'tokens'])
+    assert.deepEqual(res.json.byProject, [])
+    assert.equal(res.json.block, null)
     const denied = await api('GET', '/api/usage', undefined, { 'x-storehouse-token': 'wrong' })
     assert.equal(denied.status, 401)
   })

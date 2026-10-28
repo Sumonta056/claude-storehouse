@@ -194,7 +194,138 @@
 .utiles .g {
   color: var(--green);
 }
+.usage .rhead .period {
+  margin-left: auto;
+}
+.blk {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.ucard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+.ucard .k {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ucard .k .hint {
+  font-weight: 400;
+  margin-left: 6px;
+}
+.ucard .v {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ucard .v small {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-left: 6px;
+}
+.ucard .note {
+  margin-top: 8px;
+}
+.prog {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--panel2);
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+.prog span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.ucard .row2 {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.ucard .row2 + .row2 {
+  margin-top: 8px;
+}
+.daily .chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.daily .yax {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 140px;
+  margin: -10px 0;
+  text-align: right;
+}
+.daily svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+  overflow: visible;
+}
+.daily .xax {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+}
+.daily line {
+  stroke: var(--line);
+}
+.daily rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+.daily rect.today {
+  fill: var(--accent);
+  stroke: none;
+}
+.pwrap {
+  margin-bottom: 20px;
+}
+table.eff.ptable {
+  min-width: 0;
+}
+.ptable code {
+  overflow-wrap: anywhere;
+}
+.ptable th.num,
+.ptable td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pbar {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--panel2);
+  overflow: hidden;
+}
+.pbar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
 @media (max-width: 1000px) {
+  .blk {
+    grid-template-columns: 1fr;
+  }
   .usage {
     grid-template-columns: 1fr;
   }

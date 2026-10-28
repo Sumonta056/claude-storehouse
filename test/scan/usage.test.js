@@ -8,9 +8,10 @@ import { priceOf } from '../../src/scan/prices.js'
 
 const NOW = new Date(2026, 9, 23)
 
-function line({ id, model = 'claude-opus-5-5', session = 's1', at = '2026-10-10T10:00:00Z', usage }) {
+function line({ id, model = 'claude-opus-5-5', session = 's1', at = '2026-10-10T10:00:00Z', usage, cwd }) {
   return JSON.stringify({
     sessionId: session,
+    cwd,
     requestId: `req-${id}`,
     timestamp: at,
     message: { id: `msg-${id}`, model, role: 'assistant', usage }
@@ -459,6 +460,138 @@ test('reads CRLF lines, a last line with no newline, and multibyte text', async 
     const result = await scanUsage({ home: fx.home, now: NOW })
     assert.equal(result.all.responses, 2)
     close(result.all.cost, 40)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+const MILLION_OUT = { input_tokens: 0, output_tokens: 1000000, cache_read_input_tokens: 0 }
+
+test('groups records into 5-hour blocks that start on the full hour', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', at: '2026-10-23T13:10:00Z', usage: MILLION_OUT }),
+      line({ id: 'b', at: '2026-10-23T14:30:00Z', usage: MILLION_OUT }),
+      line({ id: 'c', at: '2026-10-23T17:59:00Z', usage: MILLION_OUT })
+    ])
+    const now = new Date('2026-10-23T17:59:30Z')
+    const { block } = await scanUsage({ home: fx.home, now })
+    assert.equal(block.start, Date.parse('2026-10-23T13:00:00Z'))
+    assert.equal(block.end, Date.parse('2026-10-23T18:00:00Z'))
+    close(block.cost, 60)
+    assert.equal(block.tokens, 3000000)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('starts a new block after the block end and computes burn and projection', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', at: '2026-10-23T13:10:00Z', usage: MILLION_OUT }),
+      line({ id: 'b', at: '2026-10-23T18:20:00Z', usage: MILLION_OUT })
+    ])
+    const now = new Date('2026-10-23T19:00:00Z')
+    const { block } = await scanUsage({ home: fx.home, now })
+    assert.equal(block.start, Date.parse('2026-10-23T18:00:00Z'))
+    assert.equal(block.end, Date.parse('2026-10-23T23:00:00Z'))
+    close(block.cost, 20)
+    close(block.burnPerHour, 20)
+    close(block.projected, 20 + 20 * 4)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('returns no block when now is after the last block end', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [line({ id: 'a', at: '2026-10-23T13:10:00Z', usage: MILLION_OUT })])
+    const { block } = await scanUsage({ home: fx.home, now: new Date('2026-10-23T18:00:00Z') })
+    assert.equal(block, null)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('returns 14 local days, oldest first, with zero days', async () => {
+  const fx = makeFixture()
+  try {
+    const today = new Date(2026, 9, 23, 12).toISOString()
+    const older = new Date(2026, 9, 20, 9).toISOString()
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', at: today, usage: MILLION_OUT }),
+      line({ id: 'b', at: older, usage: MILLION_OUT }),
+      line({ id: 'c', at: new Date(2026, 9, 1, 9).toISOString(), usage: MILLION_OUT })
+    ])
+    const { days } = await scanUsage({ home: fx.home, now: new Date(2026, 9, 23, 15) })
+    assert.equal(days.length, 14)
+    assert.equal(days[0].date, '2026-10-10')
+    assert.equal(days[13].date, '2026-10-23')
+    close(days[13].cost, 20)
+    assert.equal(days[13].tokens, 1000000)
+    close(days[10].cost, 20)
+    assert.equal(days.filter((d) => d.cost === 0 && d.tokens === 0).length, 12)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('groups this month by cwd with the home folder as ~, else by folder name', async () => {
+  const fx = makeFixture()
+  try {
+    const cwd = path.join(fx.home, 'acme-api')
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', session: 's1', cwd, at: '2026-10-20T10:00:00Z', usage: MILLION_OUT })
+    ])
+    writeTranscript(fx.home, '-proj-b', 's2', [
+      line({ id: 'b', session: 's2', cwd, at: '2026-10-21T10:00:00Z', usage: MILLION_OUT })
+    ])
+    writeTranscript(fx.home, '-proj-c', 's3', [
+      line({ id: 'c', session: 's3', at: '2026-10-21T10:00:00Z', usage: MILLION_OUT }),
+      line({ id: 'd', session: 's3', at: '2026-09-21T10:00:00Z', usage: MILLION_OUT })
+    ])
+    const result = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(result.byProject, [
+      { project: '~/acme-api', sessions: 2, tokens: 2000000, cost: 40 },
+      { project: '-proj-c', sessions: 1, tokens: 1000000, cost: 20 }
+    ])
+    close(
+      result.byProject.reduce((sum, p) => sum + p.cost, 0),
+      result.month.cost
+    )
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('keeps a session in one project row when its cwd changes', async () => {
+  const fx = makeFixture()
+  try {
+    const cwd = path.join(fx.home, 'acme')
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', cwd, at: '2026-10-20T10:00:00Z', usage: MILLION_OUT }),
+      line({ id: 'b', cwd: path.join(cwd, 'packages', 'api'), at: '2026-10-20T11:00:00Z', usage: MILLION_OUT }),
+      line({ id: 'c', at: '2026-10-20T12:00:00Z', usage: MILLION_OUT })
+    ])
+    const { byProject } = await scanUsage({ home: fx.home, now: NOW })
+    assert.deepEqual(byProject, [{ project: '~/acme', sessions: 1, tokens: 3000000, cost: 60 }])
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('keeps a record exactly at the block end in the old block', async () => {
+  const fx = makeFixture()
+  try {
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', at: '2026-10-23T13:10:00Z', usage: MILLION_OUT }),
+      line({ id: 'b', at: '2026-10-23T18:00:00Z', usage: MILLION_OUT })
+    ])
+    const { block } = await scanUsage({ home: fx.home, now: new Date('2026-10-23T18:00:00Z') })
+    assert.equal(block, null)
   } finally {
     fx.cleanup()
   }
