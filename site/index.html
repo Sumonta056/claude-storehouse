@@ -161,6 +161,7 @@
               <button role="tab" aria-selected="false" data-page="dups">Duplicates</button>
               <button role="tab" aria-selected="false" data-page="doctor">Doctor</button>
               <button role="tab" aria-selected="false" data-page="context">Context</button>
+              <button role="tab" aria-selected="false" data-page="projects">Projects</button>
               <button role="tab" aria-selected="false" data-page="skills">Skills</button>
               <button role="tab" aria-selected="false" data-page="agents">Agents</button>
               <button role="tab" aria-selected="false" data-page="plugins">Plugins</button>
@@ -207,7 +208,7 @@
             </p>
             <ul>
               <li>API-equal cost of your Claude Code use, by model</li>
-              <li>Tokens, sessions, projects, and prompt-cache savings</li>
+              <li>Tokens, sessions, prompt-cache savings, and your top 3 projects</li>
               <li>Reads token counts and tool names, never prompts or message text</li>
               <li>Counts for skills, agents, plugins, hooks, and MCP servers</li>
             </ul>
@@ -216,7 +217,7 @@
           <figure class="frame">
             <img
               src="screenshots/dashboard.png"
-              alt="Dashboard with an API-equal value band, token totals, item counts, favorites, and the project file list"
+              alt="Dashboard with an API-equal value band, token totals, the current 5-hour block, cost per day, and the top projects by tokens"
               loading="lazy"
               width="2880"
               height="1800"
@@ -454,6 +455,33 @@
             <img
               src="screenshots/settings-effective.png"
               alt="Settings page, Effective view: a table of keys with the value Claude Code uses, the file it comes from, and crossed-out values from lower files"
+              loading="lazy"
+              width="2880"
+              height="1800"
+              data-zoom
+            />
+          </figure>
+        </div>
+
+        <div class="wrap feature">
+          <div class="txt">
+            <h3>Cost by project and session</h3>
+            <p>
+              The Dashboard shows your top 3 projects by tokens. The Projects page lists every project, and one click
+              opens the cost of each session in it.
+            </p>
+            <ul>
+              <li>Sessions, tokens, cost, and last active for each project</li>
+              <li>Each session with its start time, length, models, tokens, and cost</li>
+              <li>This month or all time, the same switch as the usage band</li>
+              <li>Reads token counts only, never prompts or message text</li>
+            </ul>
+            <a class="more" href="#demo" data-demo="projects">Open Projects in the demo →</a>
+          </div>
+          <figure class="frame">
+            <img
+              src="screenshots/projects.png"
+              alt="Projects page for one project: cost, tokens, sessions, and longest session, and a table of sessions with start time, length, model, tokens, and cost"
               loading="lazy"
               width="2880"
               height="1800"

@@ -30,7 +30,7 @@ npx claude-storehouse
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/dashboard.png" alt="Dashboard: API-equal cost and token usage by model, counts for skills, agents, plugins, hooks and MCP servers, favorites, and the project files" width="100%">
+  <img src="https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/dashboard.png" alt="Dashboard: API-equal cost and token usage by model, the current 5-hour block, cost per day, and the top projects by tokens" width="100%">
 </p>
 
 ---
@@ -67,7 +67,7 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 
 - Counts for skills, agents, plugins, hooks, and MCP servers, with how many are on and off.
 - API-equal cost of your Claude Code use, by model, from the session files in `~/.claude/projects`.
-- Tokens, sessions, projects, and how much the prompt cache saved.
+- Tokens, sessions, prompt-cache savings, the current 5-hour block, the cost per day, and your top 3 projects by tokens.
 - Session files give only token counts, tool names, and the skill, agent, or MCP server name of each call. Never prompts or message text.
 - Your favorites, recent changes, and which Claude Code files this project has.
 
@@ -80,6 +80,16 @@ After a few months with Claude Code you have dozens of skills, a handful of plug
 - Use in the last 30 days for each skill, agent, and MCP server, with an Unused 30 d filter, a sort by use, and "Switch off N" for the unused ones.
 
 ![Skills page with on/off switches, 30-day use chips, an Unused 30 d filter, a sort by use, and a banner to switch off unused skills](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/skills.png)
+
+### Cost by project and session
+
+- The Dashboard shows your top 3 projects by tokens. Click a card to open that project.
+- The Projects page lists every project with its sessions, tokens, cost, and last active time.
+- Click a project to see each session: start time, length, models, responses, tokens, and cost.
+- Switch between this month and all time. The search box filters project names.
+- A session shows its id, not a title: Storehouse never reads prompts or message text.
+
+![Projects page for one project: cost, tokens, sessions, and longest session, and a table of sessions with start time, length, model, tokens, and cost](https://raw.githubusercontent.com/Sumonta056/claude-storehouse/main/docs/images/projects.png)
 
 ### Find duplicates
 

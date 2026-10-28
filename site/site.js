@@ -8,6 +8,7 @@
     dups: 'Duplicates',
     doctor: 'Doctor',
     context: 'Context',
+    projects: 'Projects',
     skills: 'Skills',
     agents: 'Agents',
     plugins: 'Plugins',
