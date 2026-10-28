@@ -7,6 +7,7 @@ import path from 'node:path'
 import open from 'open'
 import { startServer } from '../src/server.js'
 import { projectScope } from '../src/write/paths.js'
+import { scanUsage } from '../src/scan/usage.js'
 
 const USAGE = `Usage: claude-storehouse [options]
 
@@ -81,6 +82,7 @@ try {
   if (err.code === 'EADDRINUSE') fail(`Port ${port} is in use`)
   fail(err.message)
 }
+scanUsage({ home }).catch(() => {})
 
 console.log(`Claude Storehouse running at ${server.url}`)
 if (projectDir) console.log(`Project: ${projectDir}`)

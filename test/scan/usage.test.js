@@ -447,3 +447,19 @@ test('returns the time of the oldest tool call as since', async () => {
     fx.cleanup()
   }
 })
+
+test('reads CRLF lines, a last line with no newline, and multibyte text', async () => {
+  const fx = makeFixture()
+  try {
+    const usage = { input_tokens: 0, output_tokens: 1000000, cache_read_input_tokens: 0 }
+    const file = path.join(fx.home, '.claude', 'projects', '-proj-é', 's1.jsonl')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    const user = '{"type":"user","message":{"role":"user","content":"ünïcødé 漢字 \\"usage\\""}}'
+    fs.writeFileSync(file, [line({ id: 'a', usage }), user, line({ id: 'b', usage })].join('\r\n'))
+    const result = await scanUsage({ home: fx.home, now: NOW })
+    assert.equal(result.all.responses, 2)
+    close(result.all.cost, 40)
+  } finally {
+    fx.cleanup()
+  }
+})

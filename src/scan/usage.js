@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import readline from 'node:readline'
 import { priceOf } from './prices.js'
 
 const FIELDS = ['input', 'output', 'cacheWrite5m', 'cacheWrite1h', 'cacheRead']
 const WINDOW = 30 * 24 * 60 * 60 * 1000
+const NEEDLE = Buffer.from('"usage"')
+const PARALLEL = 8
 const cache = new Map()
 const running = new Map()
 
@@ -70,11 +71,15 @@ function recordOf(line, fallbackId) {
 
 async function readFile(file) {
   const records = []
-  const lines = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity })
-  let index = 0
-  for await (const line of lines) {
-    const record = recordOf(line, `${file}#${index++}`)
+  const buffer = await fs.promises.readFile(file)
+  let at = buffer.indexOf(NEEDLE)
+  while (at !== -1) {
+    const start = buffer.lastIndexOf(10, at) + 1
+    const newline = buffer.indexOf(10, at)
+    const end = newline === -1 ? buffer.length : newline
+    const record = recordOf(buffer.toString('utf8', start, end), `${file}#${start}`)
     if (record) records.push(record)
+    at = newline === -1 ? -1 : buffer.indexOf(NEEDLE, newline)
   }
   return records
 }
@@ -144,22 +149,24 @@ async function collect(root) {
   const responses = new Map()
   const uses = new Map()
   const files = transcripts(root)
-  const live = new Set()
-  for (const { project, file } of files) {
-    live.add(file)
-    let records
-    try {
-      records = await fileRecords(file)
-    } catch {
-      continue
+  const live = new Set(files.map((f) => f.file))
+  const loaded = new Array(files.length)
+  let next = 0
+  const worker = async () => {
+    while (next < files.length) {
+      const index = next++
+      loaded[index] = await fileRecords(files[index].file).catch(() => [])
     }
-    for (const record of records) {
+  }
+  await Promise.all(Array.from({ length: PARALLEL }, worker))
+  files.forEach(({ project }, index) => {
+    for (const record of loaded[index]) {
       for (const use of record.uses) if (!uses.has(use.id)) uses.set(use.id, use)
       const seen = responses.get(record.id)
       if (seen) merge(seen, record)
       else responses.set(record.id, { ...record, project })
     }
-  }
+  })
   for (const file of cache.keys()) if (file.startsWith(root + path.sep) && !live.has(file)) cache.delete(file)
   return { records: [...responses.values()], uses: [...uses.values()] }
 }
