@@ -327,6 +327,29 @@ test('counts one tool call once when it shows in two lines and two files', async
   }
 })
 
+test('sums the last 30 days into last30 and skips older, future, and undated responses', async () => {
+  const fx = makeFixture()
+  try {
+    const usage = { input_tokens: 1000, output_tokens: 0 }
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'in', at: new Date(NOW.getTime() - 29 * 864e5).toISOString(), usage }),
+      line({ id: 'start', at: new Date(NOW.getTime() - 30 * 864e5).toISOString(), usage }),
+      line({ id: 'now', at: NOW.toISOString(), usage }),
+      line({ id: 'edge', at: new Date(NOW.getTime() - 30 * 864e5 - 1).toISOString(), usage }),
+      line({ id: 'old', at: new Date(NOW.getTime() - 31 * 864e5).toISOString(), usage }),
+      line({ id: 'future', at: new Date(NOW.getTime() + 864e5).toISOString(), usage }),
+      line({ id: 'undated', at: 'not a date', usage })
+    ])
+    const result = await scanUsage({ home: fx.home, now: NOW })
+    assert.equal(result.all.responses, 7)
+    assert.equal(result.last30.responses, 3)
+    assert.equal(result.last30.tokens, 3000)
+    close(result.last30.cost, (3000 * 4) / 1e6)
+  } finally {
+    fx.cleanup()
+  }
+})
+
 test('keeps a call older than 30 days in last but not in count30', async () => {
   const fx = makeFixture()
   try {

@@ -4,6 +4,7 @@ import { ago, compact, esc, money, tilde } from '../core/format.js'
 import { state } from '../core/state.js'
 import { KIND_WORD, PAGES, counts, favoriteEntries, otherCounts, projectOn, visible } from '../logic/catalog.js'
 import { projectRows, topProjects } from '../logic/projects.js'
+import { TIERS, rankOf } from '../logic/rank.js'
 import { USAGE_PAGES, blockProgress, clock, duration, modelShares, niceMax } from '../logic/usage.js'
 import { projectOffHtml, render } from '../ui/nav.js'
 import { periodHtml, periodLabel, refreshHtml } from '../ui/period.js'
@@ -136,10 +137,44 @@ function topProjectsHtml(rows) {
   return `${head}<div class="tprojs">${cards}</div>`
 }
 
+function tierHtml(u) {
+  if (!u) return ''
+  const r = rankOf(u.cost)
+  const steps = TIERS.map((t, i) => {
+    const cls = i < r.index ? ' done' : i === r.index ? ' cur' : ''
+    const fill = i === r.index && r.next ? `<span style="width:${r.pct.toFixed(1)}%"></span>` : ''
+    return `<div class="step${cls}" data-tier="${t.name.toLowerCase()}"><div class="seg">${fill}</div><b>${t.name}</b><small>$${t.min.toLocaleString('en-US')}+</small></div>`
+  }).join('')
+  const goal = r.next
+    ? `<span><b>${money(r.toNext)}</b> to ${r.next.name} · ${Math.floor(r.pct)}% of the way</span>`
+    : '<span><b>Top tier.</b> There is no tier above Legend.</span>'
+  const label = r.next
+    ? `Tier ${r.index + 1} of ${TIERS.length}: ${r.tier.name}. ${money(r.toNext)} to ${r.next.name}.`
+    : `Tier ${TIERS.length} of ${TIERS.length}: ${r.tier.name}.`
+  const low = u.unpriced.length
+    ? `<p class="note">Tier may be low: no price for ${u.unpriced.map((m) => `<code>${esc(m)}</code>`).join(', ')}.</p>`
+    : ''
+  return `<section class="ucard tier" data-tier="${r.tier.name.toLowerCase()}" aria-label="Your usage tier">
+      <div class="who">
+        <div class="tier-badge" aria-hidden="true">◆</div>
+        <div>
+          <div class="k">Your tier · last 30 days <span class="hint">for fun</span></div>
+          <div class="name">${r.tier.name}</div>
+          <div class="sub">${money(u.cost)} API-equal on this machine</div>
+        </div>
+      </div>
+      <div>
+        <div class="ladder" role="img" aria-label="${esc(label)}">${steps}</div>
+        <div class="row2">${goal}<span>Saved by prompt cache: <b class="g">${money(u.saved)}</b></span></div>
+        ${low}
+      </div>
+    </section>`
+}
+
 function usageExtrasHtml() {
   const u = state.usage
   if (state.usageError || !u?.all?.responses || !u.days?.length || !u.byProject) return ''
-  return `<div class="blk">${blockHtml(u.block)}${dailyHtml(u.days)}</div>${topProjectsHtml(projectRows())}`
+  return `${tierHtml(u.last30)}<div class="blk">${blockHtml(u.block)}${dailyHtml(u.days)}</div>${topProjectsHtml(projectRows())}`
 }
 
 async function loadUsage() {

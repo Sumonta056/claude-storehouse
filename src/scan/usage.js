@@ -337,10 +337,12 @@ export async function scanUsage({ home, now = new Date() }) {
   const monthKey = monthOf(now)
   const time = new Date(now).getTime()
   const month = records.filter((r) => r.month === monthKey)
+  const last30 = records.filter((r) => r.time >= time - WINDOW && r.time <= time)
   return {
     monthKey,
     all: summarize(records),
     month: summarize(month),
+    last30: summarize(last30),
     days: summarizeDays(records, time),
     byProject: { all: summarizeProjects(records, home), month: summarizeProjects(month, home) },
     block: currentBlock(records, time),

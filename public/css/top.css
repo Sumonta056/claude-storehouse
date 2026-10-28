@@ -322,7 +322,155 @@ table.eff.ptable {
   height: 100%;
   background: var(--accent);
 }
+.tier[data-tier='bronze'],
+.tier [data-tier='bronze'] {
+  --tc: #c79a63;
+}
+.tier[data-tier='silver'],
+.tier [data-tier='silver'] {
+  --tc: #b3bccb;
+}
+.tier[data-tier='gold'],
+.tier [data-tier='gold'] {
+  --tc: #e6c35c;
+}
+.tier[data-tier='platinum'],
+.tier [data-tier='platinum'] {
+  --tc: var(--teal);
+}
+.tier[data-tier='diamond'],
+.tier [data-tier='diamond'] {
+  --tc: var(--blue);
+}
+.tier[data-tier='elite'],
+.tier [data-tier='elite'] {
+  --tc: var(--purple);
+}
+.tier[data-tier='epic'],
+.tier [data-tier='epic'] {
+  --tc: #ff8a5c;
+}
+.tier[data-tier='legend'],
+.tier [data-tier='legend'] {
+  --tc: #ff5c8a;
+}
+@media (prefers-color-scheme: light) {
+  .tier[data-tier='bronze'],
+  .tier [data-tier='bronze'] {
+    --tc: #8a5a24;
+  }
+  .tier[data-tier='silver'],
+  .tier [data-tier='silver'] {
+    --tc: #5d6878;
+  }
+  .tier[data-tier='gold'],
+  .tier [data-tier='gold'] {
+    --tc: #8a6a00;
+  }
+  .tier[data-tier='epic'],
+  .tier [data-tier='epic'] {
+    --tc: #c0461b;
+  }
+  .tier[data-tier='legend'],
+  .tier [data-tier='legend'] {
+    --tc: #c2185b;
+  }
+}
+.tier {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 2.4fr;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.tier .who {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.tier-badge {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: var(--panel);
+  background: var(--tc);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tc) 22%, transparent);
+}
+.tier .name {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--tc);
+}
+.tier .sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.tier .ladder {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.tier .step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.tier .step b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tier .step small {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.tier .seg {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel2);
+  overflow: hidden;
+}
+.tier .step.done .seg {
+  background: var(--tc);
+}
+.tier .seg span {
+  display: block;
+  height: 100%;
+  background: var(--tc);
+}
+.tier .step.cur {
+  color: var(--text);
+}
+.tier .step.cur b {
+  color: var(--tc);
+}
+.tier .row2 {
+  margin-top: 12px;
+}
+.tier .row2 b {
+  color: var(--text);
+}
+.tier .row2 b.g {
+  color: var(--green);
+}
 @media (max-width: 1000px) {
+  .tier {
+    grid-template-columns: 1fr;
+  }
+  .tier .ladder {
+    grid-template-columns: repeat(4, 1fr);
+  }
   .blk {
     grid-template-columns: 1fr;
   }

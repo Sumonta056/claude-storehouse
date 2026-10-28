@@ -127,6 +127,27 @@ Target file per scope:
 - "Switch off N" toggles each switchable unused item that the scope filter and search show, one at a time, after a confirm dialog. Each toggle gets its own Activity entry with undo.
 - The sort (Most used, Least used, Name) is kept in `localStorage` key `storehouse.usageSort`. The default is Name.
 
+### Tier
+
+`GET /api/usage` also returns `last30`, with the same fields as `month`, for records from 30 days before now up to now. Records with no valid time are left out. The Dashboard shows a "Your tier" card from `last30.cost`, under the 4 usage tiles. It is for fun.
+
+| Tier     | API-equal cost in the last 30 days |
+| -------- | ---------------------------------- |
+| Bronze   | $0                                 |
+| Silver   | $25                                |
+| Gold     | $75                                |
+| Platinum | $200                               |
+| Diamond  | $500                               |
+| Elite    | $1,200                             |
+| Epic     | $3,000                             |
+| Legend   | $7,500                             |
+
+- The table is `TIERS` in `public/logic/rank.js`. A tier starts at its value.
+- Sources for the limits: code.claude.com/docs/en/costs gives $150 to $250 per developer per month on average, and less than $30 per active day for 90% of users (about $660 per month). Gold and Platinum hold the average, and Diamond starts above the 90th percentile. viberank.app, a ccusage leaderboard, sets Legend.
+- The window is 30 days, not all time: Claude Code deletes transcripts after `cleanupPeriodDays`, 30 days by default. A calendar month would put every user in Bronze on day 1.
+- The card ignores the period switch. It also shows the amount to the next tier and "Saved by prompt cache", so it does not reward only spend.
+- When `last30.unpriced` is not empty, the card says "Tier may be low".
+
 ## Favorites
 
 - Stored in `~/.claude/storehouse.json` → `favorites[]` as `{ kind, id, source, order }`.

@@ -456,3 +456,37 @@ test('refreshUsage does not take focus from a field the user moved to', async ()
     Object.assign(state, before)
   }
 })
+
+test('the tier card shows the tier, the amount to the next tier, and cache savings for the last 30 days', () => {
+  const html = dash(inventory(), { usage: extras({ last30: period({ cost: 742.18, saved: 1310.4 }) }) })
+  assert.ok(html.includes('class="ucard tier" data-tier="diamond"'))
+  assert.ok(html.includes('Your tier · last 30 days'))
+  assert.ok(html.includes('<div class="name">Diamond</div>'))
+  assert.ok(html.includes('$742.18 API-equal on this machine'))
+  assert.ok(html.includes('<b>$457.82</b> to Elite · 34% of the way'))
+  assert.ok(html.includes('aria-label="Tier 5 of 8: Diamond. $457.82 to Elite."'))
+  assert.ok(html.includes('<b class="g">$1,310.40</b>'))
+  assert.equal(html.match(/class="step done"/g).length, 4)
+  assert.ok(html.includes('<div class="seg"><span style="width:34.6%"></span></div><b>Diamond</b>'))
+  assert.ok(html.indexOf('class="ucard tier"') < html.indexOf('class="blk"'))
+})
+
+test('the tier card says Legend is the top tier', () => {
+  const html = dash(inventory(), { usage: extras({ last30: period({ cost: 9000 }) }) })
+  assert.ok(html.includes('<div class="name">Legend</div>'))
+  assert.ok(html.includes('There is no tier above Legend.'))
+  assert.ok(html.includes('aria-label="Tier 8 of 8: Legend."'))
+  assert.ok(!html.includes('<div class="seg"><span'))
+})
+
+test('the tier card warns with an escaped model name when a model has no price', () => {
+  const html = dash(inventory(), { usage: extras({ last30: period({ unpriced: ['<img onerror=x>'] }) }) })
+  assert.ok(html.includes('Tier may be low: no price for <code>&lt;img onerror=x&gt;</code>.'))
+  assert.ok(!html.includes('<img onerror=x>'))
+})
+
+test('the tier card is absent when the server sends no last30', () => {
+  const html = dash(inventory(), { usage: extras() })
+  assert.ok(!html.includes('class="ucard tier"'))
+  assert.ok(html.includes('class="blk"'))
+})
