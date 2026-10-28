@@ -1,10 +1,12 @@
 import { get } from '../api.js'
 import { $, toast } from '../core/dom.js'
-import { ago, compact, esc, money, monthName, tilde } from '../core/format.js'
-import { PERIOD_KEY, state } from '../core/state.js'
+import { ago, compact, esc, money, tilde } from '../core/format.js'
+import { state } from '../core/state.js'
 import { KIND_WORD, PAGES, counts, favoriteEntries, otherCounts, projectOn, visible } from '../logic/catalog.js'
+import { projectRows, topProjects } from '../logic/projects.js'
 import { USAGE_PAGES, blockProgress, clock, duration, modelShares, niceMax } from '../logic/usage.js'
 import { projectOffHtml, render } from '../ui/nav.js'
+import { periodHtml, periodLabel, refreshHtml } from '../ui/period.js'
 import { empty, nothingMatches, rowHtml, rowsHtml } from '../ui/rows.js'
 import { usageSkeletonHtml } from '../ui/skeleton.js'
 
@@ -20,14 +22,6 @@ function statTile(page, label, c) {
   </button>`
 }
 
-export function setPeriod(period) {
-  state.usagePeriod = period
-  try {
-    localStorage.setItem(PERIOD_KEY, period)
-  } catch {}
-  renderDash()
-}
-
 function usageHtml() {
   const source = '<code>~/.claude/projects</code>'
   if (state.usageError)
@@ -36,22 +30,13 @@ function usageHtml() {
   if (!state.usage.all.responses)
     return `<section class="usage note-only"><p>No Claude Code usage found in ${source}.</p></section>`
   const u = state.usage[state.usagePeriod]
-  const label = state.usagePeriod === 'month' ? monthName(state.usage.monthKey) : 'All time'
+  const label = periodLabel()
   const shares = modelShares(u)
   const pct = (n) => `${n.toFixed(1)}%`
   const unpriced = u.unpriced.length
     ? `<br>No price for ${u.unpriced.map((m) => `<code>${esc(m)}</code>`).join(', ')}. Its tokens count, its cost does not.`
     : ''
   const [dollars, cents] = money(u.cost).slice(1).split('.')
-  const periods = [
-    ['month', 'This month'],
-    ['all', 'All time']
-  ]
-    .map(
-      ([k, text]) =>
-        `<button type="button" data-period="${k}" aria-pressed="${k === state.usagePeriod ? 'true' : 'false'}">${text}</button>`
-    )
-    .join('')
   const legend = shares.length
     ? `<div class="bar" role="img" aria-label="${esc(`Cost by model: ${shares.map((m) => `${m.name} ${pct(m.share)}`).join(', ')}`)}">${shares
         .map((m) => `<span class="${m.cls}" style="width:${m.share}%"></span>`)
@@ -67,8 +52,8 @@ function usageHtml() {
       <div class="right">
         <div class="rhead">
           <div class="k">Cost by model</div>
-          <div class="scope period" role="group" aria-label="Usage period">${periods}</div>
-          <button type="button" class="btn-link" data-urefresh${state.usageBusy ? ' disabled aria-busy="true"' : ''}>${state.usageBusy ? 'Refreshing…' : 'Refresh'}</button>
+          ${periodHtml()}
+          ${refreshHtml()}
         </div>
         <div class="mon">${compact(u.tokens)}<span>tokens · ${u.responses.toLocaleString('en-US')} responses</span></div>
         ${legend}
@@ -130,26 +115,31 @@ function dailyHtml(days) {
     </div>`
 }
 
-function projectsHtml(rows) {
-  const head = `<h2>Cost by project <span class="pill">${rows.length}</span><span class="hint">This month</span></h2>`
-  if (!rows.length) return `${head}<p class="empty">No use this month.</p>`
-  const max = Math.max(...rows.map((r) => r.cost)) || 1
-  const body = rows
-    .map(
-      (r) =>
-        `<tr><td><code>${esc(r.project)}</code><div class="pbar"><span style="width:${((r.cost / max) * 100).toFixed(1)}%"></span></div></td><td class="num">${r.sessions.toLocaleString('en-US')}</td><td class="num">${compact(r.tokens)}</td><td class="num">${money(r.cost)}</td></tr>`
-    )
+function topProjectsHtml(rows) {
+  const all = rows.length
+    ? '<button type="button" class="btn-link" data-go="projects">All projects <span aria-hidden="true">→</span></button>'
+    : ''
+  const head = `<h2>Top projects by tokens <span class="hint">${esc(periodLabel())}</span>${all}</h2>`
+  if (!rows.length) return `${head}<p class="empty">No use in this period.</p>`
+  const total = rows.reduce((sum, r) => sum + r.tokens, 0) || 1
+  const cards = topProjects(rows)
+    .map((r, i) => {
+      const share = (r.tokens / total) * 100
+      return `<button type="button" class="ucard tproj" data-proj="${esc(r.project)}" aria-label="${esc(`${r.project}: ${compact(r.tokens)} tokens, ${money(r.cost)}. Open its sessions`)}">
+          <span class="k"><span class="rank">#${i + 1}</span><code>${esc(r.project)}</code></span>
+          <span class="v">${compact(r.tokens)}<small>tokens</small></span>
+          <span class="pbar"><span style="width:${share.toFixed(1)}%"></span></span>
+          <span class="row2"><span>${share.toFixed(1)}% of tokens</span><span>${r.sessions.toLocaleString('en-US')} session${r.sessions === 1 ? '' : 's'} · ${money(r.cost)}</span></span>
+        </button>`
+    })
     .join('')
-  return `${head}<div class="eff-wrap pwrap"><table class="eff ptable">
-      <thead><tr><th>Project</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
-      <tbody>${body}</tbody>
-    </table></div>`
+  return `${head}<div class="tprojs">${cards}</div>`
 }
 
 function usageExtrasHtml() {
   const u = state.usage
-  if (state.usageError || !u?.all?.responses || !u.days?.length || !Array.isArray(u.byProject)) return ''
-  return `<div class="blk">${blockHtml(u.block)}${dailyHtml(u.days)}</div>${projectsHtml(u.byProject)}`
+  if (state.usageError || !u?.all?.responses || !u.days?.length || !u.byProject) return ''
+  return `<div class="blk">${blockHtml(u.block)}${dailyHtml(u.days)}</div>${topProjectsHtml(projectRows())}`
 }
 
 async function loadUsage() {

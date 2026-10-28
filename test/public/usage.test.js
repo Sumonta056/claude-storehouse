@@ -297,6 +297,7 @@ test('duration writes hours and minutes', () => {
   assert.equal(duration(45 * 60000), '45 min')
   assert.equal(duration(2 * 3600000), '2 h 0 min')
   assert.equal(duration(-5), '0 min')
+  assert.equal(duration((13 * 24 + 2) * 3600000 + 26 * 60000), '13 d 2 h')
 })
 
 test('clock writes the local time as HH:MM', () => {

@@ -5,7 +5,7 @@ description: Where new browser code goes in claude-storehouse public/ and how to
 
 # Storehouse UI structure
 
-`public/` is native ES modules with no build step. `index.html` loads `app.js` as the only module entry and the 14 files in `public/css/` in a fixed order. The full folder table is in `.claude/rules/ui.md`.
+`public/` is native ES modules with no build step. `index.html` loads `app.js` as the only module entry and the 15 files in `public/css/` in a fixed order. The full folder table is in `.claude/rules/ui.md`.
 
 ## 1. Pick the layer before you write code
 

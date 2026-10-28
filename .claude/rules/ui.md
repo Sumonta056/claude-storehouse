@@ -8,17 +8,17 @@ paths:
 - Vanilla JS as native ES modules, no framework, no build step. `public/index.html` loads `app.js` as the only module entry and the stylesheets in `public/css/` in a fixed order.
 - Layout of `public/`:
 
-  | Folder or file                    | Holds                                                                                                      | May use the DOM        |
-  | --------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------- |
-  | `app.js`                          | `start` and `wire`: the event delegation for the whole page                                                | yes                    |
-  | `api.js`                          | `get` and `send` with the token                                                                            | yes                    |
-  | `core/state.js`                   | the one `state` object and the shared Maps and objects (`items`, `dr`, `cfg`, `eds`)                       | no                     |
-  | `core/format.js`, `core/icons.js` | text helpers (`esc`, `plural`, `tilde`, `ago`) and SVG icons                                               | no                     |
-  | `core/dom.js`, `core/actions.js`  | `$`, `toast`, `ask`, focus helpers; write actions (`toggle`, `star`, `refresh`)                            | yes                    |
-  | `logic/`                          | pure rules: catalog, usage, chips, duplicates, doctor, context, markdown, hooks, mcp, config, effective    | no, ESLint enforces it |
-  | `pages/`                          | one file per page: render and its `*Html` builders                                                         | yes                    |
-  | `ui/`                             | parts shared by pages: rows, chips, nav, menu, drawer, favorite popover, config panels, skeletons, palette | yes                    |
-  | `css/`                            | 14 stylesheets, one per topic, in cascade order                                                            | —                      |
+  | Folder or file                    | Holds                                                                                                                     | May use the DOM        |
+  | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+  | `app.js`                          | `start` and `wire`: the event delegation for the whole page                                                               | yes                    |
+  | `api.js`                          | `get` and `send` with the token                                                                                           | yes                    |
+  | `core/state.js`                   | the one `state` object and the shared Maps and objects (`items`, `dr`, `cfg`, `eds`)                                      | no                     |
+  | `core/format.js`, `core/icons.js` | text helpers (`esc`, `plural`, `tilde`, `ago`) and SVG icons                                                              | no                     |
+  | `core/dom.js`, `core/actions.js`  | `$`, `toast`, `ask`, focus helpers; write actions (`toggle`, `star`, `refresh`)                                           | yes                    |
+  | `logic/`                          | pure rules: catalog, usage, projects, chips, duplicates, doctor, context, markdown, hooks, mcp, config, effective         | no, ESLint enforces it |
+  | `pages/`                          | one file per page: render and its `*Html` builders                                                                        | yes                    |
+  | `ui/`                             | parts shared by pages: rows, chips, nav, menu, drawer, favorite popover, config panels, skeletons, palette, period switch | yes                    |
+  | `css/`                            | 15 stylesheets, one per topic, in cascade order                                                                           | —                      |
 
 - Mutable values shared by modules are fields of `state`, never a module-level `let`: an ES module cannot reassign an imported binding.
 - A new stylesheet needs a `<link>` in `index.html`. `test/public/index-html.test.js` fails otherwise. Add it where its rules must win in the cascade.
@@ -30,7 +30,7 @@ paths:
 
 ## Pages
 
-Dashboard, Favorites, Duplicates, Doctor, Context, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUDE.md, Activity.
+Dashboard, Favorites, Duplicates, Doctor, Context, Projects, Skills, Agents, Plugins, Mods, Hooks, MCP, Settings, CLAUDE.md, Activity.
 
 Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective switch at the top. Details: `business-logic.md` › Settings page.
 
@@ -50,4 +50,4 @@ Settings: file list plus one file panel, like CLAUDE.md, and a Files | Effective
 - After any toggle, a banner says: "Claude Code applies this at the next session."
 - Plugin skills show a "Fork to local" button.
 - MCP secrets are masked.
-- All data comes from `GET /api/inventory`, except usage, which the first page that needs it (Dashboard, Skills, Agents, or MCP) loads from `GET /api/usage` one time per page load, and again when the user clicks Refresh on the usage band, at the same time as the inventory when the page opens on one of them, and the Doctor page, which loads `GET /api/doctor` with each inventory refresh. Re-render from the content each write returns.
+- All data comes from `GET /api/inventory`, except usage, which the first page that needs it (Dashboard, Projects, Skills, Agents, or MCP) loads from `GET /api/usage` one time per page load, and again when the user clicks Refresh on the usage band, at the same time as the inventory when the page opens on one of them, and the Doctor page, which loads `GET /api/doctor` with each inventory refresh. Re-render from the content each write returns.

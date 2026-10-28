@@ -123,6 +123,7 @@ export const state = {
   usageSort: readSort(),
   usageLoad: null,
   usageBusy: false,
+  projectSel: null,
   bannerDismissed: false,
   bannerShown: false,
   dragKey: null,

@@ -15,6 +15,7 @@ import { renderDups } from '../pages/dups.js'
 import { renderFav } from '../pages/fav.js'
 import { renderHooks } from '../pages/hooks.js'
 import { renderMcp } from '../pages/mcp.js'
+import { renderProjects } from '../pages/projects.js'
 import { renderSettings } from '../pages/settings.js'
 import { syncDrawerHead } from './drawer.js'
 
@@ -64,6 +65,7 @@ function renderPage() {
   else if (page === 'dups') renderDups()
   else if (page === 'doctor') renderDoctor()
   else if (page === 'context') renderContext()
+  else if (page === 'projects') renderProjects()
   else if (page === 'skills')
     renderCatalog(
       'skills',
@@ -108,6 +110,7 @@ export function go(page) {
 }
 
 function show(page) {
+  if (state.page === 'projects' && page !== 'projects') state.projectSel = null
   state.page = page
   markStale()
   if (location.hash !== `#${page}`) history.replaceState(null, '', `${location.search}#${page}`)

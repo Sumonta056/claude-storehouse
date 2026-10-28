@@ -74,10 +74,15 @@ function extras(over = {}) {
   const now = Date.now()
   return usage({
     days: days([0.1, 0, 0.4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, 1.86]),
-    byProject: [
-      { project: '~/acme-api', sessions: 3, tokens: 8020000, cost: 5.1 },
-      { project: '~/<script>x</script>', sessions: 1, tokens: 1260000, cost: 0.86 }
-    ],
+    byProject: {
+      month: [
+        { project: '~/acme-api', sessions: 3, tokens: 8020000, cost: 5.1, list: [] },
+        { project: '~/<script>x</script>', sessions: 1, tokens: 1260000, cost: 0.86, list: [] },
+        { project: '~/big-tokens', sessions: 2, tokens: 9000000, cost: 0.5, list: [] },
+        { project: '~/fourth', sessions: 1, tokens: 100, cost: 0.01, list: [] }
+      ],
+      all: []
+    },
     block: {
       start: now - 2 * 3600000,
       end: now + 3 * 3600000,
@@ -337,19 +342,24 @@ test('the daily chart draws 14 bars, marks today, and labels $0, the middle, and
   assert.ok(!html.includes('<text'), 'axis text stays in HTML so it does not shrink below 14 px')
 })
 
-test('the project table lists each project with sessions, tokens, and cost, escaped', () => {
+test('the Dashboard shows the top 3 projects by tokens as cards, escaped, with a link to all projects', () => {
   const html = dash(inventory(), { usage: extras() })
-  assert.ok(html.includes('Cost by project'))
-  assert.ok(html.includes('<code>~/acme-api</code>'))
-  assert.ok(html.includes('~/&lt;script&gt;x&lt;/script&gt;'))
+  assert.ok(html.includes('Top projects by tokens'))
+  assert.equal(html.match(/class="ucard tproj"/g).length, 3)
+  assert.ok(html.indexOf('~/big-tokens') < html.indexOf('~/acme-api'))
+  assert.ok(html.indexOf('~/acme-api') < html.indexOf('~/&lt;script&gt;'))
+  assert.ok(!html.includes('~/fourth'))
   assert.ok(!html.includes('<script>x'))
-  assert.ok(html.includes('<td class="num">3</td><td class="num">8.02M</td><td class="num">$5.10</td>'))
-  assert.ok(html.indexOf('acme-api') < html.indexOf('&lt;script'))
+  assert.ok(html.includes('data-proj="~/big-tokens"'))
+  assert.ok(html.includes('9M<small>tokens</small>'))
+  assert.ok(html.includes('data-go="projects"'))
+  assert.ok(!html.includes('Cost by project'))
 })
 
-test('the project table says so when this month has no use', () => {
-  const html = dash(inventory(), { usage: extras({ byProject: [] }) })
-  assert.ok(html.includes('No use this month.'))
+test('the top projects follow the period switch', () => {
+  const html = dash(inventory(), { usage: extras(), usagePeriod: 'all' })
+  assert.ok(html.includes('No use in this period.'))
+  assert.ok(!html.includes('class="ucard tproj"'))
 })
 
 test('the usage band has a Refresh button and hides the extras when the server sends none', () => {

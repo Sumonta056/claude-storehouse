@@ -236,13 +236,41 @@ function summarizeProjects(records, home) {
   for (const record of records) {
     const cwd = first.get(record.session)?.cwd || record.cwd
     const project = cwd ? tilde(cwd, home) : record.project
-    const row = rows.get(project) ?? { project, sessions: new Set(), tokens: 0, cost: 0 }
+    const row = rows.get(project) ?? { project, tokens: 0, cost: 0, list: new Map() }
     rows.set(project, row)
-    if (record.session) row.sessions.add(record.session)
-    row.tokens += tokensOf(record)
-    row.cost += priced(record)
+    const tokens = tokensOf(record)
+    const cost = priced(record)
+    row.tokens += tokens
+    row.cost += cost
+    if (!record.session) continue
+    const session = row.list.get(record.session) ?? {
+      id: record.session,
+      start: null,
+      end: null,
+      responses: 0,
+      tokens: 0,
+      cost: 0,
+      models: new Set()
+    }
+    row.list.set(record.session, session)
+    session.responses++
+    session.tokens += tokens
+    session.cost += cost
+    session.models.add(record.model)
+    if (!Number.isNaN(record.time)) {
+      if (session.start === null || record.time < session.start) session.start = record.time
+      if (session.end === null || record.time > session.end) session.end = record.time
+    }
   }
-  return [...rows.values()].map((row) => ({ ...row, sessions: row.sessions.size })).sort((a, b) => b.cost - a.cost)
+  return [...rows.values()]
+    .map(({ list, ...row }) => ({
+      ...row,
+      sessions: list.size,
+      list: [...list.values()]
+        .map((s) => ({ ...s, models: [...s.models] }))
+        .sort((a, b) => (b.start ?? 0) - (a.start ?? 0))
+    }))
+    .sort((a, b) => b.cost - a.cost)
 }
 
 function currentBlock(records, now) {
@@ -314,7 +342,7 @@ export async function scanUsage({ home, now = new Date() }) {
     all: summarize(records),
     month: summarize(month),
     days: summarizeDays(records, time),
-    byProject: summarizeProjects(month, home),
+    byProject: { all: summarizeProjects(records, home), month: summarizeProjects(month, home) },
     block: currentBlock(records, time),
     items: summarizeUses(uses, time),
     since: uses.reduce((min, u) => (min === null || u.time < min ? u.time : min), null)

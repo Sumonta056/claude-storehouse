@@ -89,10 +89,18 @@ Target file per scope:
 
 ### Block, days, and projects
 
-`GET /api/usage` also returns `days`, `byProject`, and `block`. The Dashboard shows them under the band, with a Refresh button that loads `/api/usage` again.
+`GET /api/usage` also returns `days`, `byProject`, and `block`. The Dashboard shows the block, the days, and the top 3 projects by tokens under the band, with a Refresh button that loads `/api/usage` again.
 
 - `days`: the last 14 local days, oldest first, with `{ date, cost, tokens }`. Days with no use have zero.
-- `byProject`: this month, `{ project, sessions, tokens, cost }`, sorted by cost. The project is the first `cwd` of the session, with `~` for the home folder, else the folder name under `~/.claude/projects`. A `cd` inside a session does not split it. The costs add up to the month cost.
+- `byProject`: `{ all, month }`. Each is a list of `{ project, sessions, tokens, cost, list }`, sorted by cost. The project is the first `cwd` of the session, with `~` for the home folder, else the folder name under `~/.claude/projects`. A `cd` inside a session does not split it. The costs add up to the cost of the period.
+- `list`: one row per session, newest first: `{ id, start, end, responses, tokens, cost, models }`. `start` and `end` are epoch ms or `null`. A record with no session id counts in the project but has no session row. No message text.
+
+### Projects page
+
+- The Dashboard shows the top 3 projects by tokens as cards in one row, for the period of the usage band. A card opens the sessions of that project. "All projects →" opens the Projects page.
+- The Projects page lists all projects of the period with sessions, tokens, cost, and last active. It has the same period switch and Refresh as the band, and the search box filters project names. The scope filter does not apply.
+- Click a project to see its sessions: start time, length, models, responses, tokens, cost. "← All projects" goes back. `state.projectSel` holds the open project, and it resets when the user leaves the page.
+- A session has no title: Storehouse does not read message text. The row shows the first 8 characters of the session id, with the full id in a tooltip.
 - `block`: the current 5-hour block, the same rule as ccusage. Sort records by time. A block starts at the first record, rounded down to the full UTC hour, and lasts 5 hours. A record after the block end starts a new block. `block` is the last block while now is before its end, else `null` ("No active block").
 - `burnPerHour = cost / hours since block start`. `projected = cost + burnPerHour × hours left`. The card says "estimate": Anthropic does not write the real limit to disk.
 - The scanner reads each transcript as one buffer, 8 files at a time, and decodes only the lines that contain `"usage"`. `bin/storehouse.js` starts a scan when the server starts, so the first `/api/usage` call joins it. A cold scan of 3.7 GB took 13.7 s with `readline` and takes about 5 s now.

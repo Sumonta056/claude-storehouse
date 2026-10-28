@@ -8,6 +8,7 @@ Known old issues (fail on `main` too, not regressions): A6 back after a nav clic
 
 A1 | Dashboard counts | open #dash | stat tiles for Skills, Agents, Plugins, Hooks, MCP show total, on, off
 A2 | Usage band | open #dash | cost, model bar, 4 tiles show; period switch "This month"/"All time" changes the numbers; reload keeps the choice (localStorage storehouse.usagePeriod)
+A2b | Top projects and Projects page | open #dash, click a top project card | 3 cards ranked by tokens follow the period switch; the card opens #projects on that project's session table; "← All projects" shows the list; search filters project names; switch to All time changes the rows
 A3 | Recent and files | open #dash | recent changes list and "files this project has" list render
 A4 | Scope filter | click All / Global / Project | counts and lists change; nav counts change
 A5 | Search | press `/` | focus moves to #q; typing filters rows on every page; clearing restores them

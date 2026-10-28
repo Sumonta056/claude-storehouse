@@ -554,13 +554,90 @@ test('groups this month by cwd with the home folder as ~, else by folder name', 
       line({ id: 'd', session: 's3', at: '2026-09-21T10:00:00Z', usage: MILLION_OUT })
     ])
     const result = await scanUsage({ home: fx.home, now: NOW })
-    assert.deepEqual(result.byProject, [
-      { project: '~/acme-api', sessions: 2, tokens: 2000000, cost: 40 },
-      { project: '-proj-c', sessions: 1, tokens: 1000000, cost: 20 }
+    const brief = (rows) => rows.map(({ list: _list, ...row }) => row)
+    assert.deepEqual(brief(result.byProject.month), [
+      { project: '~/acme-api', tokens: 2000000, cost: 40, sessions: 2 },
+      { project: '-proj-c', tokens: 1000000, cost: 20, sessions: 1 }
+    ])
+    assert.deepEqual(brief(result.byProject.all), [
+      { project: '~/acme-api', tokens: 2000000, cost: 40, sessions: 2 },
+      { project: '-proj-c', tokens: 2000000, cost: 40, sessions: 1 }
     ])
     close(
-      result.byProject.reduce((sum, p) => sum + p.cost, 0),
+      result.byProject.month.reduce((sum, p) => sum + p.cost, 0),
       result.month.cost
+    )
+    close(
+      result.byProject.all.reduce((sum, p) => sum + p.cost, 0),
+      result.all.cost
+    )
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('lists the sessions of each project, newest first, and they add up to the project', async () => {
+  const fx = makeFixture()
+  try {
+    const cwd = path.join(fx.home, 'acme')
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', session: 's1', cwd, at: '2026-10-20T10:00:00Z', usage: MILLION_OUT }),
+      line({ id: 'b', session: 's1', cwd, at: '2026-10-20T11:30:00Z', usage: MILLION_OUT })
+    ])
+    writeTranscript(fx.home, '-proj-a', 's2', [
+      line({ id: 'c', session: 's2', cwd, at: '2026-10-21T09:00:00Z', usage: MILLION_OUT })
+    ])
+    const { byProject } = await scanUsage({ home: fx.home, now: NOW })
+    const [row] = byProject.month
+    assert.deepEqual(
+      row.list.map((s) => s.id),
+      ['s2', 's1']
+    )
+    const s1 = row.list[1]
+    assert.equal(s1.responses, 2)
+    assert.equal(s1.tokens, 2000000)
+    close(s1.cost, 40)
+    assert.equal(s1.start, Date.parse('2026-10-20T10:00:00Z'))
+    assert.equal(s1.end, Date.parse('2026-10-20T11:30:00Z'))
+    assert.ok(Array.isArray(s1.models) && s1.models.length === 1)
+    close(
+      row.list.reduce((sum, s) => sum + s.cost, 0),
+      row.cost
+    )
+    assert.equal(
+      row.list.reduce((sum, s) => sum + s.tokens, 0),
+      row.tokens
+    )
+    assert.ok(!JSON.stringify(byProject).includes('"text"'))
+  } finally {
+    fx.cleanup()
+  }
+})
+
+test('counts a record with no session id in its project, with no session row, and keeps a bad time as null', async () => {
+  const fx = makeFixture()
+  try {
+    const cwd = path.join(fx.home, 'acme')
+    writeTranscript(fx.home, '-proj-a', 's1', [
+      line({ id: 'a', session: 's1', cwd, at: '2026-10-20T10:00:00Z', usage: MILLION_OUT }),
+      line({ id: 'b', session: null, cwd, at: '2026-10-20T11:00:00Z', usage: MILLION_OUT })
+    ])
+    writeTranscript(fx.home, '-proj-a', 's2', [
+      line({ id: 'c', session: 's2', cwd, at: 'not a date', usage: MILLION_OUT })
+    ])
+    const { byProject } = await scanUsage({ home: fx.home, now: NOW })
+    const [row] = byProject.all
+    assert.equal(row.tokens, 3000000)
+    assert.equal(row.sessions, 2)
+    assert.deepEqual(
+      row.list.map((s) => s.id),
+      ['s1', 's2']
+    )
+    assert.equal(row.list[1].start, null)
+    assert.equal(row.list[1].end, null)
+    assert.equal(
+      row.list.reduce((sum, s) => sum + s.tokens, 0),
+      2000000
     )
   } finally {
     fx.cleanup()
@@ -577,7 +654,11 @@ test('keeps a session in one project row when its cwd changes', async () => {
       line({ id: 'c', at: '2026-10-20T12:00:00Z', usage: MILLION_OUT })
     ])
     const { byProject } = await scanUsage({ home: fx.home, now: NOW })
-    assert.deepEqual(byProject, [{ project: '~/acme', sessions: 1, tokens: 3000000, cost: 60 }])
+    assert.deepEqual(
+      byProject.month.map(({ list: _list, ...row }) => row),
+      [{ project: '~/acme', tokens: 3000000, cost: 60, sessions: 1 }]
+    )
+    assert.equal(byProject.month[0].list.length, 1)
   } finally {
     fx.cleanup()
   }

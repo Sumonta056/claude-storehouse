@@ -2,7 +2,7 @@ import { MODEL_CLASSES, ago, modelName } from '../core/format.js'
 import { state } from '../core/state.js'
 import { pluginLabel } from './catalog.js'
 
-export const USAGE_PAGES = new Set(['dash', 'skills', 'agents', 'mcp'])
+export const USAGE_PAGES = new Set(['dash', 'projects', 'skills', 'agents', 'mcp'])
 
 export const USE_WORD = { skills: 'skill', agents: 'agent', mcp: 'MCP server' }
 
@@ -31,6 +31,7 @@ export function niceMax(value) {
 export function duration(ms) {
   const minutes = Math.max(0, Math.round(ms / 60000))
   const hours = Math.floor(minutes / 60)
+  if (hours >= 24) return `${Math.floor(hours / 24)} d ${hours % 24} h`
   return hours ? `${hours} h ${minutes % 60} min` : `${minutes} min`
 }
 
