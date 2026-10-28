@@ -6,6 +6,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-28
+
+This release shows where your Claude Code money goes. The Dashboard now shows the current 5-hour block, the cost per day, your top projects, and a usage tier. A new Projects page shows the cost of each session. A command palette lets you reach any item, page, or action from the keyboard.
+
+### Added
+
+**Usage**
+
+- A "Your tier" card ranks the API-equal cost of your last 30 days in 8 tiers, from Bronze ($0) to Legend ($7,500). It shows the amount to the next tier and your prompt-cache savings. It is just for fun.
+- The current 5-hour block, with its cost, burn rate, reset time, and an estimate for the end of the block.
+- The cost per day for the last 14 days.
+- The top 3 projects by tokens, as cards that open the sessions of that project.
+- A Refresh button on the usage band. A failed refresh keeps the numbers you have and shows the error.
+
+**Projects page**
+
+- Lists every project with its sessions, tokens, cost, and last use, for this month or all time.
+- Click a project to see each session: start time, length, models, responses, tokens, and cost. Storehouse still never reads message text.
+
+**Command palette**
+
+- Press ⌘P (Ctrl+P) on any page to search items, pages, and actions. ↵ opens, ⌘↵ switches on or off, and ⇧↵ stars.
+- With an empty search, the palette shows the last 5 items you opened.
+- Change the key from the palette footer. Storehouse refuses keys that the browser or the dashboard already uses.
+
+### Fixed
+
+- A Dashboard left open after the 5-hour block ends now says "No active block".
+- Refresh no longer takes focus from a field you moved to.
+
+### Performance
+
+- The first usage scan is about 3 times faster. A cold scan of 3.7 GB of transcripts took 13.7 s and now takes about 5 s. The scan also starts when the CLI starts.
+
 ## [1.4.0] - 2026-10-24
 
 This release makes the dashboard feel faster when it opens. The page shows its layout at once, and usage now loads at the same time as the rest of your setup.
@@ -171,7 +205,8 @@ First stable release. Claude Storehouse is a local web dashboard for your Claude
 - New README with screenshots, MIT license, and full npm package metadata.
 - Development: ESLint, Prettier, Husky, and commitlint; CI on Node 20 and 22 on Ubuntu and macOS; tag-driven npm publish with provenance.
 
-[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Sumonta056/claude-storehouse/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Sumonta056/claude-storehouse/compare/v1.1.0...v1.2.0
